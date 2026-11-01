@@ -415,6 +415,8 @@ def test_status_json_contract(repo, monkeypatch, capsys):
     rc = main(["--json", "--host", "19BK", "status", "--full"])
     full = json.loads(capsys.readouterr().out)["options"]
     assert full["nixos"]["total"] == 0 and full["nixos"]["excluded"] == 8
+    saved = json.loads(options.ExclusionStore(repo).path.read_text())  # first pass writes it
+    assert saved["nixos"] == options.SEED_EXCLUSIONS["nixos"]
     assert set(full["home"]) == {"brucking"}
     n = len(repo.nix.calls)
     rc = main(["--json", "--host", "19BK", "status", "--quick"])  # the default, spelled out

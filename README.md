@@ -128,9 +128,10 @@ Skeleton: the CLI contract and the package build. The layers land in order,
 discovery → truth → writer → apply, each with `--json` and tests, tested on a
 second machine before touching the main one.
 
-Truth: `configrepo.py` and `nixin/truth/` are written and unit-tested against recorded
-evals; `status`/`where` have not yet been run end to end on a real host (see
-`HANDOFF.md` for the measured eval costs and the next steps).
+Truth: `configrepo.py` and `nixin/truth/` are unit-tested against recorded evals and
+`status`/`where` were run end to end against the real config on mbp13 (both hosts, NixOS
+and Home Manager, the `eval-failed` path); `HANDOFF.md` has the measured eval costs and
+the next steps.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com
