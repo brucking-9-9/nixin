@@ -365,6 +365,10 @@ def test_find_option_lines_follows_nesting():
     best = scan.best_option_line(NESTED, ["services", "openssh", "settings", "PermitRootLogin"])
     assert (best.line, best.score) == (6, 3)
     assert scan.best_option_line(NESTED, ["programs", "kitty", "enable"]).line == 9
+    best = scan.best_option_line(NESTED, ["services", "openssh", "settings"])
+    assert (best.line, best.score) == (5, 3)  # `settings = {`, not the line inside it
+    best = scan.best_option_line(NESTED, ["programs", "kitty"])
+    assert (best.line, best.score) == (9, 2)  # `programs.kitty.enable = …` defines it
     assert scan.best_option_line(NESTED, ["programs", "git", "enable"]) is None
 
 
@@ -454,15 +458,54 @@ def test_where_option_and_package(repo, monkeypatch, capsys):
     assert doc["kind"] == "package" and doc["installed"][0]["user"] == "brucking"
     assert doc["programs"][0]["option"] == "programs.kitty.enable"
 
+    (repo.path / "hosts" / "mbp13").mkdir(parents=True)
+    (repo.path / "hosts" / "mbp13" / "default.nix").write_text("{ pkgs, ... }: [ pkgs.ripgrep ]\n")
+    (repo.path / "common.nix").write_text("{ pkgs, ... }: [ pkgs.ripgrep ]\n")
     rc = main(["--json", "--host", "19BK", "where", "ripgrep"])
     doc = json.loads(capsys.readouterr().out)
     assert [(p["scope"], p["name"]) for p in doc["installed"]] == [("system", "ripgrep-15.2.0")]
     assert [(d["scope"], d["option"], d["items"]) for d in doc["declared"]] == [
         ("system", "environment.systemPackages", ["<derivation ripgrep-15.2.0>"])
     ]
+    assert [m["file"] for m in doc["mentions"]] == ["common.nix"]  # not hosts/mbp13/…
 
     rc = main(["--json", "--host", "19BK", "where", "no.such.option"])
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "not-found"
+
+
+def test_nix_text_renders_values_as_nix():
+    from nixin.truth.render import nix_text
+
+    assert nix_text(True) == "true" and nix_text(None) == "null" and nix_text(22) == "22"
+    assert nix_text("a\nb") == '"a…"' and nix_text("<derivation kitty-0.49.2>").startswith("<d")
+    assert nix_text(["%h/x", 1]) == '[ "%h/x" 1 ]'
+    assert nix_text({"19BK": {"a": False}, "<…>": "3 more attributes"}) == (
+        '{ "19BK" = { a = false; }; … 3 more attributes }'
+    )
+
+
+def test_human_rendering(repo, monkeypatch, capsys):
+    from nixin.cli import main
+
+    monkeypatch.setattr(
+        configrepo.ConfigRepo, "locate", classmethod(lambda cls, explicit=None, nix=None: repo)
+    )
+    assert main(["--host", "19BK", "status"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("19BK evaluates") and "options   not indexed" in out
+    assert "packages  2 system, 1 home brucking" in out
+
+    assert main(["--host", "19BK", "where", "services.openssh"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "services.openssh  [nixos]  3 options, 2 set beyond their defaults"
+    assert out[1].split() == ["enable", "=", "true", "ssh.nix:4"]
+    assert out[2].startswith("  settings = { AllowUsers") and out[2].endswith("ssh.nix:5 + nixpkgs")
+
+    assert main(["--host", "19BK", "where", "services.openssh.enable"]) == 0
+    out = capsys.readouterr().out
+    assert "services.openssh.enable = true  [nixos]" in out
+    assert "  declared  nixpkgs nixos/modules/services/networking/ssh/sshd.nix:247" in out
+    assert "  set in    ssh.nix:4" in out
 
 
 # --- live -------------------------------------------------------------------------------

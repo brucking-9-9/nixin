@@ -6,7 +6,7 @@ adds the truth arguments to the two stub parsers and installs the handlers via
 document (without verb/host, which cli adds); in human mode it also puts the rendered
 text under "message", which cli prints.
 
-STATUS: written against measured shapes but NOT yet run end to end (see HANDOFF.md).
+Run end to end against the workspace config on mbp13 (HANDOFF.md has the numbers).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Any
 from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system
 from . import options as opts
 from . import packages as pkgs
-from . import scan
+from . import render, scan
 from .cache import TruthCache
 
 VERBS = ("status", "where")
@@ -88,12 +88,9 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     option_docs: dict[str, Any] = {}
     if ns.full:
         store = opts.ExclusionStore(repo)
-        option_docs["nixos"] = opts.summarize(
-            opts.index(repo, host, cache, store=store), src.store_path
-        )
+        option_docs["nixos"] = opts.summary(repo, host, cache, store=store)
         option_docs["home"] = {
-            u: opts.summarize(opts.index(repo, host, cache, hm=u, store=store), src.store_path)
-            for u in pk["hm_users"]
+            u: opts.summary(repo, host, cache, hm=u, store=store) for u in pk["hm_users"]
         }
     else:  # whatever an earlier --full left in the cache, without evaluating anything
         nixos = opts.cached_summary(cache)
@@ -133,40 +130,8 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
         "timings": {**timings, "total": round(time.monotonic() - t0, 2)},
     }
     if not ns.json:
-        doc["message"] = render_status(doc, host)
+        doc["message"] = render.status(doc, host)
     return doc
-
-
-def render_status(d: dict[str, Any], host: str) -> str:
-    c, lock, run = d["config"], d["lock"] or {}, d["running"]
-    hosts = ", ".join(h + ("*" if h == run["hostname"] else "") for h in c["hosts"])
-    head = (c["head"] or "?")[:7] + (" dirty" if c["dirty"] else " clean")
-    lines = [
-        f"config   {c['path']} @ {head}   hosts: {hosts}",
-        f"lock     {lock.get('input', 'nixpkgs')} {lock.get('rev', '?')[:7]} {lock.get('ref') or ''} {lock.get('date') or ''}".rstrip(),
-        f"running  {run.get('version') or '?'}"
-        + ("  (matches lock)" if run["matches_lock"] else "  (lock differs)"),
-        f"host     {host} evaluates  ({d['eval']['seconds']}s)",
-        f"packages system {d['packages']['system']}"
-        + "".join(f" · home {u} {n}" for u, n in d["packages"]["home"].items()),
-        f"programs system {len(d['programs']['system'])}"
-        + "".join(f" · home {u} {len(p)}" for u, p in d["programs"]["home"].items()),
-    ]
-    o = d["options"]
-    if o:
-        n = o["nixos"]
-        lines.append(
-            f"options  nixos {n['defined']} defined of {n['total']}"
-            + "".join(
-                f" · home {u} {h['defined']} defined of {h['total']}" for u, h in o["home"].items()
-            )
-            + (f"  ({n['excluded']} skipped)" if n["excluded"] else "")
-        )
-    cache = d["cache"]
-    lines.append(
-        f"cache    {cache['dir']}  hits {len(cache['hits'])} misses {len(cache['misses'])}"
-    )
-    return "\n".join(lines)
 
 
 # --- where --------------------------------------------------------------------------
@@ -193,11 +158,11 @@ def _where(ns: argparse.Namespace) -> dict[str, Any]:
     doc = (
         _where_option(repo, host, cache, pk, name)
         if kind == "option"
-        else _where_package(repo, host, cache, pk, name)
+        else _where_package(repo, host, cache, pk, name, hosts)
     )
     doc.update({"ok": True, "name": name, "kind": kind, "cache": cache.doc()})
     if not ns.json:
-        doc["message"] = render_where(doc)
+        doc["message"] = render.where(doc)
     return doc
 
 
@@ -310,7 +275,9 @@ def _list_definers(
     return out
 
 
-def _where_package(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str) -> dict:
+def _where_package(
+    repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str, hosts: list[str]
+) -> dict:
     installed = pkgs.find(pk, name)
     enabled = pkgs.programs(pk, name)
     declared: list[dict] = []
@@ -347,65 +314,14 @@ def _where_package(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, nam
         "installed": installed,
         "programs": via,
         "declared": declared,
-        "mentions": [m.doc() for m in scan.grep_package(repo.path, name)],
+        "mentions": [
+            m.doc()
+            for m in scan.grep_package(repo.path, name, limit=200)
+            if not _other_host_file(m.file, host, hosts)
+        ][:20],
     }
 
 
-def render_where(d: dict[str, Any]) -> str:
-    lines: list[str] = []
-    if d["kind"] == "package":
-        inst = d["installed"]
-        lines.append(
-            f"{d['name']}: "
-            + (
-                "installed — "
-                + ", ".join(
-                    f"{p['scope']}{' ' + p['user'] if p['user'] else ''}: {p['name']}" for p in inst
-                )
-                if inst
-                else "not installed on this host"
-            )
-        )
-        for v in d["programs"]:
-            for df in v["definitions"]:
-                where_ = (
-                    f"{df.get('file')}:{df.get('line')}"
-                    if df.get("line")
-                    else (df.get("file") or df["source"])
-                )
-                lines.append(
-                    f"  {v['option']} = {df.get('value')!s:<6} {where_}  [{v['scope']} {v['user'] or ''}]".rstrip()
-                )
-        for loc in d["declared"]:
-            where_ = loc["file"] if loc["source"] == "config" else f"{loc['source']}: {loc['file']}"
-            ln = f":{loc['lines'][0]['line']}" if loc.get("lines") else ""
-            lines.append(
-                f"  {loc['option']}  {where_}{ln}  [{loc['scope']} {loc['user'] or ''}]".rstrip()
-            )
-        if d["mentions"]:
-            lines.append("mentions:")
-            lines += [f"  {m['file']}:{m['line']}  {m['text']}" for m in d["mentions"][:8]]
-        return "\n".join(lines)
-    for s in d["scopes"]:
-        tag = f"[{s['scope']}{' ' + s['user'] if s['user'] else ''}]"
-        if s["mode"] == "prefix":
-            lines.append(
-                f"{d['name']} {tag}: {s['under_prefix']} options, {len(s['options'])} defined"
-            )
-        for o in s["options"]:
-            val = f" = {o['value']!s}"[:200] if "value" in o else ""
-            lines.append(f"{o['name']} {tag}  {o['type']}{val}")
-            for dec in o["declarations"]:
-                pos = f":{dec['line']}" if dec.get("line") else ""
-                lines.append(f"  declared  {dec['source']}: {dec['file']}{pos}")
-            for df in o["definitions"]:
-                pos = f":{df['line']}" if df.get("line") else ""
-                src = df["file"] if df["source"] == "config" else f"{df['source']}: {df['file']}"
-                lines.append(f"  set in    {src}{pos}  = {df.get('value')!s}"[:200])
-                for c in df.get("candidates", [])[:3]:
-                    lines.append(f"            maybe {c['file']}:{c['line']}  {c['text']}")
-            if o.get("description"):
-                lines.append(f"  {o['description'][:160]}")
-        for name, msg in s["excluded"].items():
-            lines.append(f"  {name}: cannot evaluate: {msg.splitlines()[-1][:120]}")
-    return "\n".join(lines)
+def _other_host_file(rel: str, host: str, hosts: list[str]) -> bool:
+    """A file under another host's directory (hosts/mbp13/… when asking about 19BK)."""
+    return any(part in hosts and part != host for part in rel.split("/")[:-1])

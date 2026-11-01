@@ -42,15 +42,18 @@ class TruthCache:
         host = _SAFE.sub("_", self.host)
         return self.dir / f"{host}-{self._key(salt)}-{name}.json"
 
-    def get(self, name: str, salt: str = "") -> Any | None:
+    def get(self, name: str, salt: str = "", *, peek: bool = False) -> Any | None:
+        """`peek`: an optional read that is not an eval avoided; a miss is not recorded."""
         if not self.enabled:
-            self.misses.append(name)
+            if not peek:
+                self.misses.append(name)
             return None
         p = self.path(name, salt)
         try:
             doc = json.loads(p.read_text())
         except (OSError, ValueError):
-            self.misses.append(name)
+            if not peek:
+                self.misses.append(name)
             return None
         self.hits.append(name)
         return doc

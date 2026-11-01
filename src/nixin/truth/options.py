@@ -30,6 +30,7 @@ MARKER = re.compile(r"nixin-option ([^\s'\"`]+)")
 MAX_RETRIES = 12
 INDEX_VALUES = "none"  # the full index carries no values; `where` fetches them per prefix
 PREFIX_MAX_ITEMS = 400
+SUMMARY_VERSION = "2"  # bump when summarize() changes meaning: cached summaries miss
 
 # Options whose definitions raise an uncatchable error in the full index (values=none),
 # learned on nixpkgs 3ec6363 + home-manager c216bf5: 19BK and mbp13 hit the same eight, so
@@ -185,13 +186,33 @@ def index(
     store.add(kind, doc["excluded"])
     doc["excluded"] = {**known, **doc["excluded"]}
     cache.put(name, doc, salt)
-    cache.put(f"{name}-summary", summarize(doc, repo.source().store_path), salt)
+    return doc
+
+
+def _summary_key(hm: str | None) -> tuple[str, str]:
+    return f"options-{scope_name(hm)}-summary", helper_text() + INDEX_VALUES + SUMMARY_VERSION
+
+
+def summary(
+    repo: ConfigRepo,
+    host: str,
+    cache: TruthCache,
+    *,
+    hm: str | None = None,
+    store: ExclusionStore | None = None,
+) -> dict[str, Any]:
+    """summarize(index(...)), also cached on its own so a quick `status` can show it
+    without reading the 10 MB index."""
+    doc = summarize(index(repo, host, cache, hm=hm, store=store), repo.source().store_path)
+    name, salt = _summary_key(hm)
+    cache.put(name, doc, salt)
     return doc
 
 
 def cached_summary(cache: TruthCache, *, hm: str | None = None) -> dict | None:
-    """The index summary if a full index of this tree is cached (no eval)."""
-    return cache.get(f"options-{scope_name(hm)}-summary", helper_text() + INDEX_VALUES)
+    """The summary of an earlier --full, if this tree's is cached (no eval)."""
+    name, salt = _summary_key(hm)
+    return cache.get(name, salt, peek=True)
 
 
 def prefix_query(

@@ -103,7 +103,12 @@ nixpkgs attributes to its own flake.nix, get `candidates[]` from a repo-wide sca
 `programs.NAME.enable` options that are true, with their definitions as above),
 `declared[]` (files whose definition of `environment.systemPackages`/`home.packages`
 lists the derivation, with candidate `lines`), and `mentions[]` (ranked grep of tracked
-`*.nix` files, lowest confidence).
+`*.nix` files, lowest confidence; files under another host's directory, i.e. a path
+component naming another host, are left out).
+
+Without `--json`, `status` is one line per fact and `where` one line per declaration /
+definition / mention, values in Nix syntax and capped to a terminal line; the `--json`
+document has everything in full.
 
 ## Develop
 

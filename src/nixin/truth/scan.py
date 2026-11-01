@@ -49,7 +49,7 @@ def _strip_strings(s: str) -> str:
 class Hit:
     line: int  # 1-based
     text: str
-    score: int  # 3 exact path, 2 a suffix of the target path, 1 leaf name only
+    score: int  # 3 exact path, 2 a suffix or an extension of it, 1 leaf name only
     path: list[str]
 
     def doc(self) -> dict:
@@ -107,6 +107,8 @@ def find_option_lines(text: str, target: list[str]) -> list[Hit]:
 def _score(no: int, raw: str, full: list[str], target: list[str]) -> list[Hit]:
     if full == target:
         return [Hit(no, raw, 3, full)]
+    if len(full) > len(target) and full[: len(target)] == target:
+        return [Hit(no, raw, 2, full)]  # `settings.PermitRootLogin = …` defines `settings`
     if len(full) < len(target) and target[-len(full) :] == full:
         return [Hit(no, raw, 2, full)]
     if full and full[-1] == target[-1] and len(full) == 1:
