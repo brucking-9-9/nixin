@@ -45,6 +45,51 @@ With `--json` every verb prints exactly one document:
 Exit codes: 0 ok · 1 verb failed (JSON error printed) · 2 usage. Nothing
 prompts; privileged steps fail with `needs-sudo` and the command to run.
 
+## Truth output
+
+`nixin [--json] [--host H] status [--config DIR] [--refresh] [--quick]` and
+`nixin [--json] [--host H] where NAME [--kind package|option] [--config DIR] [--refresh]`
+evaluate the config flake (`--config`, else `$NIXIN_CONFIG`, else `/etc/nixos`) with the
+host's own `nix`. Results are cached under `$XDG_CACHE_HOME/nixin/truth/` keyed by nix's
+flake fingerprint (tree as nix sees it + lock) and the host, so any tracked edit misses;
+`--refresh` skips reads. Errors: `config-not-found`, `unknown-host`, `eval-failed` (the
+last `error:` block of nix's stderr, traces and warnings stripped), `not-found`,
+`nix-missing`, `eval-timeout`.
+
+`status` fields (`ok: true`):
+
+| field | meaning |
+|---|---|
+| `config` | `path`, `head` (git HEAD), `dirty`, `source` (`/nix/store/…-source` nix evaluates), `source_hash`, `fingerprint`, `last_modified`, `hosts`, `host_is_local` |
+| `lock` | the root flake's nixpkgs node (`nodes.root.inputs.nixpkgs`, here `nixpkgs_2`): `node`, `rev`, `ref`, `date`, `last_modified`, `flakeref`, `nar_hash` |
+| `running` | `/run/current-system`: `system`, `version` (nixos-version), `nixpkgs_rev`, `hostname`, `matches_lock` |
+| `eval` | `ok`, `toplevel` (drvPath of `system.build.toplevel`; evaluating it runs the assertions), `seconds` — a host that does not evaluate makes the whole verb fail with `eval-failed` |
+| `hm_users` | Home Manager users of the host (`[]` without HM) |
+| `packages` | counts: `system` (`environment.systemPackages`), `home.<user>` (`home.packages`) |
+| `programs` | names with `programs.<x>.enable = true`: `system`, `home.<user>` |
+| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined`, `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; `{}` with `--quick` |
+| `cache`, `timings` | cache dir + hits/misses; seconds per eval |
+
+`where NAME` with a dot (or `--kind option`) answers for every scope the option exists in
+(`scopes[]`, each `scope` nixos/home + `user`): `mode` is `exact` (the option itself),
+`sub` (a path inside an `attrsOf` option, e.g. `systemd.services.foo.enable`, dug out of
+the parent's value) or `prefix` (a non-leaf path: the defined options under it). Each
+option carries `name`, `option`, `type`, `description`, `isDefined`, `highestPrio`,
+`value` (size-capped; `<derivation foo-1.2>`, `<function>`, `<… N more>` placeholders),
+`declarations[]` (`source` = `config` | `nixpkgs` | `home-manager` | other input | `inline`,
+`file` relative to that source, `line`/`column` from `declarationPositions`) and
+`definitions[]` — the file that sets it (same mapping), `value` that file contributes,
+and for config files a `line` found by a brace-tracking text scan (`line_heuristic:
+true`; `inline` definitions, i.e. attrsets written inside the `nixosSystem` call that
+nixpkgs attributes to its own flake.nix, get `candidates[]` from a repo-wide scan).
+
+`where NAME` without a dot is a package: `installed[]` (`scope`, `user`, `name`, `pname`,
+`version` — attribute paths are not recoverable from derivations), `programs[]` (the
+`programs.NAME.enable` options that are true, with their definitions as above),
+`declared[]` (files whose definition of `environment.systemPackages`/`home.packages`
+lists the derivation, with candidate `lines`), and `mentions[]` (ranked grep of tracked
+`*.nix` files, lowest confidence).
+
 ## Develop
 
 ```
@@ -62,6 +107,10 @@ Consume from a config flake: add `nixin` as an input and
 Skeleton: the CLI contract and the package build. The layers land in order,
 discovery → truth → writer → apply, each with `--json` and tests, tested on a
 second machine before touching the main one.
+
+Truth: `configrepo.py` and `nixin/truth/` are written and unit-tested against recorded
+evals; `status`/`where` have not yet been run end to end on a real host (see
+`HANDOFF.md` for the measured eval costs and the next steps).
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com
