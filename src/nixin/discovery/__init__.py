@@ -32,6 +32,8 @@ Human output is rendered by `format.render` and handed to cli._emit as `message`
 from __future__ import annotations
 
 import argparse
+import os
+import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -128,8 +130,14 @@ def register(sub: argparse._SubParsersAction) -> set[str]:
 # --------------------------------------------------------------------------- plumbing
 
 
-def _error(exc: DiscoveryError | NetworkError) -> dict[str, Any]:
-    return {"code": exc.code, "message": exc.message}
+def _error(exc: Exception) -> dict[str, Any]:
+    if isinstance(exc, DiscoveryError | NetworkError):
+        return {"code": exc.code, "message": exc.message}
+    # Anything else is a bug or a source that changed shape. Report it as an error
+    # document, because under --json a traceback would leave stdout empty.
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f" at {os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
+    return {"code": "internal", "message": f"{type(exc).__name__}: {exc}{where}"}
 
 
 def _guard(fn: Callable[[argparse.Namespace], dict[str, Any]]) -> Callable:
@@ -138,7 +146,7 @@ def _guard(fn: Callable[[argparse.Namespace], dict[str, Any]]) -> Callable:
     def run(ns: argparse.Namespace) -> dict[str, Any]:
         try:
             doc = fn(ns)
-        except (DiscoveryError, NetworkError) as exc:
+        except Exception as exc:  # noqa: BLE001 -- every failure must become the error document
             return {"ok": False, "error": _error(exc)}
         if getattr(ns, "json", False):
             return doc
@@ -269,7 +277,7 @@ def _fan_out(
     for kind in kinds:
         try:
             parts.append((kind, one(kind), None))
-        except (DiscoveryError, NetworkError) as exc:
+        except Exception as exc:
             if len(kinds) == 1:
                 raise
             parts.append((kind, None, {**_error(exc), "source": _source_for(kind, ns)}))

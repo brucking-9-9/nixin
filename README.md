@@ -118,7 +118,10 @@ Result records by `kind`:
 
 Errors: `{"ok": false, "verb", "host", "error": {"code", "message"}}` with codes
 `network` (unreachable, 5xx, non-JSON), `bad-channel`, `not-found`, `usage`,
-`nix-missing`, `nix-failed`, `nix-timeout`, `http-<status>`.
+`nix-missing`, `nix-failed`, `nix-timeout`, `http-<status>`, and `internal`
+(an unexpected exception, e.g. a source changed its response shape; the
+message names the exception and where it was raised). In a multi-source call
+any of these can appear as one source's `sources[...].error`.
 
 Without `--json` the same data is a compact table (`PACKAGE VERSION
 DESCRIPTION`, `OPTION TYPE DESCRIPTION`, ...; `KIND NAME VERSION/TYPE

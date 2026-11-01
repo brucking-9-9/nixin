@@ -121,3 +121,31 @@ def test_all_reports_the_concrete_channel(es_transport, cache_dir, capsys):
     assert rc == 0 and doc["source"] == "all"
     assert doc["channel"] == "26.05"  # not "stable": the document names what it searched
     assert {s["channel"] for s in doc["sources"].values()} == {"26.05"}
+
+
+def test_unexpected_exception_is_an_internal_error_document(monkeypatch, cache_dir, capsys):
+    from nixin.discovery import home_manager
+
+    def boom(*a, **k):
+        raise KeyError("options")
+
+    monkeypatch.setattr(home_manager, "search", boom)
+    rc = main(["--json", "--host", "t", "search", "--kind", "hm", "x"])
+    out, err = capsys.readouterr()
+    doc = json.loads(out)  # still exactly one document on stdout, no traceback
+    assert rc == 1 and err == "" and doc["ok"] is False
+    assert doc["error"]["code"] == "internal" and "KeyError" in doc["error"]["message"]
+
+
+def test_unexpected_exception_in_one_source_spares_the_others(
+    es_transport, monkeypatch, cache_dir, capsys
+):
+    from nixin.discovery import home_manager
+
+    def boom(*a, **k):
+        raise TypeError("shape changed")
+
+    monkeypatch.setattr(home_manager, "search", boom)
+    rc, doc = run_json(capsys, "search", "--kind", "all", "firefox")
+    assert rc == 0 and doc["ok"] is True and doc["source"] == "search.nixos.org"
+    assert doc["sources"]["home-manager-options"]["error"]["code"] == "internal"
