@@ -73,8 +73,9 @@ _HEADERS = {
 
 def _footer(doc: dict[str, Any]) -> str:
     bits = [f"{doc.get('count', len(doc.get('results', [])))} result(s)"]
-    if doc.get("source") == "all":
-        for name, s in doc.get("sources", {}).items():
+    sources = doc.get("sources") or {}
+    if doc.get("source") == "all" or len(sources) > 1:
+        for name, s in sources.items():
             tag = f"{name}"
             if s.get("channel"):
                 tag += f" {s['channel']}"

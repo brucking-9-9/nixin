@@ -1,0 +1,38 @@
+{
+ "description": "A collection of packages for the Nix package manager",
+ "fingerprint": "d3b8794888d39f0cc5d281b0a83863c0570ae49b8c20c19f5465f62a935151bc",
+ "lastModified": 1792773339,
+ "locked": {
+  "__final": true,
+  "lastModified": 1792773339,
+  "narHash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+  "owner": "nixos",
+  "repo": "nixpkgs",
+  "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "type": "github"
+ },
+ "locks": {
+  "nodes": {
+   "root": {}
+  },
+  "root": "root",
+  "version": 7
+ },
+ "original": {
+  "owner": "nixos",
+  "repo": "nixpkgs",
+  "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "type": "github"
+ },
+ "originalUrl": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+ "path": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source",
+ "resolved": {
+  "owner": "nixos",
+  "repo": "nixpkgs",
+  "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "type": "github"
+ },
+ "resolvedUrl": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+ "revision": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+ "url": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504?narHash=sha256-rZLrzrC6i%2BjnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw%3D"
+}

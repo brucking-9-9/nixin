@@ -15,6 +15,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 import pytest
 import requests
@@ -78,6 +79,8 @@ class FakeSession:
 
     def request(self, method: str, url: str, **kw: Any) -> FakeResponse:
         body = kw.get("json")
+        if kw.get("params"):
+            url = url + "?" + urlencode(kw["params"])  # so rules can match query strings
         self.calls.append((method.upper(), url, body))
         for m, pat, when, status, payload in self.rules:
             if m == method.upper() and pat.search(url) and (when is None or when(body)):

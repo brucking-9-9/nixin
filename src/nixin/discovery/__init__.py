@@ -219,6 +219,7 @@ def _merge(ns: argparse.Namespace, parts: list[tuple[str, Part | None, dict | No
         entry["kinds"].append(kind)
         entry["cached"] = entry["cached"] and part.cached
         entry["count"] += len(part.results)
+        entry.update(part.extra)
         results.extend(part.results)
         notes.extend(n for n in part.notes if n not in notes)
     if sources and all(e["error"] for e in sources.values()):

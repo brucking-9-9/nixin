@@ -1,0 +1,24 @@
+{
+ "broken": false,
+ "description": "Fast, feature-rich, GPU based terminal emulator",
+ "homepage": "https://github.com/kovidgoyal/kitty",
+ "license": [
+  "GPL-3.0-only"
+ ],
+ "mainProgram": "kitty",
+ "outputs": [
+  "out",
+  "terminfo",
+  "shell_integration",
+  "kitten"
+ ],
+ "platforms": [
+  "aarch64-darwin",
+  "aarch64-linux",
+  "arc-linux"
+ ],
+ "pname": "kitty",
+ "position": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/pkgs/by-name/ki/kitty/package.nix:345",
+ "unfree": false,
+ "version": "0.49.2"
+}
