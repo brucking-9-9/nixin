@@ -94,10 +94,13 @@ One document per call. Every result carries `kind`, `source`, `channel` and
 
 `source`/`channel`/`rev`/`cached` at the top are the single-source shortcut.
 When several sources answer (`--kind all`, `info` without `--kind`) `source` is
-`"all"`, `rev` is null, and `sources` carries each source's channel, rev,
-cache state, count and `error` (`null`, or `{"code", "message"}` when that
-source failed while another answered — `ok` stays true; it is false only when
-every source failed). `channel` is null for sources without channels (nixhub,
+`"all"`, `channel` is the concrete channel the channel-based sources searched,
+`rev` is null, and `sources` carries each source's channel, rev, cache state,
+count and `error` (`null`, or the first `{"code", "message"}` that source hit
+while something else answered). One source can serve several kinds and fail
+for only some of them, so a source may carry both an `error` and a non-zero
+`count`. `ok` stays true; it is false only when no source answered at all.
+`channel` is null for sources without channels (nixhub,
 noogle); for `local-nix` it is the flakeref as given. `info` returns the exact
 matches as `results` (usually one; `programs.git.enable` and `git` cannot
 collide but a name may be both a package and an option).

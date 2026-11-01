@@ -180,49 +180,41 @@ def _merge(ns: argparse.Namespace, parts: list[tuple[str, Part | None, dict | No
 
     `parts` holds `(kind, part, error)`; `error` is set when that kind's source
     failed and the request spanned several kinds (a single-kind failure raises
-    instead). The `sources` map always exists; the top-level `source`,
-    `channel`, `rev` and `cached` are the single-source convenience, and read
-    `"all"` / requested channel / null when several sources answered.
+    instead). One source can serve several kinds (search.nixos.org: pkg, opt,
+    program) and fail for only some of them: its `error` is then the first
+    failure while the kinds it did answer still count. The document fails only
+    when no source answered at all. The `sources` map always exists; the
+    top-level `source`, `channel`, `rev` and `cached` are the single-source
+    convenience, and read `"all"` / the concrete channel the channel-based
+    sources searched / null when several sources answered.
     """
     results: list[dict[str, Any]] = []
     notes: list[str] = []
     sources: dict[str, dict[str, Any]] = {}
+    answered: dict[str, dict[str, Any]] = {}
     for kind, part, error in parts:
-        if part is None:
-            assert error is not None
-            name = error.pop("source")
-            entry = sources.setdefault(
-                name,
-                {
-                    "kinds": [],
-                    "channel": None,
-                    "rev": None,
-                    "cached": False,
-                    "count": 0,
-                    "error": None,
-                },
-            )
-            entry["kinds"].append(kind)
-            entry["error"] = error
-            continue
+        name = part.source if part is not None else error["source"]  # type: ignore[index]
         entry = sources.setdefault(
-            part.source,
-            {
-                "kinds": [],
-                "channel": part.channel,
-                "rev": part.rev,
-                "cached": True,
-                "count": 0,
-                "error": None,
-            },
+            name,
+            {"kinds": [], "channel": None, "rev": None, "cached": True, "count": 0, "error": None},
         )
         entry["kinds"].append(kind)
+        if part is None:
+            assert error is not None
+            entry["error"] = entry["error"] or {"code": error["code"], "message": error["message"]}
+            continue
+        if name not in answered:
+            entry.update(channel=part.channel, rev=part.rev)
+            answered[name] = entry
         entry["cached"] = entry["cached"] and part.cached
         entry["count"] += len(part.results)
         entry.update(part.extra)
         results.extend(part.results)
         notes.extend(n for n in part.notes if n not in notes)
-    if sources and all(e["error"] for e in sources.values()):
+    for name, entry in sources.items():
+        if name not in answered:
+            entry["cached"] = False
+    if not answered:
         first = next(iter(sources.values()))["error"]
         raise DiscoveryError(first["code"], first["message"])
     doc: dict[str, Any] = {
@@ -233,14 +225,18 @@ def _merge(ns: argparse.Namespace, parts: list[tuple[str, Part | None, dict | No
     }
     if notes:
         doc["notes"] = notes
-    answered = {k: v for k, v in sources.items() if not v["error"]}
     if len(answered) == 1:
         ((name, entry),) = answered.items()
         doc.update(source=name, channel=entry["channel"], rev=entry["rev"], cached=entry["cached"])
     else:
+        # local-nix reports the flakeref as its channel; the others agree on one channel name
+        flakeref = getattr(ns, "nixpkgs", None)
+        named = {e["channel"] for e in answered.values() if e["channel"] not in (None, flakeref)}
         doc.update(
             source="all",
-            channel=getattr(ns, "channel", None) or DEFAULT_CHANNEL,
+            channel=named.pop()
+            if len(named) == 1
+            else getattr(ns, "channel", None) or DEFAULT_CHANNEL,
             rev=None,
             cached=all(e["cached"] for e in answered.values()),
         )

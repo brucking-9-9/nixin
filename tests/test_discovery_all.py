@@ -2,7 +2,11 @@
 
 import json
 
+from conftest import has
+
 from nixin.cli import main
+
+REV_UNSTABLE = "1c89083e451e891152365b799595cf7790a43325"
 
 
 def run_json(capsys, *argv):
@@ -68,3 +72,52 @@ def test_info_all_returns_every_exact_match(es_transport, cache_dir, capsys):
         doc["error"]["message"]
         == "no package or NixOS option or Home Manager option named 'nothing-anywhere' on unstable"
     )
+
+
+def _es_failing_for(transport, doc_type):
+    """ES rules where every search of `doc_type` ("package"/"option") answers 503."""
+    transport.add("GET", r"/_cat/aliases", fixture_file="es/aliases.json")
+    transport.add("POST", r"/_count$", fixture_file="es/count.json")
+    transport.add("POST", r"/_search$", None, status=503, when=lambda b: has(b, "type", doc_type))
+    transport.add(
+        "POST",
+        r"/_search$",
+        fixture_file="es/search_pkg_firefox.json",
+        when=lambda b: has(b, "query", "firefox"),
+    )
+    transport.add("POST", r"/_search$", fixture_file="es/empty.json")
+
+
+def test_all_keeps_a_sources_answers_when_another_of_its_kinds_fails(transport, cache_dir, capsys):
+    # pkg and program answer, opt fails, Home Manager is down: still a result, not an error
+    _es_failing_for(transport, "option")
+    rc, doc = run_json(capsys, "search", "--kind", "all", "firefox", "--limit", "3")
+    assert rc == 0 and doc["ok"] is True
+    assert doc["source"] == "search.nixos.org" and doc["rev"] == REV_UNSTABLE
+    es = doc["sources"]["search.nixos.org"]
+    assert es["kinds"] == ["pkg", "opt", "program"] and es["error"]["code"] == "network"
+    assert es["channel"] == "unstable" and es["count"] == doc["count"] > 0
+    assert {r["kind"] for r in doc["results"]} == {"pkg", "program"}
+    assert doc["sources"]["home-manager-options"]["error"]["code"] == "network"
+
+
+def test_all_source_failing_first_then_answering_keeps_channel_and_rev(
+    transport, cache_dir, capsys
+):
+    _es_failing_for(transport, "package")  # pkg (first kind) and program fail, opt answers
+    transport.add("GET", r"/data/options-master\.json$", fixture_file="hm/options-master.json")
+    rc, doc = run_json(capsys, "search", "--kind", "all", "firefox")
+    assert rc == 0 and doc["ok"] is True and doc["source"] == "all"
+    es = doc["sources"]["search.nixos.org"]
+    assert es["channel"] == "unstable" and es["rev"] == REV_UNSTABLE
+    assert es["error"]["code"] == "network" and es["cached"] is False
+
+
+def test_all_reports_the_concrete_channel(es_transport, cache_dir, capsys):
+    es_transport.add(
+        "GET", r"/data/options-release-26\.05\.json$", fixture_file="hm/options-master.json"
+    )
+    rc, doc = run_json(capsys, "search", "--kind", "all", "firefox", "--channel", "stable")
+    assert rc == 0 and doc["source"] == "all"
+    assert doc["channel"] == "26.05"  # not "stable": the document names what it searched
+    assert {s["channel"] for s in doc["sources"].values()} == {"26.05"}
