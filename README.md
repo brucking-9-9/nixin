@@ -109,12 +109,12 @@ Result records by `kind`:
 
 | kind | fields (besides `kind`, `source`, `channel`, `rev`) |
 |---|---|
-| `pkg` | `name` (attribute path), `pname`, `version`, `description`, `homepage`, `license` (SPDX ids), `unfree` (null from the index, bool from `--nixpkgs`), `programs`, `main_program`, `platforms`, `outputs`, `position` (`file:line` in nixpkgs); `info` adds `matched_by` (`attr`/`pname`), `alternatives` (other attrs with that pname) and, from `--nixpkgs`, `broken`. `local-nix` search rows carry only name/pname/version/description (that is all `nix search` gives). |
+| `pkg` | `name` (attribute path), `pname`, `version`, `description`, `homepage`, `license` (SPDX ids), `unfree` (null from the index, bool from `--nixpkgs`), `programs`, `main_program`, `platforms`, `outputs`, `position` (`file:line` in nixpkgs); `info` adds `matched_by` (`attr`/`pname`), with `pname` also `alternatives` (the other attrs with that pname; absent on an `attr` match, which does not look), and, from `--nixpkgs`, `broken`. `local-nix` search rows carry only name/pname/version/description (that is all `nix search` gives). |
 | `opt` | `name`, `type`, `default`, `example` (Nix text or null), `description` (plain text), `declarations` (`nixos/modules/...nix`), `declaration_urls` |
 | `hm` | `name`, `type`, `default`, `example`, `description` (Markdown as published), `declarations` (`modules/...nix`), `declaration_urls`, `read_only` |
 | `program` | `name` (the binary), `package` (attribute), `pname`, `version`, `description`, `exact` (false for substring matches) |
 | `fn` | `name`, `aliases`, `signature`, `description` (first paragraph), `position` (`lib/strings.nix:225`), `primop` |
-| `version` | `name`, `version`, `date` (`YYYY-MM-DD`), `rev` (nixpkgs commit), `attr`, `platforms`, `programs`; the document adds `package`, `total`, `latest`, `summary`, `homepage`, `license` |
+| `version` | `name`, `version`, `date` (`YYYY-MM-DD`), `rev` (nixpkgs commit), `attr`, `platforms`, `programs`; the document adds `package`, `total`, `latest`, and the latest release's `summary`, `homepage`, `license`, `programs` |
 
 Errors: `{"ok": false, "verb", "host", "error": {"code", "message"}}` with codes
 `network` (unreachable, 5xx, non-JSON), `bad-channel`, `not-found`, `usage`,
