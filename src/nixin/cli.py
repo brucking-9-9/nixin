@@ -21,7 +21,7 @@ import json
 import socket
 import sys
 
-from . import __version__
+from . import __version__, truth
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -53,6 +53,7 @@ def _parser() -> argparse.ArgumentParser:
     for verb, (_layer, help_) in VERBS.items():
         sp = sub.add_parser(verb, help=help_)
         sp.add_argument("args", nargs="*")
+    truth.register(sub)
     return p
 
 
@@ -73,6 +74,9 @@ def main(argv: list[str] | None = None) -> int:
     if ns.verb is None:
         _parser().print_help()
         return 2
+    run = getattr(ns, "run", None)  # a layer's register() installed a handler
+    if run is not None:
+        return _emit(ns, run(ns))
     layer = VERBS[ns.verb][0]
     return _emit(
         ns,
