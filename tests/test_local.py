@@ -209,3 +209,25 @@ def test_cli_info_all_with_rev_ref_answers_packages_only(fake_nix, cache_dir, ca
     assert doc["source"] == "local-nix" and doc["channel"] == REF
     assert doc["sources"]["search.nixos.org"]["error"]["code"] == "bad-channel"
     assert doc["sources"]["home-manager-options"]["error"]["code"] == "bad-channel"
+
+
+def test_cli_all_attributes_local_failure_to_local_nix(fake_nix, es_transport, cache_dir, capsys):
+    """A failing nix search under --kind all is reported under local-nix, not search.nixos.org."""
+    rc = main(
+        [
+            "--json",
+            "search",
+            "--kind",
+            "all",
+            "nothing-matches",
+            "--nixpkgs",
+            REF,
+            "--channel",
+            "unstable",
+        ]
+    )
+    doc = json.loads(capsys.readouterr().out)
+    assert rc == 0 and doc["ok"] is True  # search.nixos.org still answered (with no hits)
+    assert doc["sources"]["local-nix"]["error"]["code"] == "nix-failed"
+    assert doc["sources"]["local-nix"]["kinds"] == ["pkg"]
+    assert doc["sources"]["search.nixos.org"]["error"] is None

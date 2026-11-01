@@ -247,8 +247,12 @@ def _merge(ns: argparse.Namespace, parts: list[tuple[str, Part | None, dict | No
     return doc
 
 
-def _source_for(kind: str) -> str:
+def _source_for(kind: str, ns: argparse.Namespace) -> str:
     """Which source name a kind reports under when it fails before answering."""
+    if kind == "pkg" and getattr(ns, "nixpkgs", None):
+        from . import local
+
+        return local.SOURCE
     if kind == "hm":
         from . import home_manager
 
@@ -272,7 +276,7 @@ def _fan_out(
         except (DiscoveryError, NetworkError) as exc:
             if len(kinds) == 1:
                 raise
-            parts.append((kind, None, {**_error(exc), "source": _source_for(kind)}))
+            parts.append((kind, None, {**_error(exc), "source": _source_for(kind, ns)}))
     return parts
 
 
