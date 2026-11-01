@@ -1,146 +1,153 @@
 # HANDOFF — truth layer (branch `truth`)
 
-Written on 19BK on 2026-11-01, stopped early because the machine had to go quiet; work
-continues on another host. Everything below was verified on 19BK unless marked otherwise.
+Started on 19BK, continued on mbp13 on 2026-11-01 (headless, as `master`). Everything below
+"verified" was run on mbp13 against the workspace config `~/nixos` (read only) unless marked.
 
 ## Done and verified
 
-- `src/nixin/configrepo.py` — locating the config (`--config` > `$NIXIN_CONFIG` >
-  `/etc/nixos`), the single `run_nix()` seam (tests inject a fake through
-  `ConfigRepo(path, nix=...)`), `trim_nix_error()` (last `error:` block, traces/warnings
-  stripped — turns the mbp13 failure into the clean message ending in
-  "Scripted initrd has been removed."), `nix flake metadata --json` (HEAD, dirty, source
-  store path, nix fingerprint), `nix flake archive --dry-run --json` (input name → store
-  path, used to classify declaration paths as `config` / `nixpkgs` / `home-manager` / …),
-  `flake.lock` parsing via `nodes.root.inputs.nixpkgs` (resolves `follows` lists; here
-  the node is `nixpkgs_2`), hosts, HM users (`c.home-manager.users or {}` so hosts without
-  HM give `[]`), `/run/current-system` version, `cache_key()`.
-  **Live-verified** against /etc/nixos: hosts `["19BK","mbp13"]`, lock
-  `3ec6363 nixos-unstable 2026-10-23`, source `/nix/store/4naz5g77…-source`, path mapping.
-- `src/nixin/truth/options.nix` — the option-index helper, passed as TEXT through
-  `nix eval --apply` (pure eval forbids `import /abs/path`). Walks the option tree under
-  a prefix; per option: name, type description, short description, declarations +
-  `declarationPositions` (file:line:col), isDefined, definition files, and with
-  `values != "none"` the capped serialised value plus `definitionValues` (what EACH file
-  contributes — the writer layer's gold). HM trees are rebuilt from the
-  `attrsOf (submoduleWith …)` type (`getSubModules` + the user's definitions +
-  `_module.args.name`, same specialArgs) — **live-verified**: `programs.kitty.enable`
-  for user brucking comes out `true`, defined in `home/modules/terminal/kitty.nix`,
-  declared in home-manager `modules/programs/kitty.nix:106`.
-  **Live-verified prefix evals**: `services.openssh` (32 options, 3.8 s, 283 MiB) and HM
-  `programs.kitty` (22 options, 3.4 s, 250 MiB).
-- `src/nixin/truth/packages.nix` — system + per-HM-user packages `{name,pname,version}`
-  and the `programs.<x>.enable == true` set (gated on `options.programs.<x>.enable.visible`
-  so renamed aliases are never read: reading them prints `trace:` lines). The probe
-  version of this expression was live-verified (4.5 s, 451 MiB on 19BK); the shipped file
-  is the same logic reorganised and parses (`nix-instantiate --parse`), but was NOT run.
-- `src/nixin/truth/scan.py` — brace-tracking scanner that maps an option path to a line
-  in a config file (`line_heuristic: true`), and a ranked token grep for package names.
-  **Live-verified** on /etc/nixos text: `services.openssh.enable` → `ssh.nix:18`,
-  `programs.kitty.enable` → `home/modules/terminal/kitty.nix:5`.
-- `src/nixin/truth/cache.py`, `options.py`, `packages.py`, `__init__.py` (verbs
-  `status`/`where`, `register()`), `cli.py` hook (import + `truth.register(sub)` +
-  a generic `ns.run` dispatch — the discovery branch should use the same
-  `set_defaults(run=handler)` pattern so the merge is trivial), `pyproject.toml`
-  package-data for `*.nix`.
-- Tests: `tests/test_truth.py` (30 pass, 2 live skipped) with a `FakeNix` answering from
-  `tests/fixtures/` (trimmed recordings of real evals). `tests/test_cli.py` adapted: the
-  truth verbs are tested with `--config /nonexistent` → `config-not-found`.
-- `ruff check` and `ruff format --check` clean (run from the store binaries, see below);
-  `nixfmt --check` clean on both .nix helpers.
+- **Build and checks.** `nix build` passes (34 tests in the sandbox, 2 live skipped). The
+  output ships `nixin/truth/options.nix` and `packages.nix`, and the built `bin/nixin` answers
+  `where` against `~/nixos`. `ruff check`, `ruff format --check` and `nix fmt -- --check .`
+  are clean (via `nix develop -c …`). `pyproject.toml` now has `pythonpath = ["src"]`, the
+  same line the discovery branch added, so `nix develop -c pytest` works and the merge is clean.
+- **End to end on mbp13** (`--config ~/nixos`), JSON and human output:
+  - `status` for mbp13 (the default host here) and for `--host 19BK`;
+  - `--host mbp13` at the committed HEAD (a `/tmp` clone of `~/nixos`) gives the clean
+    `eval-failed` "Failed assertions: … Scripted initrd has been removed." with exit 1 and no
+    traceback;
+  - `where kitty` (mbp13: system package listed in `hosts/mbp13/default.nix:198`; 19BK:
+    `programs.kitty.enable` in `home/modules/terminal/kitty.nix:5`, which home-manager's
+    `modules/programs/kitty.nix` turns into `home.packages`);
+  - `where services.openssh.enable` (mbp13 `hosts/mbp13/default.nix:240`, 19BK `ssh.nix:18`);
+  - `where programs.kitty.enable --host 19BK` (HM, user brucking);
+  - prefix mode `where services.openssh`, sub mode
+    `where services.openssh.settings.PermitRootLogin`;
+  - `not-found`.
+- **Exclusions persisted** (`options.ExclusionStore`): one file per (nixpkgs rev,
+  home-manager rev), `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs12>-<hm12>.json`, holding
+  `{"nixos": {name: first line of the error}, "home": {...}, "nixpkgs": rev,
+  "home-manager": rev}`. It is seeded from `SEED_EXCLUSIONS` (the 8 NixOS + 4 HM options
+  learned on 3ec6363 / c216bf5; mbp13 hit exactly the same 8 as 19BK, so they belong to the
+  modules, not the config), extended when the retry loop learns one, and written on the first
+  pass. `--refresh` still uses it; delete the file to re-learn. Prefix queries (`where`) do
+  not use it.
+- **`status` is quick by default.** `--quick` is still accepted and means the same thing.
+  `--full` builds the index of NixOS and of each HM user. Without `--full`, `options` shows
+  the summaries an earlier `--full` cached for the same tree (separate small cache files, so
+  the 10 MB index is never read), else `{}`.
+- **`defined` fixed.** `isDefined` is true for every option that has a default (the module
+  system adds the default as a definition from the declaring file). `defined` now means "set
+  by more than its own default" (`options.is_set`: definitions ≠ `[declarations[0]]`). New
+  field `in_config` = defined in a file of the config tree. 19BK: nixos 239 set (86 by the
+  config) of 17 015; home brucking 156 (132) of 4 093; mbp13 nixos 322 (140) of 16 989.
+  Before, "14 548 defined". Prefix mode of `where` filters with the same rule
+  (services.openssh: 4 of 32 instead of 18).
+- **Bugs found live and fixed:**
+  - `where <system package>` never looked at `environment.systemPackages`, because scope
+    `nixos` and `system` were compared;
+  - a module imported as a directory (`./hosts/mbp13`) is reported by nix as the directory;
+    `locate_path` now maps it to `…/default.nix`, so the line scan works;
+  - the scanner now also matches a line that extends the option path
+    (`settings.PermitRootLogin = …` defines `settings`);
+  - `mentions` drop files under another host's directory (a path component naming another
+    host);
+  - a cached summary carries `SUMMARY_VERSION` in its key, so a meaning change misses.
+- **Human rendering** reviewed and rewritten (`truth/render.py`): one fact per line, aligned
+  labels, values in Nix syntax capped to a line, "cached" instead of stale seconds, "running …
+  on mbp13, not 19BK" when asking about another host, mentions capped to 4 strong ones.
+  Tested in `test_human_rendering`.
 
-## Half-done / NOT verified
+## Half-done / not verified
 
-- `nixin status` and `nixin where` were never run end to end against a real host (only
-  through the fake). The code paths are straightforward glue over verified pieces, but
-  expect small shape bugs. Run first: `nix develop -c nixin --json status --quick`,
-  then `--host mbp13` (must give `eval-failed` with the Scripted-initrd text),
-  `nixin where kitty`, `nixin where services.openssh.enable`,
-  `nixin where programs.kitty.enable`.
-- `nix build` was NOT run (forbidden at wrap-up). Check that
-  `result/lib/python3.14/site-packages/nixin/truth/options.nix` exists after it.
-- The full option index (`status` without `--quick`) works in principle (the exclusion
-  loop was exercised live with the draft helper, see numbers) but is far too slow cold —
-  see "Next steps".
-- Human (non-`--json`) rendering of `status`/`where` is unreviewed.
+- A cold `status --full` for 19BK was measured with toplevel/packages warm; the all-cold
+  number exists for mbp13 only (and under heavy load, see below).
+- `nix fmt -- --check` *without* a path fails on `main` too: the skeleton's formatter is
+  bare `nixfmt`, `nix fmt` passes no paths, and nixfmt then reads empty stdin.
+  `nix fmt -- --check .` works (prints a deprecation note). The fix belongs in `flake.nix`
+  (shared with discovery), so it is not done here. `nixfmt-tree` has no `--check`, so the fix
+  would be a small `writeShellApplication` that appends `git ls-files '*.nix'` when no file
+  argument is given.
+- The HM seed messages are placeholders ("seed list (failed on 19BK)"); the real ones get
+  recorded if the list is ever re-learned.
 
-## Measured on 19BK (nix 2.34.9, nixpkgs 3ec6363, 8 threads, 15 GiB)
+## Measured on mbp13 (nix 2.34.9, 8 cores, 15 GiB, nixpkgs 3ec6363, HM c216bf5)
 
-| eval | wall | peak RSS |
-|---|---|---|
-| `nixosConfigurations --apply attrNames` | 0.07 s (nix eval cache) | 41 MiB |
-| `nix flake metadata` / `archive --dry-run` | 0.08 s each | 41 MiB |
-| HM users of 19BK | 1.8 s | 194 MiB |
-| packages.nix (system + HM packages + programs) | 4.5 s | 451 MiB |
-| mbp13 `system.build.toplevel.drvPath` (fails: Scripted initrd) | 5.1 s | 475 MiB |
-| 19BK `system.build.toplevel.drvPath` | 20.5 s cold, 34.7 s on a busy box; NOT cached by nix's eval cache | 1356 MiB |
-| 19BK `config.assertions` failed-list only | 7.7 s | 601 MiB |
-| prefix index `services.openssh`, values=all | 3.8 s | 283 MiB |
-| HM prefix index `programs.kitty`, values=all (re-evaluates the HM submodule) | 3.4 s | 250 MiB |
-| full NixOS index, values=none, final successful pass | 30.5 s | 1639 MiB → 17 015 options, 10.6 MB JSON |
-| full HM index (brucking), values=none, final pass | 18.1 s | 1055 MiB → 4 093 options, 2.4 MB JSON |
-| full NixOS index, values=defined | 30–38 s per attempt, more failures | 1650 MiB |
+The box was shared with three other Claude sessions and their nix evals. The 1-minute load
+was 3–9 for the first runs and 13–26 later, so wall times are upper bounds; peak RSS is not
+affected. `~/nixos` stayed at HEAD `ebd8190` + 4 uncommitted files under `hosts/mbp13/`
+(another session's work; no stash entries). With those edits mbp13 evaluates; at HEAD it
+does not.
 
-The full index needs the exclusion loop: `definitionsWithLocations`/`isDefined` force every
-definition's `mkIf` condition and some nixpkgs/HM modules raise *type* errors there when
-their service is off (`null.version`), which `builtins.tryEval` cannot catch. Each entry is
-wrapped in `addErrorContext "nixin-option <name>"`; `options.evaluate()` reads the marker
-from the failed eval's stderr, excludes the option, retries. On this lock the NixOS tree
-needed 8 exclusions (≈22–27 s each): `hardware.nvidia.gsp.enable`, `hardware.nvidia.open`,
-`hardware.nvidia.powerManagement.kernelSuspendNotifier`, `services.dawarich.redis.host`,
-`services.greenlight.redis.host`, `services.immich.redis.host`, `services.kener.redis.host`,
-`services.nagios.cgiConfigFile`; with values=defined also
-`services.grafana-image-renderer.settings`, `services.immich-kiosk.settings`. HM needed 4:
-`programs.google-chrome-beta.package`, `programs.google-chrome-dev.package`,
-`programs.radicle.uri.web-rad.browser`, `programs.vscode.haskell.hie.executablePath`.
-Cold total for a first `status` would be ≈ 4 min; unacceptable.
+| run | wall | peak RSS | load before → after |
+|---|---|---|---|
+| `nix build` (sandbox pytest) | 5–11 s | 240 MiB | — |
+| mbp13 `status`, OLD default (full index), cold: 9 index passes | 8 min 22 s | 3.1 GiB | 5.9 → 9.0 |
+| … of which index (8 exclusions learned, ≈50 s per pass) | 458 s | | |
+| 19BK `status` quick, cold (toplevel 61.5 s + packages 8.1 s) | 70 s | 1.34 GiB | 5.0 → 12.8 |
+| 19BK / mbp13 `status`, warm | 0.5–1.8 s | 41–60 MiB | |
+| 19BK `status --full`, seeded store, toplevel/packages warm: NixOS index 24.6 s + HM 27.7 s, **1 pass each** | 52.7 s | 1.61 GiB | 4.9 → 8.5 |
+| mbp13 `status --full --refresh`, all cold, seeded: toplevel 65 s, packages 2.8 s, index 184 s **1 pass** | 4 min 13 s | 3.1 GiB | 8.5 → 20.8 |
+| mbp13 toplevel alone | 263 s | 2.88 GiB | 21.6 |
+| mbp13 index alone (seeded: 16 989 options, 0 retries) | 106 s | 3.10 GiB | 26 |
+| `status --full`, warm (reads 13 MB of index JSON) | 2.7 s | 59 MiB | |
+| mbp13 at HEAD → `eval-failed` | 4.3 s | 475 MiB | 13.3 |
+| `where services.openssh.enable`, cold (one prefix eval) | 3.1 s (mbp13) / 6.2 s (19BK) | 196 / 222 MiB | ~13 |
+| `where programs.kitty.enable --host 19BK`, cold / warm | 3.0 s / 0.7 s | 195 / 42 MiB | ~14 |
+| `where kitty --host 19BK`, cold (2 prefix evals) | 10.5 s | 427 MiB | ~13 |
+
+19BK numbers from the first session (quiet box): toplevel 20.5 s / 1.36 GiB, packages
+4.5 s, full NixOS index 30.5 s / 1.6 GiB, HM index 18.1 s / 1.0 GiB.
 
 ## Next steps (in order)
 
-1. Persist the exclusion list per (nixpkgs rev, home-manager rev) — the failures are
-   properties of the modules, not of the config — e.g. `$XDG_CACHE_HOME/nixin/truth/
-   exclude-<nixpkgs-rev>.json`, seeded with the lists above, loaded by `options.index()`
-   and extended whenever the loop learns a new one. That turns a cold full index into
-   one 30 s pass (+ 18 s HM).
-2. Decide what `status` does by default: `--quick` (no index, ≈ 25 s cold: toplevel 20 s +
-   packages 4.5 s, then ≈ 0.3 s from cache) is probably the right default and the index
-   an explicit `--index`/background step. Consider the `config.assertions` check
-   (7.7 s / 601 MiB) as the "does it evaluate" test with a documented caveat, keeping
-   toplevel for `plan`.
-3. Run the live checks listed under "Half-done", fix shape bugs, then `nix build`.
-4. `where <package>` only links a package to `programs.<name>.enable`; the general link
-   (a module file in an input that adds the package → which user-defined options that file
-   declares) is `options.options_declared_in()` and needs the full index — wire it in
-   once (1) makes the index cheap.
-5. Live tests: `NIXIN_LIVE=1 nix develop -c pytest -k live` (two small ones exist; add
-   one for `status --quick` and the mbp13 error once verified).
+1. Run independent evals in parallel. With `--full`, NixOS and HM indexes run at the same
+   time (19BK: 24.6 + 27.7 s → ≈28 s, peak ≈2.6 GiB); `ExclusionStore.add` already takes a
+   lock. In the quick path, toplevel and packages run at the same time (saves 3–8 s). Measure
+   on a quiet box.
+2. The cold cost of a quick `status` is the toplevel eval (19BK 20–60 s; mbp13 41–263 s,
+   2.9 GiB). Consider `config.assertions` (7.7 s / 601 MiB on 19BK) as the "does it
+   evaluate" check, with the caveat that it skips build-time failures, and keep toplevel for
+   `plan`.
+3. `where <package>` general link: a module file in an input that adds the package → the
+   user-defined options that file declares (`options.options_declared_in()`, needs the
+   index; now one `--full` away).
+4. Live tests (`NIXIN_LIVE=1`): `status` quick against `$NIXIN_CONFIG`, and `eval-failed`
+   against a clone pinned to a failing rev (ebd8190 of the workspace fails for mbp13).
+5. mbp13's evals peak at about 3 GiB each (toplevel and index), twice 19BK's on the same box
+   and nixpkgs, and run much slower (index pass 106–184 s vs 25 s for 19BK). Load explains
+   the time only partly. Re-measure on a quiet box and find what in the mbp13 config costs
+   that (it matters for parallelising, step 1: two 3 GiB evals at once on a 15 GiB box).
 
 ## Open questions
 
+- A seeded exclusion hides an option the index could evaluate on a host that uses it
+  (`hardware.nvidia.open` with nvidia enabled). `where` still answers for it. Should the
+  index retry excluded options that the config defines, or key the store per host as well?
 - Should an `eval-failed` status still carry `config`/`lock`/`running` (known without the
   eval)? Today the error doc is strictly `{ok, verb, host, error}` per the contract.
 - `definitionsWithLocations` has no line numbers; lines come from the text scanner. Is
   `line_heuristic` good enough for the writer, or should the writer re-scan itself?
 - Inline modules (attrsets inside the `nixosSystem` call) are attributed by nixpkgs to
-  `<nixpkgs>/flake.nix` (`setDefaultModuleLocation` in `nixos/lib/eval-config.nix`);
-  reported as `source: "inline"` with repo-wide `candidates`. Fine for `where`; the
-  writer must not edit based on it.
-- Whether `status` should run the HM index per user eagerly (18 s each) or lazily.
+  `<nixpkgs>/flake.nix`; reported as `source: "inline"` with repo-wide `candidates`. On
+  this config the only such definition is nixpkgs' own `nixpkgs.flake.source`. Fine for
+  `where`; the writer must not edit based on it.
+- `in_config` counts files of the config tree only (inline definitions not counted).
 
-## How to run the tests
+## How to test
 
 ```
 nix develop -c pytest                 # unit tests, fixtures only (no nix needed)
 NIXIN_LIVE=1 nix develop -c pytest    # + the live ones (run nix against $NIXIN_CONFIG)
 nix develop -c ruff check src tests && nix develop -c ruff format --check src tests
-nix fmt -- --check                    # or: nixfmt --check src/nixin/truth/*.nix
+nix fmt -- --check .                  # the path matters, see "Half-done"
 nix build                             # runs pytest in the sandbox (nix unavailable there)
+
+# end to end, from the worktree (the dev shell's python; truth needs no dependencies):
+PYTHONPATH=src python -m nixin.cli --json status --config ~/nixos
+PYTHONPATH=src python -m nixin.cli --host 19BK status --full --config ~/nixos
+PYTHONPATH=src python -m nixin.cli --host 19BK where programs.kitty.enable --config ~/nixos
 ```
 
-Without the dev shell (how the last run here was done, because `nix develop` would have
-rebuilt the shell env): `PYTHONPATH=src /nix/store/…-python3.14-pytest-9.1.1/bin/pytest -q`
-and `/nix/store/…-ruff-0.17.2/bin/ruff check src tests`.
-
-Scratch material from this session (not in the repo): `/tmp/nixin-scratch/` holds the
-bench logs (`bench.log`, `bench2.log`), the draft helper and the full recorded outputs
-(`out-ssh.json`, `out-kitty.json`) the fixtures were trimmed from.
+Scratch from the mbp13 session (not in the repo): `/tmp/nixin-mbp13/`, with `bench.sh` (the
+`time -v` wrapper), `*.out` (JSON of each run), `*.time` (`time -v` + load), `split.py`, and
+`nixos-head/` (the clone used for the `eval-failed` check).
