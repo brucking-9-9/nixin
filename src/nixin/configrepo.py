@@ -358,7 +358,10 @@ class ConfigRepo:
         """Map a /nix/store/...-source/... path nix reported to its origin."""
         src = self.source().store_path
         if src and (raw == src or raw.startswith(src + "/")):
-            return Location(raw, "config", raw[len(src) + 1 :] or "flake.nix")
+            rel = raw[len(src) + 1 :] or "flake.nix"
+            if os.path.isfile(os.path.join(raw, "default.nix")):
+                rel += "/default.nix"  # a module imported as a directory (./hosts/mbp13)
+            return Location(raw, "config", rel)
         inputs = self.inputs()
         nixpkgs = inputs.get("nixpkgs")
         if nixpkgs and raw == f"{nixpkgs}/flake.nix":

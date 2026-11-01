@@ -80,17 +80,19 @@ option that does evaluate on that host).
 | `hm_users` | Home Manager users of the host (`[]` without HM) |
 | `packages` | counts: `system` (`environment.systemPackages`), `home.<user>` (`home.packages`) |
 | `programs` | names with `programs.<x>.enable = true`: `system`, `home.<user>` |
-| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined`, `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; without `--full` the cached counts of an earlier `--full`, else `{}` |
+| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined` (set by more than the option's own default — `isDefined` alone is true for every option that has a default), `in_config` (defined in a file of the config tree), `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; without `--full` the cached counts of an earlier `--full`, else `{}` |
 | `cache`, `timings` | cache dir + hits/misses; seconds per eval |
 
 `where NAME` with a dot (or `--kind option`) answers for every scope the option exists in
 (`scopes[]`, each `scope` nixos/home + `user`): `mode` is `exact` (the option itself),
 `sub` (a path inside an `attrsOf` option, e.g. `systemd.services.foo.enable`, dug out of
-the parent's value) or `prefix` (a non-leaf path: the defined options under it). Each
+the parent's value) or `prefix` (a non-leaf path: the options under it that something sets
+beyond their own default; `under_prefix` counts all of them). Each
 option carries `name`, `option`, `type`, `description`, `isDefined`, `highestPrio`,
 `value` (size-capped; `<derivation foo-1.2>`, `<function>`, `<… N more>` placeholders),
 `declarations[]` (`source` = `config` | `nixpkgs` | `home-manager` | other input | `inline`,
-`file` relative to that source, `line`/`column` from `declarationPositions`) and
+`file` relative to that source — a module imported as a directory is reported as its
+`default.nix` — `line`/`column` from `declarationPositions`) and
 `definitions[]` — the file that sets it (same mapping), `value` that file contributes,
 and for config files a `line` found by a brace-tracking text scan (`line_heuristic:
 true`; `inline` definitions, i.e. attrsets written inside the `nixosSystem` call that

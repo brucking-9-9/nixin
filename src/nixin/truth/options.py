@@ -147,7 +147,9 @@ class ExclusionStore:
         return self._read()[kind]
 
     def add(self, kind: str, learned: dict[str, str]) -> None:
-        if not learned:
+        """Record what an index pass learned; the first pass on a rev pair also writes the
+        seed out, so the file shows what the index skipped."""
+        if not learned and self.path.exists():
             return
         with self._lock:
             doc = self._read()
@@ -183,7 +185,7 @@ def index(
     store.add(kind, doc["excluded"])
     doc["excluded"] = {**known, **doc["excluded"]}
     cache.put(name, doc, salt)
-    cache.put(f"{name}-summary", summarize(doc), salt)
+    cache.put(f"{name}-summary", summarize(doc, repo.source().store_path), salt)
     return doc
 
 
@@ -209,15 +211,33 @@ def prefix_query(
 # --- reading an index -------------------------------------------------------------------
 
 
-def summarize(doc: dict) -> dict[str, Any]:
+def is_set(entry: dict) -> bool:
+    """Set by something other than its own default. isDefined alone is true for every
+    option with a default: the module system adds the default as a definition from the
+    declaring file, and that is all `definitions` holds when nothing overrides it."""
+    defs = entry.get("definitions")
+    if not entry.get("isDefined") or defs is None:
+        return False
+    return defs != entry.get("declarations", [])[:1]
+
+
+def summarize(doc: dict, config_source: str | None = None) -> dict[str, Any]:
+    """Counts for `status`; `in_config` = options with a definition in a file of the
+    config tree (`config_source`, the /nix/store/…-source nix evaluated)."""
     entries = doc["entries"]
-    return {
+    out: dict[str, Any] = {
         "total": len(entries),
-        "defined": sum(1 for e in entries if e.get("isDefined")),
+        "defined": sum(1 for e in entries if is_set(e)),
         "excluded": len(doc.get("excluded", {})),
         "definitions_error": sum(1 for e in entries if e.get("definitionsError")),
         "seconds": doc.get("seconds"),
     }
+    if config_source:
+        inside = config_source.rstrip("/") + "/"
+        out["in_config"] = sum(
+            1 for e in entries if any(f.startswith(inside) for f in e.get("definitions") or [])
+        )
+    return out
 
 
 def lookup(entries: list[dict], name: str) -> dict | None:

@@ -88,9 +88,11 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     option_docs: dict[str, Any] = {}
     if ns.full:
         store = opts.ExclusionStore(repo)
-        option_docs["nixos"] = opts.summarize(opts.index(repo, host, cache, store=store))
+        option_docs["nixos"] = opts.summarize(
+            opts.index(repo, host, cache, store=store), src.store_path
+        )
         option_docs["home"] = {
-            u: opts.summarize(opts.index(repo, host, cache, hm=u, store=store))
+            u: opts.summarize(opts.index(repo, host, cache, hm=u, store=store), src.store_path)
             for u in pk["hm_users"]
         }
     else:  # whatever an earlier --full left in the cache, without evaluating anything
@@ -275,7 +277,7 @@ def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name
                 mode, items = "sub", [_entry_doc(repo, parent, rest)]
             else:
                 mode = "prefix"
-                items = [_entry_doc(repo, e, []) for e in entries if e.get("isDefined")]
+                items = [_entry_doc(repo, e, []) for e in entries if opts.is_set(e)]
         scopes_out.append(
             {
                 "scope": scope,
@@ -312,7 +314,8 @@ def _where_package(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, nam
     installed = pkgs.find(pk, name)
     enabled = pkgs.programs(pk, name)
     declared: list[dict] = []
-    for scope, user in _scopes(pk):
+    for tree, user in _scopes(pk):
+        scope = "system" if tree == "nixos" else tree  # package docs say system/home
         names = {
             f"<derivation {p['name']}>"
             for p in installed

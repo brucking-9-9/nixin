@@ -40,6 +40,20 @@ MBP13_STDERR = """error:
 """
 
 
+# environment.systemPackages as a prefix query reports it (trimmed): which file lists what
+SYSTEM_PACKAGES = {
+    "name": "environment.systemPackages",
+    "type": "list of package",
+    "isDefined": True,
+    "declarations": [f"{NIXPKGS_STORE}/nixos/modules/config/system-path.nix"],
+    "definitions": [f"{CONFIG_STORE}/hosts/x", f"{NIXPKGS_STORE}/nixos/modules/x.nix"],
+    "definitionValues": [
+        {"file": f"{CONFIG_STORE}/hosts/x", "value": ["<derivation ripgrep-15.2.0>"]},
+        {"file": f"{NIXPKGS_STORE}/nixos/modules/x.nix", "value": ["<derivation quiet>"]},
+    ],
+}
+
+
 def fixture(name: str):
     return json.loads((FIXTURES / name).read_text())
 
@@ -110,6 +124,8 @@ class FakeNix:
                     return (FIXTURES / "prefix-home-brucking-programs.kitty.json").read_text()
                 if "hm = null" in tail and '"services" "openssh"' in tail:
                     return (FIXTURES / "prefix-nixos-services.openssh.json").read_text()
+                if "hm = null" in tail and '"environment" "systemPackages"' in tail:
+                    return json.dumps([SYSTEM_PACKAGES])
                 return "[]"
         raise AssertionError(f"unexpected nix call: {args}")
 
@@ -182,6 +198,14 @@ def test_source_lock_hosts_and_path_mapping(repo):
     assert repo.cache_key("19BK") != repo.cache_key("mbp13")
 
 
+def test_directory_module_maps_to_default_nix(tmp_path):
+    (tmp_path / "hosts" / "x").mkdir(parents=True)
+    (tmp_path / "hosts" / "x" / "default.nix").write_text("{ }")
+    repo = ConfigRepo(tmp_path, nix=FakeNix(), _meta={"path": str(tmp_path)})
+    loc = repo.locate_path(f"{tmp_path}/hosts/x")  # how nix names `imports = [ ./hosts/x ]`
+    assert (loc.source, loc.file) == ("config", "hosts/x/default.nix")
+
+
 def test_toplevel_failure_is_a_clean_eval_failed(repo):
     with pytest.raises(NixinError) as e:
         repo.eval_raw("nixosConfigurations.mbp13.config.system.build.toplevel.drvPath")
@@ -240,8 +264,11 @@ def test_prefix_query_and_entry_shape(repo):
     assert parent["name"] == "services.openssh.settings" and rest == ["PermitRootLogin"]
     assert options.dig(parent["value"], rest) == (True, "no")
     assert options.dig(parent["value"], ["Nope"]) == (False, None)
-    summary = options.summarize(q)
-    assert summary["total"] == 3 and summary["defined"] == 3 and summary["excluded"] == 0
+    summary = options.summarize(q, CONFIG_STORE)
+    assert summary["total"] == 3 and summary["excluded"] == 0
+    # ports only carries its default (defined in the declaring file): not counted
+    assert summary["defined"] == 2 and summary["in_config"] == 2
+    assert not options.is_set(options.lookup(q["entries"], "services.openssh.ports"))
 
 
 def test_evaluate_excludes_poisoned_options_by_marker(repo):
@@ -426,6 +453,13 @@ def test_where_option_and_package(repo, monkeypatch, capsys):
     doc = json.loads(capsys.readouterr().out)
     assert doc["kind"] == "package" and doc["installed"][0]["user"] == "brucking"
     assert doc["programs"][0]["option"] == "programs.kitty.enable"
+
+    rc = main(["--json", "--host", "19BK", "where", "ripgrep"])
+    doc = json.loads(capsys.readouterr().out)
+    assert [(p["scope"], p["name"]) for p in doc["installed"]] == [("system", "ripgrep-15.2.0")]
+    assert [(d["scope"], d["option"], d["items"]) for d in doc["declared"]] == [
+        ("system", "environment.systemPackages", ["<derivation ripgrep-15.2.0>"])
+    ]
 
     rc = main(["--json", "--host", "19BK", "where", "no.such.option"])
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "not-found"
