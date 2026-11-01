@@ -36,8 +36,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     sub.choices["where"].add_argument(
         "--kind", choices=["package", "option"], help="what NAME is (default: guess from a dot)"
     )
-    sub.choices["status"].add_argument(
-        "--quick", action="store_true", help="skip the option index (counts only what is cached)"
+    st = sub.choices["status"]
+    st.add_argument(
+        "--full",
+        action="store_true",
+        help="also build the option index (NixOS + each HM user; ~30 s per tree when cold)",
+    )
+    st.add_argument(
+        "--quick", action="store_true", help="the default: option counts only if already cached"
     )
 
 
@@ -80,12 +86,21 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     pk = pkgs.collect(repo, host, cache)
     timings["packages"] = pk["seconds"]
     option_docs: dict[str, Any] = {}
-    if not ns.quick:
-        idx = opts.index(repo, host, cache)
-        option_docs["nixos"] = opts.summarize(idx)
-        option_docs["home"] = {}
-        for user in pk["hm_users"]:
-            option_docs["home"][user] = opts.summarize(opts.index(repo, host, cache, hm=user))
+    if ns.full:
+        store = opts.ExclusionStore(repo)
+        option_docs["nixos"] = opts.summarize(opts.index(repo, host, cache, store=store))
+        option_docs["home"] = {
+            u: opts.summarize(opts.index(repo, host, cache, hm=u, store=store))
+            for u in pk["hm_users"]
+        }
+    else:  # whatever an earlier --full left in the cache, without evaluating anything
+        nixos = opts.cached_summary(cache)
+        if nixos is not None:
+            home = {u: opts.cached_summary(cache, hm=u) for u in pk["hm_users"]}
+            option_docs = {
+                "nixos": nixos,
+                "home": {u: h for u, h in home.items() if h is not None},
+            }
 
     running_rev = run.get("nixpkgs_rev")
     doc = {

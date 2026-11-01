@@ -267,6 +267,42 @@ def test_evaluate_excludes_poisoned_options_by_marker(repo):
     assert doc["entries"][0]["name"] == "hardware.nvidia.enabled"
 
 
+def test_index_seeds_learns_and_persists_exclusions(repo):
+    base, args_seen = repo.nix, []
+
+    def nix(args, **kw):
+        if "--apply" not in args:
+            return base(args, **kw)
+        tail = args[args.index("--apply") + 1].splitlines()[-1]  # `) { ...ARGS }`
+        args_seen.append(tail)
+        if "hm = null" in tail and '"services.new.thing"' not in tail:
+            raise NixinError(
+                "eval-failed",
+                "boom\nsecond line",
+                stderr="error:\n … while evaluating 'nixin-option services.new.thing'\nerror: boom\n",
+            )
+        return '[{"name": "a.b", "isDefined": true}]'
+
+    repo.nix = nix
+    doc = options.index(repo, "19BK", TruthCache(repo, "19BK"))
+    assert len(args_seen) == 2 and '"hardware.nvidia.open"' in args_seen[0]  # seeded
+    assert len(doc["excluded"]) == len(options.SEED_EXCLUSIONS["nixos"]) + 1
+    store = options.ExclusionStore(repo)
+    assert store.path.name == "exclude-3ec636362e18-c216bf5a1f17.json"
+    saved = json.loads(store.path.read_text())
+    assert saved["nixos"]["services.new.thing"] == "boom"  # first line only
+    assert saved["nixpkgs"].startswith("3ec6363")
+    assert saved["home"] == options.SEED_EXCLUSIONS["home"]
+
+    args_seen.clear()  # a new config tree (cache miss) on the same lock: one eval
+    options.index(repo, "19BK", TruthCache(repo, "19BK", enabled=False))
+    assert len(args_seen) == 1 and '"services.new.thing"' in args_seen[0]
+    args_seen.clear()
+    hm = options.index(repo, "19BK", TruthCache(repo, "19BK"), hm="brucking")
+    assert len(args_seen) == 1 and '"programs.radicle.uri.web-rad.browser"' in args_seen[0]
+    assert options.summarize(hm)["excluded"] == len(options.SEED_EXCLUSIONS["home"])
+
+
 def test_evaluate_gives_up_without_a_marker(repo):
     def nix(args, **kw):
         raise NixinError("eval-failed", "boom", stderr="error: boom\n")
@@ -339,13 +375,21 @@ def test_status_json_contract(repo, monkeypatch, capsys):
         },
     )
     monkeypatch.setattr("nixin.truth.running_system", configrepo.running_system)
-    rc = main(["--json", "--host", "19BK", "status", "--quick"])
+    rc = main(["--json", "--host", "19BK", "status"])
     doc = json.loads(capsys.readouterr().out)
     assert rc == 0 and doc["ok"] and doc["verb"] == "status"
     assert doc["lock"]["node"] == "nixpkgs_2" and doc["running"]["matches_lock"] is True
     assert doc["eval"]["ok"] and doc["packages"] == {"system": 2, "home": {"brucking": 1}}
-    assert doc["hm_users"] == ["brucking"] and doc["options"] == {}
-    rc = main(["--json", "--host", "mbp13", "status", "--quick"])
+    assert doc["hm_users"] == ["brucking"] and doc["options"] == {}  # no index by default
+    rc = main(["--json", "--host", "19BK", "status", "--full"])
+    full = json.loads(capsys.readouterr().out)["options"]
+    assert full["nixos"]["total"] == 0 and full["nixos"]["excluded"] == 8
+    assert set(full["home"]) == {"brucking"}
+    n = len(repo.nix.calls)
+    rc = main(["--json", "--host", "19BK", "status", "--quick"])  # the default, spelled out
+    assert json.loads(capsys.readouterr().out)["options"] == full  # summaries from the cache
+    assert not [c for c in repo.nix.calls[n:] if "--apply" in c and "attrNames" not in c[-1]]
+    rc = main(["--json", "--host", "mbp13", "status"])
     doc = json.loads(capsys.readouterr().out)
     assert rc == 1 and doc["ok"] is False and doc["error"]["code"] == "eval-failed"
     assert "Scripted initrd has been removed." in doc["error"]["message"]

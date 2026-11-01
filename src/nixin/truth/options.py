@@ -14,19 +14,47 @@ A scope is the NixOS tree (hm=None) or a Home Manager user's tree (hm="brucking"
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
+import threading
 import time
 from importlib.resources import files
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, nix_value
-from .cache import TruthCache
+from .cache import TruthCache, cache_dir
 
 HELPER = files("nixin.truth") / "options.nix"
 MARKER = re.compile(r"nixin-option ([^\s'\"`]+)")
 MAX_RETRIES = 12
 INDEX_VALUES = "none"  # the full index carries no values; `where` fetches them per prefix
 PREFIX_MAX_ITEMS = 400
+
+# Options whose definitions raise an uncatchable error in the full index (values=none),
+# learned on nixpkgs 3ec6363 + home-manager c216bf5: 19BK and mbp13 hit the same eight, so
+# they are properties of the modules, not of a config. The seed for a (nixpkgs,
+# home-manager) pair nixin has not indexed yet; evaluate() still learns anything new.
+SEED_EXCLUSIONS: dict[str, dict[str, str]] = {
+    "nixos": {
+        "hardware.nvidia.gsp.enable": "expected a set but found null: null",
+        "hardware.nvidia.open": "expected a set but found null: null",
+        "hardware.nvidia.powerManagement.kernelSuspendNotifier": (
+            "expected a set but found null: null"
+        ),
+        "services.dawarich.redis.host": "attribute 'dawarich' missing",
+        "services.greenlight.redis.host": "attribute 'greenlight' missing",
+        "services.immich.redis.host": "attribute 'immich' missing",
+        "services.kener.redis.host": "attribute 'kener' missing",
+        "services.nagios.cgiConfigFile": "cannot coerce null to a string: null",
+    },
+    "home": {
+        "programs.google-chrome-beta.package": "seed list (failed on 19BK)",
+        "programs.google-chrome-dev.package": "seed list (failed on 19BK)",
+        "programs.radicle.uri.web-rad.browser": "seed list (failed on 19BK)",
+        "programs.vscode.haskell.hie.executablePath": "seed list (failed on 19BK)",
+    },
+}
 
 
 def helper_text() -> str:
@@ -87,15 +115,81 @@ def evaluate(
     )
 
 
-def index(repo: ConfigRepo, host: str, cache: TruthCache, *, hm: str | None = None) -> dict:
+class ExclusionStore:
+    """The full index's exclusions, persisted per (nixpkgs rev, home-manager rev) as
+    `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>.json` = {"nixos": {name: message},
+    "home": {...}}, seeded with SEED_EXCLUSIONS. Kind "home" covers every HM user.
+
+    Not used by prefix queries: `where` asks for values (other failures) and should still
+    answer for an excluded option on a host where it does evaluate (nvidia enabled).
+    Best effort like TruthCache; delete the file to re-learn."""
+
+    _lock = threading.Lock()  # the NixOS and HM index may learn at the same time
+
+    def __init__(self, repo: ConfigRepo) -> None:
+        nixpkgs, hm = repo.lock("nixpkgs"), repo.lock("home-manager")
+        self.revs = {
+            "nixpkgs": nixpkgs.rev if nixpkgs else None,
+            "home-manager": hm.rev if hm else None,
+        }
+        np_rev = (self.revs["nixpkgs"] or "unknown")[:12]
+        hm_rev = (self.revs["home-manager"] or "none")[:12]
+        self.path = cache_dir() / f"exclude-{np_rev}-{hm_rev}.json"
+
+    def _read(self) -> dict[str, dict[str, str]]:
+        try:
+            doc = json.loads(self.path.read_text())
+        except (OSError, ValueError):
+            return {k: dict(v) for k, v in SEED_EXCLUSIONS.items()}
+        return {k: dict(doc.get(k, {})) for k in SEED_EXCLUSIONS}
+
+    def load(self, kind: str) -> dict[str, str]:
+        return self._read()[kind]
+
+    def add(self, kind: str, learned: dict[str, str]) -> None:
+        if not learned:
+            return
+        with self._lock:
+            doc = self._read()
+            doc[kind].update({k: v.splitlines()[0] if v else v for k, v in learned.items()})
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = self.path.with_suffix(f".{os.getpid()}.tmp")
+                tmp.write_text(json.dumps({**self.revs, **doc}, indent=1, sort_keys=True))
+                os.replace(tmp, self.path)
+            except OSError:
+                pass
+
+
+def index(
+    repo: ConfigRepo,
+    host: str,
+    cache: TruthCache,
+    *,
+    hm: str | None = None,
+    store: ExclusionStore | None = None,
+) -> dict:
+    """The full index of a scope: one eval when the exclusion store already knows every
+    option that cannot be evaluated; `excluded` lists known + newly learned ones."""
     name = f"options-{scope_name(hm)}"
     salt = helper_text() + INDEX_VALUES
     hit = cache.get(name, salt)
     if hit is not None:
         return hit
-    doc = evaluate(repo, host, hm=hm, values=INDEX_VALUES)
+    store = store or ExclusionStore(repo)
+    kind = "nixos" if hm is None else "home"
+    known = store.load(kind)
+    doc = evaluate(repo, host, hm=hm, values=INDEX_VALUES, exclude=list(known))
+    store.add(kind, doc["excluded"])
+    doc["excluded"] = {**known, **doc["excluded"]}
     cache.put(name, doc, salt)
+    cache.put(f"{name}-summary", summarize(doc), salt)
     return doc
+
+
+def cached_summary(cache: TruthCache, *, hm: str | None = None) -> dict | None:
+    """The index summary if a full index of this tree is cached (no eval)."""
+    return cache.get(f"options-{scope_name(hm)}-summary", helper_text() + INDEX_VALUES)
 
 
 def prefix_query(

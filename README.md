@@ -47,7 +47,7 @@ prompts; privileged steps fail with `needs-sudo` and the command to run.
 
 ## Truth output
 
-`nixin [--json] [--host H] status [--config DIR] [--refresh] [--quick]` and
+`nixin [--json] [--host H] status [--config DIR] [--refresh] [--full]` and
 `nixin [--json] [--host H] where NAME [--kind package|option] [--config DIR] [--refresh]`
 evaluate the config flake (`--config`, else `$NIXIN_CONFIG`, else `/etc/nixos`) with the
 host's own `nix`. Results are cached under `$XDG_CACHE_HOME/nixin/truth/` keyed by nix's
@@ -55,6 +55,19 @@ flake fingerprint (tree as nix sees it + lock) and the host, so any tracked edit
 `--refresh` skips reads. Errors: `config-not-found`, `unknown-host`, `eval-failed` (the
 last `error:` block of nix's stderr, traces and warnings stripped), `not-found`,
 `nix-missing`, `eval-timeout`.
+
+`status` is quick by default (`--quick` is accepted and means the same): it evaluates
+`system.build.toplevel` and the package lists, 25–70 s cold depending on the host and its
+load, well under a second from the cache. `--full` also builds the option index of the
+NixOS tree and of each Home Manager user (one eval per tree, ~30 s / 1.6 GiB for NixOS,
+~20 s for HM on 19BK; under load on mbp13 much slower); later quick runs show those counts
+from the cache for as long as the tree is unchanged. Some nixpkgs/HM options raise an error
+nix cannot catch when their service is off; the index skips them. Which ones is a property
+of the module set, so the list is kept per (nixpkgs rev, home-manager rev) in
+`$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>.json`, seeded with the ones known on
+nixpkgs 3ec6363; a new one costs one extra eval once and is added. Delete the file to
+re-learn. `where` does not use the list (it asks per prefix and still answers for an
+option that does evaluate on that host).
 
 `status` fields (`ok: true`):
 
@@ -67,7 +80,7 @@ last `error:` block of nix's stderr, traces and warnings stripped), `not-found`,
 | `hm_users` | Home Manager users of the host (`[]` without HM) |
 | `packages` | counts: `system` (`environment.systemPackages`), `home.<user>` (`home.packages`) |
 | `programs` | names with `programs.<x>.enable = true`: `system`, `home.<user>` |
-| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined`, `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; `{}` with `--quick` |
+| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined`, `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; without `--full` the cached counts of an earlier `--full`, else `{}` |
 | `cache`, `timings` | cache dir + hits/misses; seconds per eval |
 
 `where NAME` with a dot (or `--kind option`) answers for every scope the option exists in
