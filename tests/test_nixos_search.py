@@ -82,15 +82,15 @@ def test_resolve_channel_errors(es_transport, cache):
 
 def test_resolve_channel_skips_empty_newest_generation(transport, cache):
     transport.add("GET", r"/_cat/aliases", fixture_file="es/aliases.json")
-    transport.add("POST", r"latest-52-nixos-unstable/_count$", {"count": 0})
-    transport.add("POST", r"latest-51-nixos-unstable/_count$", {"count": 5})
+    transport.add("POST", r"/nixos-52-unstable-[0-9a-f]{40}/_count$", {"count": 0})
+    transport.add("POST", r"/nixos-51-unstable-[0-9a-f]{40}/_count$", {"count": 5})
     assert es.resolve_channel(cache, "unstable").alias == "latest-51-nixos-unstable"
 
 
 def test_resolve_channel_404_count_means_empty(transport, cache):
     transport.add("GET", r"/_cat/aliases", fixture_file="es/aliases.json")
-    transport.add("POST", r"latest-52-nixos-unstable/_count$", None, status=404)
-    transport.add("POST", r"latest-51-nixos-unstable/_count$", {"count": 5})
+    transport.add("POST", r"/nixos-52-unstable-[0-9a-f]{40}/_count$", None, status=404)
+    transport.add("POST", r"/nixos-51-unstable-[0-9a-f]{40}/_count$", {"count": 5})
     assert es.resolve_channel(cache, "unstable").alias == "latest-51-nixos-unstable"
 
 
@@ -131,6 +131,16 @@ def test_search_packages(es_transport, cache):
     _m, _u, body = es_transport.calls[-1]
     assert body["size"] == 4 and body["_source"] == es.PKG_SOURCE_FIELDS and "rescore" in body
     assert body["query"]["bool"]["filter"] == [{"term": {"type": "package"}}]
+
+
+def test_search_asks_the_concrete_index_not_the_alias(es_transport, cache):
+    # the alias moves to a newer rev between alias-list refreshes; the index name is the rev
+    ch = es.resolve_channel(cache, "unstable")
+    part = es.search(cache, "firefox", "pkg", ch, 4)
+    _m, url, _b = es_transport.calls[-1]
+    assert url.endswith(f"/nixos-52-unstable-{REV_UNSTABLE}/_search")
+    assert all(r["rev"] == REV_UNSTABLE for r in part.results)
+    assert not any("latest-" in u for _m, u, _b in es_transport.calls)
 
 
 def test_search_is_cached(es_transport, cache):

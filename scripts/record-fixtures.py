@@ -77,7 +77,7 @@ def record_es() -> None:
     ch = es.resolve_channel(cache, "unstable")
     write(
         "es/count.json",
-        post_json(f"{es.ES_URL}/{ch.alias}/_count", {"query": {"match_all": {}}}, auth=es.ES_AUTH),
+        post_json(f"{es.ES_URL}/{ch.index}/_count", {"query": {"match_all": {}}}, auth=es.ES_AUTH),
     )
 
     def search_body(query: str, kind: str, limit: int) -> dict:
@@ -105,7 +105,7 @@ def record_es() -> None:
         q = es._build_query(words, "option", es._OPT_FIELDS, "option_name", es._OPT_PHRASE, [])
         return {"query": q, "size": limit, "_source": es.OPT_SOURCE_FIELDS}
 
-    url = f"{es.ES_URL}/{ch.alias}/_search"
+    url = f"{es.ES_URL}/{ch.index}/_search"
     write(
         "es/search_pkg_firefox.json",
         trim_hits(post_json(url, search_body("firefox", "pkg", 5), auth=es.ES_AUTH), 4),

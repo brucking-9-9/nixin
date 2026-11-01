@@ -9,7 +9,10 @@ channel generation and an alias per channel:
 
 so the alias list (`_cat/aliases`) is the channel list, the highest generation
 per channel is the freshest data, and the index name tells the exact nixpkgs
-commit the documents were built from (reported as `rev`).
+commit the documents were built from (reported as `rev`). Queries go to that
+concrete index, not the alias: the alias moves to a new rev several times a
+day while the alias list is cached, and the superseded indices stay up for
+days, so asking the index keeps `rev` true to the documents returned.
 
 Document fields used (type "package"): package_attr_name, package_pname,
 package_pversion, package_description, package_homepage (list),
@@ -259,7 +262,7 @@ def _count(cache: Cache, ch: Channel) -> int:
     def fetch() -> int:
         try:
             data = post_json(
-                f"{ES_URL}/{ch.alias}/_count", {"query": {"match_all": {}}}, auth=ES_AUTH
+                f"{ES_URL}/{ch.index}/_count", {"query": {"match_all": {}}}, auth=ES_AUTH
             )
         except NetworkError as exc:
             if exc.status == 404:
@@ -268,7 +271,7 @@ def _count(cache: Cache, ch: Channel) -> int:
         count = data.get("count", 0) if isinstance(data, dict) else 0
         return int(count) if isinstance(count, int) else 0
 
-    count, _ = cache.fetch("es", f"count:{ch.alias}", TTL["es-search"], fetch)
+    count, _ = cache.fetch("es", f"count:{ch.index}", TTL["es-search"], fetch)
     return count
 
 
@@ -357,7 +360,7 @@ def _build_query(
 
 def _es_search(cache: Cache, ch: Channel, body: dict[str, Any]) -> tuple[list[dict], bool]:
     """POST a search body; returns the hits' `_source` documents."""
-    url = f"{ES_URL}/{ch.alias}/_search"
+    url = f"{ES_URL}/{ch.index}/_search"
     key = url + "\n" + json.dumps(body, sort_keys=True)
 
     def fetch() -> list[dict]:
@@ -367,7 +370,7 @@ def _es_search(cache: Cache, ch: Channel, body: dict[str, Any]) -> tuple[list[di
             if exc.status == 404:
                 raise DiscoveryError(
                     "bad-channel",
-                    f"index {ch.alias} is gone from {SOURCE} (channel rolled over); retry with --refresh",
+                    f"index {ch.index} is gone from {SOURCE} (channel rolled over); retry with --refresh",
                 ) from exc
             raise
         hits = data.get("hits", {}).get("hits", []) if isinstance(data, dict) else []
