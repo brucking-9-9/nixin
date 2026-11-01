@@ -44,6 +44,7 @@ SOURCE = "search.nixos.org"
 ES_URL = "https://search.nixos.org/backend"
 ES_AUTH = ("aWVSALXpZv", "X8gPHnzL52wFEekuxsfQ9cSh")  # the public frontend's read-only user
 
+MAX_SIZE = 10_000  # the cluster's max_result_window: a larger `size` is an HTTP 400
 _ALIAS_RE = re.compile(r"^latest-(\d+)-nixos-(unstable|\d+\.\d+)$")
 _REV_RE = re.compile(r"-([0-9a-f]{40})$")
 _HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -491,18 +492,19 @@ def search(cache: Cache, query: str, kind: str, ch: Channel, limit: int) -> Part
     words = _words(query)
     if not words:
         raise DiscoveryError("usage", f"nothing searchable in {query!r}")
+    size = min(limit, MAX_SIZE)
     body: dict[str, Any]
     if kind == "pkg":
         q = _build_query(
             words, "package", _PKG_FIELDS, "package_attr_name", _PKG_PHRASE, _PKG_POPULARITY
         )
-        body = {"query": q, "size": limit, "_source": PKG_SOURCE_FIELDS, "rescore": _PKG_RESCORE}
+        body = {"query": q, "size": size, "_source": PKG_SOURCE_FIELDS, "rescore": _PKG_RESCORE}
     elif kind == "program":
         q = _build_query(words, "package", _PKG_FIELDS, "package_programs", _PKG_PHRASE, [])
-        body = {"query": q, "size": limit, "_source": PKG_SOURCE_FIELDS}
+        body = {"query": q, "size": size, "_source": PKG_SOURCE_FIELDS}
     elif kind == "opt":
         q = _build_query(words, "option", _OPT_FIELDS, "option_name", _OPT_PHRASE, [])
-        body = {"query": q, "size": limit, "_source": OPT_SOURCE_FIELDS}
+        body = {"query": q, "size": size, "_source": OPT_SOURCE_FIELDS}
     else:
         raise DiscoveryError("usage", f"{SOURCE} has no kind {kind!r}")
     hits, cached = _es_search(cache, ch, body)

@@ -143,6 +143,13 @@ def test_search_asks_the_concrete_index_not_the_alias(es_transport, cache):
     assert not any("latest-" in u for _m, u, _b in es_transport.calls)
 
 
+def test_search_size_is_capped_at_the_result_window(es_transport, cache):
+    ch = es.resolve_channel(cache, "unstable")
+    es.search(cache, "firefox", "pkg", ch, 50_000)
+    _m, _u, body = es_transport.calls[-1]
+    assert body["size"] == es.MAX_SIZE
+
+
 def test_search_is_cached(es_transport, cache):
     ch = es.resolve_channel(cache, "unstable")
     assert es.search(cache, "firefox", "pkg", ch, 4).cached is False
