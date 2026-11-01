@@ -348,7 +348,8 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
 
         return noogle.info(cache, name)
 
-    doc = _merge(ns, _fan_out(ns, kinds, one))
+    parts = _fan_out(ns, kinds, one)
+    doc = _merge(ns, parts)
     doc.update(name=name, kind=ns.kind)
     if not doc["results"]:
         what = {
@@ -357,9 +358,14 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
             "hm": "Home Manager option",
             "fn": "function",
         }
-        wanted = " or ".join(what[k] for k in kinds)
+        # only claim "no such X" for the kinds that were actually asked
+        wanted = " or ".join(what[k] for k, part, _err in parts if part is not None)
         where = f" on {doc['channel']}" if doc.get("channel") else ""
-        raise DiscoveryError("not-found", f"no {wanted} named {name!r}{where}")
+        message = f"no {wanted} named {name!r}{where}"
+        failed = [f"{what[k]} ({err['code']})" for k, part, err in parts if part is None and err]
+        if failed:
+            message += "; not asked: " + ", ".join(failed)
+        raise DiscoveryError("not-found", message)
     return doc
 
 

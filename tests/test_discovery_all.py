@@ -123,6 +123,16 @@ def test_all_reports_the_concrete_channel(es_transport, cache_dir, capsys):
     assert {s["channel"] for s in doc["sources"].values()} == {"26.05"}
 
 
+def test_info_not_found_names_only_the_kinds_that_were_asked(es_transport, cache_dir, capsys):
+    # no Home Manager rule: that source is unreachable, so it cannot vouch for "not found"
+    rc, doc = run_json(capsys, "info", "nothing-anywhere")
+    assert rc == 1 and doc["error"]["code"] == "not-found"
+    assert doc["error"]["message"] == (
+        "no package or NixOS option named 'nothing-anywhere' on unstable;"
+        " not asked: Home Manager option (network)"
+    )
+
+
 def test_unexpected_exception_is_an_internal_error_document(monkeypatch, cache_dir, capsys):
     from nixin.discovery import home_manager
 
