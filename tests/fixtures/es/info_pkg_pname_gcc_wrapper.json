@@ -1,0 +1,154 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "gccNGPackages_15.gccWithLibcAndBasicLibgcc",
+     "package_description": "System C compiler (wrapper script)",
+     "package_homepage": [
+      "https://gcc.gnu.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "gcc",
+     "package_outputs": [
+      "info",
+      "out",
+      "man"
+     ],
+     "package_platforms": [],
+     "package_pname": "gcc-wrapper",
+     "package_position": "pkgs/build-support/cc-wrapper/default.nix:1064",
+     "package_programs": [
+      "ld.bfd",
+      "ld.gold",
+      "size",
+      "ld",
+      "ranlib",
+      "elfedit",
+      "ar",
+      "objcopy",
+      "readelf",
+      "c++",
+      "gprof",
+      "objdump",
+      "gcc",
+      "cc",
+      "strings",
+      "g++",
+      "c++filt",
+      "nm",
+      "dwp",
+      "strip",
+      "cpp",
+      "as",
+      "addr2line"
+     ],
+     "package_pversion": "15.3.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "gccNGPackages.gccNoLibgcc",
+     "package_description": "System C compiler (wrapper script)",
+     "package_homepage": [
+      "https://gcc.gnu.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "gcc",
+     "package_outputs": [
+      "man",
+      "out",
+      "info"
+     ],
+     "package_platforms": [],
+     "package_pname": "gcc-wrapper",
+     "package_position": "pkgs/build-support/cc-wrapper/default.nix:1064",
+     "package_programs": [
+      "gcc",
+      "strip",
+      "ld",
+      "nm",
+      "readelf",
+      "objcopy",
+      "elfedit",
+      "addr2line",
+      "cc",
+      "c++filt",
+      "strings",
+      "ld.bfd",
+      "size",
+      "g++",
+      "ld.gold",
+      "dwp",
+      "as",
+      "ar",
+      "objdump",
+      "ranlib",
+      "cpp",
+      "c++",
+      "gprof"
+     ],
+     "package_pversion": "16.2.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "gccNGPackages.gccWithLibgccNoCxx",
+     "package_description": "System C compiler (wrapper script)",
+     "package_homepage": [
+      "https://gcc.gnu.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "gcc",
+     "package_outputs": [
+      "out",
+      "info",
+      "man"
+     ],
+     "package_platforms": [],
+     "package_pname": "gcc-wrapper",
+     "package_position": "pkgs/build-support/cc-wrapper/default.nix:1064",
+     "package_programs": [],
+     "package_pversion": "16.2.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "gccNGPackages_16.gccWithLibgccNoCxx",
+     "package_description": "System C compiler (wrapper script)",
+     "package_homepage": [
+      "https://gcc.gnu.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "gcc",
+     "package_outputs": [
+      "info",
+      "out",
+      "man"
+     ],
+     "package_platforms": [],
+     "package_pname": "gcc-wrapper",
+     "package_position": "pkgs/build-support/cc-wrapper/default.nix:1064",
+     "package_programs": [],
+     "package_pversion": "16.2.0"
+    }
+   }
+  ],
+  "total": {
+   "relation": "eq",
+   "value": 33
+  }
+ }
+}

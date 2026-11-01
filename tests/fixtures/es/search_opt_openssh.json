@@ -1,0 +1,43 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "option_default": "true",
+     "option_description": "<rendered-html><p>Whether to enable the SFTP subsystem in the SSH daemon. This enables\nthe use of commands such as <code class=\"interpreted-text\"\nrole=\"command\">sftp</code> and <code class=\"interpreted-text\"\nrole=\"command\">sshfs</code>.</p>\n</rendered-html>",
+     "option_example": null,
+     "option_name": "services.openssh.allowSFTP",
+     "option_source": "nixos/modules/services/networking/ssh/sshd.nix",
+     "option_type": "boolean"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "option_default": "\"none\"",
+     "option_description": "<rendered-html><p>Specifies a program to be used to look up the user’s public keys. The\nprogram must be owned by root, not writable by group or others and\nspecified by an absolute path.</p>\n</rendered-html>",
+     "option_example": null,
+     "option_name": "services.openssh.authorizedKeysCommand",
+     "option_source": "nixos/modules/services/networking/ssh/sshd.nix",
+     "option_type": "string"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "option_default": "\"nobody\"",
+     "option_description": "<rendered-html><p>Specifies the user under whose account the AuthorizedKeysCommand is\nrun. It is recommended to use a dedicated user that has no other role on\nthe host than running authorized keys commands.</p>\n</rendered-html>",
+     "option_example": null,
+     "option_name": "services.openssh.authorizedKeysCommandUser",
+     "option_source": "nixos/modules/services/networking/ssh/sshd.nix",
+     "option_type": "string"
+    }
+   }
+  ],
+  "total": {
+   "relation": "eq",
+   "value": 53
+  }
+ }
+}
