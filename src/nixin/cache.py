@@ -16,7 +16,9 @@ Modes, from `--no-cache` / `--refresh`:
 
 Writes are best-effort: a read-only or missing cache dir (the `nix build`
 sandbox has `HOME=/homeless-shelter`) must never turn a good answer into an
-error, so every OSError on the way to disk is swallowed.
+error, so every OSError on the way to disk is swallowed. Each write goes to a
+per-process temp file renamed into place, so concurrent nixin calls (a UI
+firing several queries at once) never interleave inside one entry.
 """
 
 from __future__ import annotations
@@ -33,7 +35,9 @@ MODES = ("normal", "refresh", "off")
 
 
 def default_root() -> Path:
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    base = os.environ.get("XDG_CACHE_HOME", "")
+    if not os.path.isabs(base):  # unset, empty or relative: the XDG spec says ignore it
+        base = os.path.join(os.path.expanduser("~"), ".cache")
     return Path(base) / "nixin"
 
 
@@ -65,7 +69,10 @@ class Cache:
         if not isinstance(entry, dict) or entry.get("key") != key or "payload" not in entry:
             return None
         stored = entry.get("stored", 0)
-        if not isinstance(stored, int | float) or time.time() - stored > ttl:
+        if not isinstance(stored, int | float):
+            return None
+        age = time.time() - stored
+        if age < 0 or age > ttl:  # stored "in the future" (the clock jumped): don't trust it
             return None
         return entry["payload"]
 
@@ -73,7 +80,7 @@ class Cache:
         if self.mode == "off":
             return
         path = self.path(source, key)
-        tmp = path.with_suffix(".tmp")
+        tmp = path.with_name(f"{path.stem}.{os.getpid()}.tmp")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with tmp.open("w", encoding="utf-8") as fh:

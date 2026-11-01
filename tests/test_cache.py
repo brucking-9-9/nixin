@@ -13,6 +13,8 @@ def test_default_root_follows_xdg(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CACHE_HOME")
     monkeypatch.setenv("HOME", str(tmp_path / "h"))
     assert default_root() == tmp_path / "h" / ".cache" / "nixin"
+    monkeypatch.setenv("XDG_CACHE_HOME", "relative/dir")  # never cache into the cwd
+    assert default_root() == tmp_path / "h" / ".cache" / "nixin"
 
 
 def test_roundtrip_and_layout(tmp_path):
@@ -35,6 +37,30 @@ def test_ttl_expiry(tmp_path, monkeypatch):
     assert c.get("s", "k", ttl=10) == "v"
     now[0] += 10
     assert c.get("s", "k", ttl=10) is None
+
+
+def test_entry_from_the_future_is_stale(tmp_path, monkeypatch):
+    c = Cache(tmp_path)
+    now = [10_000.0]
+    monkeypatch.setattr("nixin.cache.time.time", lambda: now[0])
+    c.put("s", "k", "v")
+    now[0] -= 3600  # the clock went back an hour after the write
+    assert c.get("s", "k", ttl=10 * 3600) is None
+
+
+def test_write_uses_a_per_process_temp_file(tmp_path, monkeypatch):
+    c = Cache(tmp_path)
+    seen = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        seen.append(os.path.basename(src))
+        real_replace(src, dst)
+
+    monkeypatch.setattr("nixin.cache.os.replace", spy)
+    c.put("s", "k", 1)
+    assert seen == [f"{c.path('s', 'k').stem}.{os.getpid()}.tmp"]
+    assert [p.name for p in (tmp_path / "s").iterdir()] == [c.path("s", "k").name]
 
 
 def test_key_collision_is_detected(tmp_path, monkeypatch):
