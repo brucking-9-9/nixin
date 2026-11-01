@@ -26,6 +26,7 @@ def fake_nix(monkeypatch):
     def run(argv, **kw):
         calls.append(argv)
         assert argv[0] == "nix" and argv[1:3] == local.NIX_FLAGS
+        assert kw["stdin"] is subprocess.DEVNULL  # nix must never wait for an answer
         cmd = argv[3:]
         if cmd[:3] == ["flake", "metadata", "--json"]:
             return Done(json.dumps(fixture("local/flake_metadata.json")))
@@ -37,6 +38,8 @@ def fake_nix(monkeypatch):
             installable = cmd[2]
             if installable.endswith(".kitty"):
                 return Done(json.dumps(fixture("local/eval_kitty.json")))
+            if installable.endswith(".garbled"):
+                return Done("warning: not json\n{")
             if installable.endswith(".nope"):
                 return Done(
                     "",
@@ -94,7 +97,13 @@ def test_search_ranks_and_strips_prefix(fake_nix, cache):
         and kitty["unfree"] is None
     )
     assert part.extra == {"system": "x86_64-linux", "total": 4}
-    assert fake_nix[-1][3:] == ["search", "--json", f"{REF}#legacyPackages.x86_64-linux", "kitty"]
+    assert fake_nix[-1][3:] == [
+        "search",
+        "--json",
+        f"{REF}#legacyPackages.x86_64-linux",
+        "--",  # a query starting with "-" is a regex, not a nix flag
+        "kitty",
+    ]
     assert len(local.search(cache, REF, "kitty", 1).results) == 1
     assert local.search(cache, REF, "kitty", 1).cached is True
 
@@ -139,6 +148,19 @@ def test_info_record(fake_nix, cache):
     assert fake_nix[-1][3:6] == ["eval", "--json", f"{REF}#legacyPackages.x86_64-linux.kitty"]
     assert fake_nix[-1][6:8] == ["--apply", local.APPLY]
     assert local.info(cache, REF, "kitty").cached is True
+
+
+def test_info_cache_is_keyed_by_the_apply_expression(fake_nix, cache, monkeypatch):
+    assert local.info(cache, REF, "kitty").cached is False
+    assert local.info(cache, REF, "kitty").cached is True
+    monkeypatch.setattr(local, "_APPLY_DIGEST", "changed0")
+    assert local.info(cache, REF, "kitty").cached is False
+
+
+def test_info_non_json_output_is_nix_failed(fake_nix, cache):
+    with pytest.raises(DiscoveryError) as e:
+        local.info(cache, REF, "garbled")
+    assert e.value.code == "nix-failed" and "JSON" in e.value.message
 
 
 def test_info_missing_attribute_is_empty(fake_nix, cache):

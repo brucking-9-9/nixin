@@ -20,6 +20,7 @@ values need the config flake, which is the truth layer's job.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import subprocess
@@ -55,6 +56,8 @@ in
   mainProgram = p.meta.mainProgram or null;
   position = p.meta.position or null;
 }"""
+# Part of the eval cache key: a changed APPLY must not be answered from 30-day-old entries.
+_APPLY_DIGEST = hashlib.sha1(APPLY.encode()).hexdigest()[:8]
 
 
 def current_system() -> str:
@@ -68,9 +71,15 @@ def current_system() -> str:
 
 
 def _nix(args: list[str], timeout: float) -> str:
+    # stdin is closed so nix can never stop to ask (e.g. about a flake's nixConfig)
     try:
         proc = subprocess.run(
-            ["nix", *NIX_FLAGS, *args], capture_output=True, text=True, timeout=timeout, check=False
+            ["nix", *NIX_FLAGS, *args],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
         )
     except FileNotFoundError as exc:
         raise DiscoveryError("nix-missing", "nix is not on PATH") from exc
@@ -86,6 +95,13 @@ def _nix(args: list[str], timeout: float) -> str:
     return proc.stdout
 
 
+def _json(out: str, what: str) -> Any:
+    try:
+        return json.loads(out)
+    except ValueError as exc:
+        raise DiscoveryError("nix-failed", f"nix {what} did not print JSON") from exc
+
+
 def _is_missing_attr(message: str) -> bool:
     low = message.lower()
     return "does not provide attribute" in low or "attribute" in low and "missing" in low
@@ -95,7 +111,9 @@ def resolve(cache: Cache, flakeref: str) -> dict[str, Any]:
     """`nix flake metadata` for the ref: rev, store path, lastModified (branch refs move: 1 h TTL)."""
 
     def fetch() -> dict[str, Any]:
-        data = json.loads(_nix(["flake", "metadata", "--json", flakeref], timeout=120))
+        data = _json(_nix(["flake", "metadata", "--json", flakeref], timeout=120), "flake metadata")
+        if not isinstance(data, dict):
+            raise DiscoveryError("nix-failed", "nix flake metadata did not print an object")
         return {
             "rev": data.get("revision"),
             "path": data.get("path"),
@@ -164,8 +182,12 @@ def search(cache: Cache, flakeref: str, query: str, limit: int) -> Part:
 
     def fetch() -> dict[str, Any]:
         started = time.monotonic()
-        out = _nix(["search", "--json", f"{flakeref}#legacyPackages.{system}", query], timeout=900)
-        hits = json.loads(out) if out.strip() else {}
+        out = _nix(
+            ["search", "--json", f"{flakeref}#legacyPackages.{system}", "--", query], timeout=900
+        )
+        hits = _json(out, "search") if out.strip() else {}
+        if not isinstance(hits, dict):
+            raise DiscoveryError("nix-failed", "nix search did not print an object")
         return {"hits": hits, "took": round(time.monotonic() - started, 1)}
 
     payload, cached = cache.fetch("local", key, TTL["local"], fetch)
@@ -215,7 +237,7 @@ def info(cache: Cache, flakeref: str, attr: str) -> Part:
     system = current_system()
     meta = resolve(cache, flakeref)
     rev = meta.get("rev")
-    key = f"eval:{rev or meta.get('path')}:{system}:{attr}"
+    key = f"eval:{rev or meta.get('path')}:{system}:{attr}:{_APPLY_DIGEST}"
 
     def fetch() -> dict[str, Any] | None:
         try:
@@ -227,7 +249,7 @@ def info(cache: Cache, flakeref: str, attr: str) -> Part:
             if exc.code == "nix-failed" and _is_missing_attr(exc.message):
                 return None
             raise
-        data = json.loads(out)
+        data = _json(out, "eval")
         return data if isinstance(data, dict) else None
 
     data, cached = cache.fetch("local", key, TTL["local"], fetch)
