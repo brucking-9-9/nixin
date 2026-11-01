@@ -101,7 +101,11 @@ while something else answered). One source can serve several kinds and fail
 for only some of them, so a source may carry both an `error` and a non-zero
 `count`. `ok` stays true; it is false only when no source answered at all.
 `channel` is null for sources without channels (nixhub,
-noogle); for `local-nix` it is the flakeref as given. `info` returns the exact
+noogle); for `local-nix` it is the flakeref as given. A `sources` entry may
+also carry that source's extras: `updated` (home-manager-options: when the
+index was generated), `system` and `total` (local-nix: the system searched and
+the hit count before `--limit`), and for nixhub.io the version summary fields
+listed under `version` below. `info` returns the exact
 matches as `results` (usually one; `programs.git.enable` and `git` cannot
 collide but a name may be both a package and an option).
 
