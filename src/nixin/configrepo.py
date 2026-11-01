@@ -19,9 +19,10 @@ import shutil
 import socket
 import subprocess
 import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 DEFAULT_CONFIG = "/etc/nixos"
 ENV_CONFIG = "NIXIN_CONFIG"
@@ -76,7 +77,7 @@ def run_nix(args: list[str], *, code: str = "eval-failed", timeout: float | None
         raise NixinError("nix-missing", "`nix` is not on PATH")
     cmd = [exe, *args, "--option", "warn-dirty", "false"]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
         raise NixinError("eval-timeout", f"nix did not finish in {timeout:.0f}s") from e
     if proc.returncode != 0:
@@ -143,7 +144,7 @@ class LockedInput:
     def date(self) -> str | None:
         if self.last_modified is None:
             return None
-        return dt.datetime.fromtimestamp(self.last_modified, dt.timezone.utc).strftime("%Y-%m-%d")
+        return dt.datetime.fromtimestamp(self.last_modified, dt.UTC).strftime("%Y-%m-%d")
 
     @property
     def short_rev(self) -> str | None:
@@ -322,10 +323,11 @@ class ConfigRepo:
             return None
         proc = subprocess.run(
             ["git", "-c", "safe.directory=*", "-C", str(self.path), "rev-parse", "HEAD"],
+            check=False,
             capture_output=True,
             text=True,
         )
-        return proc.stdout.strip() or None if proc.returncode == 0 else None
+        return (proc.stdout.strip() or None) if proc.returncode == 0 else None
 
     def lock(self, name: str = "nixpkgs") -> LockedInput | None:
         lock_file = self.path / "flake.lock"
@@ -336,7 +338,9 @@ class ConfigRepo:
     def inputs(self) -> dict[str, str]:
         """Input name -> store path (nested inputs as "outer/inner"); from `nix flake archive`."""
         if self._inputs is None:
-            out = self.nix(["flake", "archive", "--json", "--dry-run", self.flake], code="not-a-flake")
+            out = self.nix(
+                ["flake", "archive", "--json", "--dry-run", self.flake], code="not-a-flake"
+            )
             flat: dict[str, str] = {}
 
             def walk(prefix: str, inputs: dict) -> None:
