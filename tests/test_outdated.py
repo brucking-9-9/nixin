@@ -457,11 +457,32 @@ def test_the_lock_already_at_the_target(repo, capsys):
     assert rc == 0 and doc["up_to_date"] is True and doc["changed"] == doc["removed"] == []
     assert doc["kernel"]["changed"] is False and doc["target"]["from"] == "nixpkgs"
     assert len(repo.nix.evals()) == 1  # no target eval
-    assert (
-        doc["commands"][0]
-        == f"nix flake lock {repo.path} --override-input nixpkgs github:nixos/nixpkgs/{LOCK_REV}"
+    assert doc["commands"] == [] and doc["notes"] == []
+    _rc, text = run(capsys, "--nixpkgs", "3ec6363", json_=False)
+    assert "the lock already has 3ec6363: nothing would change" in text
+
+
+def test_another_branch_is_pinned_with_a_note(repo, capsys):
+    rev = "9bb52223f4f6a0cc606fd0852d8784f896c137d5"  # nixos-26.05 on 2026-11-01
+    repo.nix.metadata["github:nixos/nixpkgs/nixos-26.05"] = {
+        "locked": {
+            "type": "github",
+            "owner": "nixos",
+            "repo": "nixpkgs",
+            "rev": rev,
+            "lastModified": 1793520000,
+        },
+        "url": f"github:nixos/nixpkgs/{rev}?narHash=sha256-x",
+    }
+    rc, doc = run(capsys, "--channel", "26.05")
+    assert rc == 0 and doc["target"]["from"] == "channel"
+    assert doc["target"]["flakeref"] == "github:nixos/nixpkgs/nixos-26.05"
+    assert doc["commands"][0] == (
+        f"nix flake lock {repo.path} --override-input nixpkgs github:nixos/nixpkgs/{rev}"
     )
-    assert "nix flake update" in doc["notes"][0]
+    assert 'set inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05"' in doc["notes"][0]
+    _rc, text = run(capsys, "--channel", "26.05", json_=False)
+    assert "  # pin nixpkgs to exactly the commit compared\n  nix flake lock " in text
 
 
 def test_a_target_the_config_does_not_evaluate_with(repo, capsys):

@@ -97,7 +97,7 @@ def _eval(
     if target is None:
         name, salt = "outdated-lock", helper
     else:
-        name, salt = "outdated-target", f"{helper}|{target.input}|{target.rev}"
+        name, salt = "outdated-target", f"{helper}|{target.input}|{target.locked}"
     hit = cache.get(name, salt)
     if hit is not None:
         return {**hit, "cached": True}
@@ -166,7 +166,9 @@ def _outdated(ns: argparse.Namespace) -> dict[str, Any]:
     return doc
 
 
-def _lock_side(repo, host, cache, ns, timings) -> dict[str, Any]:
+def _lock_side(
+    repo: ConfigRepo, host: str, cache: TruthCache, ns: argparse.Namespace, timings: dict
+) -> dict[str, Any]:
     lock = _eval(repo, host, cache)
     timings["lock"] = 0.0 if lock["cached"] else lock["seconds"]
     if ns.home is not None and ns.home not in (lock.get("home") or {}):
@@ -192,7 +194,14 @@ def _stable_release(refresh: bool) -> str | None:
     return releases[-1] if releases else None
 
 
-def _lock(ns, repo, host, np, cache, timings) -> dict[str, Any]:
+def _lock(
+    ns: argparse.Namespace,
+    repo: ConfigRepo,
+    host: str,
+    np: tgt.Nixpkgs,
+    cache: TruthCache,
+    timings: dict,
+) -> dict[str, Any]:
     if ns.channel:
         stable = _stable_release(ns.refresh) if ns.channel == "stable" else None
         flakeref, source = tgt.requested(np, None, tgt.channel_branch(ns.channel, stable))
@@ -228,8 +237,8 @@ def _lock(ns, repo, host, np, cache, timings) -> dict[str, Any]:
         "count": len(d["changed"]),
         "total": d["total"],
         "scopes": d["scopes"],
-        "commands": _commands(repo, host, np, target),
-        "notes": _notes(np, target),
+        "commands": [] if same else _commands(repo, host, np, target),
+        "notes": [] if same else _notes(np, target),
         "_release": lock.get("release"),
     }
 
@@ -267,7 +276,14 @@ def _notes(np: tgt.Nixpkgs, target: tgt.Target) -> list[str]:
 # --- --published --------------------------------------------------------------------
 
 
-def _published(ns, repo, host, np, cache, timings) -> dict[str, Any]:
+def _published(
+    ns: argparse.Namespace,
+    repo: ConfigRepo,
+    host: str,
+    np: tgt.Nixpkgs,
+    cache: TruthCache,
+    timings: dict,
+) -> dict[str, Any]:
     from ..cache import Cache
     from ..discovery import DiscoveryError
     from ..discovery import nixos_search as es
