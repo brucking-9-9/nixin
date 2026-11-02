@@ -274,8 +274,9 @@ changes something. The view-model is shared (`ui/view.py`: `package_rows`,
   packages would change; kernel 7.2.12 → 7.2.14` (`outdated` 4 s with the target cached).
   `docs/tui/live-{phone,desktop}-4-packages.svg`, `-5-updates.svg`. `~/nixos` unchanged
   (`git status` and the `flake.lock` hash compared before and after).
-- The update round trip on a throwaway clone (`git clone ~/nixos ~/nixos-ui-test`,
-  deleted afterwards), driven at 50×25 on the real backend: list 2.0 s, where 2.2 s,
+- The update round trip on a throwaway clone (`git clone ~/nixos ~/nixos-ui-test`; still
+  there, with the moved `flake.lock`: this run's settings deny `rm -rf`, so remove it by
+  hand, with `/tmp/uipk`), driven at 50×25 on the real backend: list 2.0 s, where 2.2 s,
   outdated 4.4 s, `--published` 0.9 s, `update --dry-run` 0.02 s, `update` 0.3 s (the
   tarball was already in the store; ~60 s cold), then Pending: **`status` failed with
   `eval-failed`**: at 0bb2eed nixpkgs refuses `gtk+-2.24.33` (gtk2 is marked broken

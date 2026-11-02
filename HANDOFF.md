@@ -41,7 +41,8 @@ on merge it moves here.
     Pending. Tests at 50×25 and 120×40 (TUI) and offscreen (GUI) on recorded documents;
     screenshots in `docs/tui/`, `docs/gui/`. Live on mbp13: both UIs read-only against
     `~/nixos`; the update round trip on a throwaway clone in both UIs. Nothing switched,
-    no sudo, `~/nixos` untouched.
+    no sudo, `~/nixos` untouched. Left behind: the clone `~/nixos-ui-test` and
+    `/tmp/uipk` (the run could not `rm -rf`): `rm -rf ~/nixos-ui-test /tmp/uipk`.
   - Gates at 9c4f1cf: `nix build` 577 passed, 25 skipped (live), then `nixin gui:
     self-test ok`; `nix develop -c pytest` the same; `ruff check`, `ruff format
     --check`, `nix fmt -- --check` clean; qmllint clean (a test).
