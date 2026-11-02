@@ -62,7 +62,7 @@ class TruthCache:
         p = self.path(name, salt)
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
-            tmp = p.with_suffix(".tmp")
+            tmp = p.with_suffix(f".{os.getpid()}.tmp")  # concurrent runs write the same key
             tmp.write_text(json.dumps(doc, separators=(",", ":")))
             os.replace(tmp, p)
         except OSError:
