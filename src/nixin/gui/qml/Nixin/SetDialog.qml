@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -12,6 +14,7 @@ Dialog {
 
     objectName: "setDialog"
     modal: true
+    focus: true
     anchors.centerIn: Overlay.overlay
     width: Math.min(parent ? parent.width - 80 : 640, 640)
     title: "set " + writer.setOption

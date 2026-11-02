@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -16,6 +18,7 @@ Dialog {
 
     objectName: "applyDialog"
     modal: true
+    focus: true
     anchors.centerIn: Overlay.overlay
     width: Math.min(parent ? parent.width - 80 : 900, 960)
     height: Math.min(parent ? parent.height - 60 : 640, 720)

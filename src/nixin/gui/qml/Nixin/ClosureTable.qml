@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 // plan's closure diff: + added, - removed, ~ changed; name, version, size.

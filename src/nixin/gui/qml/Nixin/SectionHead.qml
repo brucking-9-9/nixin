@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -29,7 +31,7 @@ RowLayout {
     Rectangle {
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignVCenter
-        height: 1
+        implicitHeight: 1
         color: Theme.line
     }
 }

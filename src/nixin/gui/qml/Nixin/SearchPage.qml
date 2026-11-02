@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -90,6 +92,7 @@ Item {
                 boundsBehavior: Flickable.StopAtBounds
                 highlightMoveDuration: 0
                 ScrollBar.vertical: ScrollBar { }
+                onCountChanged: currentIndex = count > 0 ? 0 : -1  // new results: the cursor on the first
                 Keys.onReturnPressed: page.vm.select(currentIndex)
                 Keys.onEnterPressed: page.vm.select(currentIndex)
                 Keys.onSpacePressed: page.vm.select(currentIndex)

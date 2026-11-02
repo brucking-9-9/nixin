@@ -16,10 +16,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimer
 from PySide6.QtGui import QGuiApplication, QImage
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
+from PySide6.QtQuick import QQuickItem, QQuickWindow, QSGRendererInterface
 from PySide6.QtQuickControls2 import QQuickStyle
 
 from ..ui.backend import Backend
@@ -29,6 +29,7 @@ QML_DIR = Path(__file__).with_name("qml")
 STYLE = "NixinStyle"
 APP_ID = "nixin"  # the Wayland app_id (window rules match it)
 SELF_TEST_TIMEOUT_MS = 20_000
+_software = False  # the software renderer is chosen (graphicsApi() does not say so)
 
 
 def offscreen() -> bool:
@@ -39,8 +40,6 @@ def application() -> QGuiApplication:
     """The process's QGuiApplication (created once; the tests' qapp is reused)."""
     app = QGuiApplication.instance()
     if app is None:
-        if offscreen():
-            QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
         app = QGuiApplication([sys.argv[0] if sys.argv else "nixin-gui"])
     QGuiApplication.setApplicationName("nixin")
     QGuiApplication.setApplicationDisplayName("nixin")
@@ -55,7 +54,12 @@ class Window:
     def __init__(self, gui: Gui) -> None:
         self.gui = gui
         self.errors: list[str] = []
-        QQuickStyle.setStyle(STYLE)
+        global _software
+        if offscreen() and not _software:  # before the first window, once per process
+            QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
+            _software = True
+        if QQuickStyle.name() != STYLE:
+            QQuickStyle.setStyle(STYLE)  # before QML imports QtQuick.Controls, once
         self.engine = QQmlApplicationEngine()
         self.engine.addImportPath(str(QML_DIR))
         self.engine.warnings.connect(self._warnings)
@@ -70,18 +74,32 @@ class Window:
         self.errors += [w.toString() for w in warnings]
 
     def find(self, name: str) -> QObject | None:
-        """A QML item by objectName."""
+        """A QML object by objectName: in the object tree (popups), else in the visual tree
+        (the delegates of repeaters and views have no QObject parent)."""
         assert self.window is not None
-        return self.window.findChild(QObject, name)
+        found = self.window.findChild(QObject, name)
+        if found is not None:
+            return found
+        todo: list[QQuickItem] = [self.window.contentItem()]
+        while todo:
+            it = todo.pop()
+            if it.objectName() == name:
+                return it
+            todo += it.childItems()
+        return None
 
     def grab(self) -> QImage:
         assert self.window is not None
         return self.window.grabWindow()
 
     def close(self) -> None:
+        """Close and delete the window and the engine now, while the Gui they bind to is
+        still alive (deleteLater would leave bindings running into a collected object)."""
         if self.window is not None:
             self.window.close()
         self.engine.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.window = None
 
 
 def run_app(backend: Backend, *, channel: str = "unstable", self_test: bool = False) -> dict:

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 // One search result: badge, name (cyan; purple for options), version or type; the

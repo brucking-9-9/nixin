@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 // Label/value rows from the view-model (view.Field: label, value, style), then an optional

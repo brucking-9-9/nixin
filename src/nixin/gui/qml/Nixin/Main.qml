@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -69,6 +71,14 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             currentIndex: ["search", "pending", "status"].indexOf(win.backend.page)
+            // the keys follow the page: the query on Search, the page itself elsewhere (a
+            // hidden text field keeping the focus would take "/" as a letter)
+            onCurrentIndexChanged: {
+                if (currentIndex === 0)
+                    searchPage.focusQuery();
+                else if (currentIndex > 0)
+                    children[currentIndex].forceActiveFocus();
+            }
 
             SearchPage {
                 id: searchPage
@@ -107,7 +117,7 @@ ApplicationWindow {
     function showPage(name: string) {
         win.backend.go(name);
         if (name === "search")
-            searchPage.focusQuery();
+            searchPage.focusQuery();  // also when Search is already the page
     }
 
     Shortcut {
