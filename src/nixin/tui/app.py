@@ -19,8 +19,8 @@ from textual.screen import Screen
 from textual.worker import Worker, get_current_worker
 
 from .. import cli
-from . import view
-from .backend import Backend
+from ..ui import view
+from ..ui.backend import Backend
 from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal
 from .screens import ApplyScreen, PendingScreen, SearchScreen, StatusScreen, TopBar
 from .theme import THEME

@@ -1,15 +1,15 @@
-"""The TUI's only data path: the CLI's verb handlers, called in-process.
+"""The front ends' only data path: the CLI's verb handlers, called in-process.
 
 `Backend.call("search", "firefox", "--kind", "all")` builds the same argv a person would
 type, parses it with the CLI's own parser and runs the verb through `cli.document`, so
 the result is the document `nixin --json …` prints (envelope keys included), with no
-subprocess and no second implementation. Calls block: the app runs them in worker
-threads.
+subprocess and no second implementation. Calls block: the UIs run them in worker
+threads (Textual workers in the TUI, QThreadPool runnables in the GUI).
 
 `stream=True` runs the verb in human mode. plan and apply then tee nix's build output and
-nixos-rebuild's log to `sys.stderr`, which Textual redirects while the app runs; the app
-captures it into the log view (App.begin_capture_print). The document is the same apart
-from `message`, the human rendering, which the TUI ignores.
+nixos-rebuild's log to `sys.stderr`; the UI routes that into its log view (the TUI with
+App.begin_capture_print, the GUI with a sys.stderr proxy). The document is the same apart
+from `message`, the human rendering, which the UIs ignore.
 
 Tests replace `Backend` with a fake that answers from recorded documents.
 """

@@ -1,12 +1,12 @@
-"""Documents → display rows: the view-model of the TUI, and the one the GUI mirrors.
+"""Documents → display rows: the view-model the TUI and the GUI share.
 
-Pure functions over the --json documents (docs/CONTRACT.md). No Textual here, no I/O:
+Pure functions over the --json documents (docs/CONTRACT.md). No toolkit here, no I/O:
 every function takes a document (or a piece of one) and returns plain data: strings,
 `Field`s, `Span`s, `Hit`s. Wording follows the CLI's human output, reusing its helpers
 where they exist (discovery's source footer, truth's `nix_text`, apply's `human_size`).
 
 Each piece of text carries a semantic `style` that the UI maps to its palette
-(theme.STYLES for the TUI):
+(nixin.tui.theme.STYLES for the TUI, Theme.qml's `style()` for the GUI):
 
     ""        normal text
     "dim"     secondary text: paths, counts, hints

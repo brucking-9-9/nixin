@@ -16,7 +16,7 @@ from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Button, DataTable, Footer, Input, Static, Tab, Tabs, TextArea
 
-from . import view
+from ..ui import view
 from .widgets import Fields, Line, LogView, NoticeBox, Spinner, Title, cell, spans_text
 
 if TYPE_CHECKING:

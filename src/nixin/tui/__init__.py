@@ -3,10 +3,8 @@
     nixin [--host H] [--config DIR] tui [--channel C]
     nixin-tui [--host H] [--config DIR] [--channel C]
 
-Modules:
+Modules (the data path and the view-model are shared with the GUI: nixin.ui):
 
-    view      documents → display rows (pure; the GUI mirrors it)
-    backend   the verb handlers, called in-process (the TUI's only data path)
     theme     the palette, as a Textual theme
     app       the App: global keys, command palette, the writer and apply flows
     screens   Search → Details → Pending → Apply, and Status
@@ -45,8 +43,8 @@ def run(ns: argparse.Namespace) -> dict[str, Any]:
         return _usage("tui is interactive and has no --json form; the other verbs have one")
     if not (sys.stdin.isatty() and sys.stderr.isatty()):  # Textual draws on stderr
         return _usage("tui needs a terminal: stdin and stderr must be a tty (it draws on stderr)")
+    from ..ui.backend import Backend
     from .app import NixinApp
-    from .backend import Backend
 
     # While the TUI owns the terminal nothing may prompt on it (sync's git fetch).
     os.environ.setdefault("GIT_TERMINAL_PROMPT", "0")

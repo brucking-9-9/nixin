@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
 from nixin.tui.app import NixinApp
-from nixin.tui.backend import Backend
 from nixin.tui.theme import THEME
+from nixin.ui.backend import Backend
 
 SIZES = {"phone": (50, 25), "desktop": (120, 40)}
 

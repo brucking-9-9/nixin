@@ -82,7 +82,7 @@ nixin-tui --config ~/nixos          # = nixin --config ~/nixos tui; --host H, --
 
 A Textual UI that shows the same documents the CLI prints with `--json`: it calls the verb
 handlers in-process, in worker threads, and renders their documents
-(`src/nixin/tui/view.py` turns them into display rows). Search (kind filter, channel,
+(`src/nixin/ui/view.py`, shared with the GUI, turns them into display rows). Search (kind filter, channel,
 typing debounced, the CLI's `source channel@rev` footer) → Details (info, versions, and
 `where` for this host: installed? declared where?) → Add / Remove / Set / Unset, each
 previewed as the writer's `--dry-run` diff before anything is written, with a Home

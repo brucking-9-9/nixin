@@ -13,7 +13,7 @@ from rich.text import Text
 from textual import events
 from textual.widgets import RichLog, Static
 
-from . import view
+from ..ui import view
 from .theme import STYLES
 
 _RICH: dict[str, dict[str, str]] = {}
