@@ -14,7 +14,9 @@ answers it two ways: what the next `flake.lock` bump would change for this host
 Done. Nothing is half-written.
 
 Gates at HEAD:
-- `nix build`: BUILD_RESULT
+- `nix build`: 509 passed, 24 skipped (live) in the sandbox, then the GUI self-test. The
+  output ships `nixin/outdated/outdated.nix`, and the built `bin/nixin outdated --host 19BK
+  --config ~/nixos` gives the same 13 of 325 as the tree.
 - `nix develop -c pytest`: 509 passed, 24 skipped (live). `tests/test_outdated.py` is 56 of
   them (+2 live), 0.4 s. The integration tests' contract checks (every verb has a section,
   every raised code is in the table) pass with the new verb.
