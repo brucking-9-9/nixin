@@ -7,8 +7,8 @@ README.md is the overview and points here. When code and this file disagree, it 
 in one of them. `tests/test_integration.py` checks the envelope rules and the error-code
 list against this file.
 
-Status: discovery, truth and writer are implemented. The apply layer (`plan`, `apply`,
-`sync`) is a stub that answers `not-implemented`.
+Status: all four layers are implemented: discovery, truth, writer and apply (`plan`,
+`apply`, `sync`).
 
 ## Invocation
 
@@ -22,7 +22,7 @@ nixin --version | --help | VERB --help
 | `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
 | `status`, `where` | truth | what this config gives a host (it evaluates the config flake) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
-| `plan`, `apply`, `sync` | apply | not implemented yet |
+| `plan`, `apply`, `sync` | apply | build + closure diff; commit, pull into the authoritative tree and switch (root); git sync with the hub |
 
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
@@ -30,12 +30,16 @@ nixin --version | --help | VERB --help
   (`socket.gethostname()`), even when `--config` points at a config that has no such
   host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
   still echoes it in the envelope.
-- `--config DIR` (truth and writer verbs) is the config flake: `--config`, else
-  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth only reads it. The writer refuses
-  `/etc/nixos` and any tree you cannot write (`not-a-workspace`). It edits a clone
+- `--config DIR` (truth, writer and apply verbs) is the config flake: `--config`, else
+  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth only reads it. The writer and apply refuse
+  `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
-- Nothing prompts, ever. nix runs with stdin closed. A step that needs root will fail
-  with `needs-sudo` and print the command to run (only the apply layer will need root).
+- `--authoritative DIR` (apply verbs) is the root-owned clone the system is switched
+  from: `--authoritative`, else `$NIXIN_AUTHORITATIVE`, else `/etc/nixos`. nixin only
+  reads it; root `git pull --ff-only`s the workspace into it during `apply`.
+- Nothing prompts, ever. nix and git run with stdin closed, sudo always as `sudo -n`. A
+  step that needs root and cannot get it fails with `needs-sudo` and the commands to run
+  (only `apply` needs root).
 - `--help` and `--version` print text to stdout and exit 0, with or without `--json`.
 
 ## Envelope
@@ -213,6 +217,7 @@ Result:
 | `options` | per scope (`nixos`, `home.<user>`): `total`, `defined` (set beyond the option's own default), `in_config` (defined in a file of the config tree), `excluded`, `definitions_error`, `seconds`. Without `--full`: the cached counts of an earlier `--full`, else `{}` |
 | `cache` | `dir`, `enabled` (false with `--refresh`), `hits[]`, `misses[]` |
 | `timings` | seconds per eval (`toplevel`, `packages`) and `total` |
+| `pending` | from the apply layer, no nix: `workspace` (the `--config` path, null when that is the authoritative tree itself), `authoritative` = `{path, head}`, `commits[]` (`{commit, subject}`: workspace commits the authoritative tree lacks; null when unknown), `dirty[]`, `untracked[]`, `built` (the authoritative HEAD's out path if plan's cache has it, else null), `running_matches` (bool: `/run/current-system` is that build; null when unknown or `--host` is another machine). On a git problem: `{error: {code, message}}` instead; `status` itself still succeeds |
 
 Errors: `usage` (any positional argument), `config-not-found`, `not-a-flake`,
 `unknown-host`, `eval-failed` (the last
@@ -361,22 +366,158 @@ never-committed ones). It never commits. The writer keeps no cache. Evals time o
 
 ### `plan`
 
-Not implemented yet: stub error `not-implemented` (exit 1). It accepts and ignores any
-arguments. Intended (`src/nixin/__init__.py`, README): build the pending workspace config
-and show the closure diff (`nix store diff-closures` against the running system), without
-root.
+```
+nixin plan [--config DIR] [--authoritative DIR]
+```
+
+Builds the workspace host's `config.system.build.toplevel` without root and diffs its
+closure against `/run/current-system`. The build is the workspace as a git+file flake:
+tracked files with their working-tree contents (the writer's new files are
+intent-to-add, so they count), nothing untracked. That is exactly what `apply` commits
+and what the authoritative tree builds after pulling it, so plan's `out` is the path
+`nixos-rebuild` will produce there. Two nix steps: evaluate `toplevel.drvPath`
+(`eval-failed`), then `nix build <drv>^out` (`build-failed`). In human mode nix's build
+output streams to stderr; under `--json` nothing does.
+
+The out path is cached by the flake's *source store path* (a content hash of that tree,
+dirty edits included) and by commit (see [Caches](#caches)), so `apply` right after
+`plan` does not rebuild even though it commits first, and a second `plan` of the same
+tree is instant. A tree whose only change is `installer/history.jsonl` is answered as
+its HEAD commit (no module reads that file).
+
+Result:
+
+| field | meaning |
+|---|---|
+| `out`, `drv` | the built toplevel and its derivation |
+| `cached` | `out` came from plan's cache (nothing evaluated or built); `cache_key` says which entry (`source <hash>` or `commit <sha>`) |
+| `up_to_date` | `out` is `/run/current-system` |
+| `duration_s`, `timings` | total seconds; `eval_s`, `build_s` when it built |
+| `workspace` | `path`, `branch`, `head`, `dirty[]` (tracked files that differ from HEAD), `untracked[]` (not part of the build) |
+| `authoritative` | `path`, `exists`, `head`, `branch`, `dirty[]`, `relation`: `same`, `ahead` (the workspace has commits to apply), `behind` (the authoritative tree has commits the workspace lacks), `diverged`, `unknown` (its HEAD is not a commit the workspace has) |
+| `running` | `store_path` (`/run/current-system`), `generation` (the newest system profile generation pointing at it, or null), `profile_generation`, `profile` |
+| `pending_commits` | `[{commit, subject}]` the workspace has and the authoritative tree does not; null when `relation` is `diverged`/`unknown` |
+| `diff` | `{added: [{name, version, size}], removed: [{name, version, size}], changed: [{name, from, to, size_delta}], size_delta}` from `nix store diff-closures`; sizes in bytes, null where nix printed none (it omits deltas under 8 KiB); `from`/`to` are nix's version sets as one string (`"6.7.5, 6.7.5-qt5"`), both null for a size-only change; `unparsed[]` if nix printed a line nixin could not read. null for another host (`--host` is not this machine) |
+| `warnings[]` | e.g. untracked files, another host |
+
+Errors: `usage` (any positional argument), `config-not-found`, `not-a-workspace` (also: not
+a git checkout, detached HEAD), `unknown-host`, `eval-failed`, `eval-timeout` (900 s),
+`build-failed` (the failing builder's block with nix's log tail), `not-a-flake`,
+`nix-missing`, `git-failed`, `internal`.
+
+Costs: runs nix (evaluation, then a build: from nothing for a no-op to hours for a new
+kernel) and git (read only). Writes nix's store and plan's cache, nothing in the trees.
 
 ### `apply`
 
-Not implemented yet: stub error `not-implemented`. Intended: commit the workspace's
-changes into the root-owned authoritative checkout and `nixos-rebuild switch`. This is
-the one privileged step. Without root it will fail with `needs-sudo` and the command to
-run; it will never prompt.
+```
+nixin apply [-m MESSAGE] [--dry-run] [--no-switch] [--config DIR] [--authoritative DIR]
+```
+
+The one privileged step. In order:
+
+1. **Commit** (in the workspace, as you): if tracked files differ from HEAD, `git add
+   -u` (plus `installer/history.jsonl` the first time), `git commit` with the
+   workspace's own git identity and hooks. The message is `-m`, else generated from what
+   `installer/state.json` gained or lost (`nixin: mbp13: +cowsay`; in-place edits of
+   hand-written modules name the files), with every item and file in the body.
+   Untracked files are never committed.
+2. **Refuse** with `nothing-to-apply` when there is nothing to commit, the authoritative
+   tree already has the workspace HEAD, and `/run/current-system` already is its build.
+   (Running a different system, e.g. after a failed switch, re-switches.)
+3. **Build**: plan's out path (cache), else the same build as `plan`.
+4. **Pull** (root): `git -C <authoritative> pull --ff-only <workspace> <branch>`.
+   Refused before anything runs when that cannot fast-forward
+   (`authoritative-diverged`) or when the authoritative tree has uncommitted changes
+   (`authoritative-dirty`).
+5. **Switch** (root): `nixos-rebuild switch --flake <authoritative>#<host>`;
+   `--no-switch` runs `nixos-rebuild boot` instead (the new generation becomes the boot
+   default; nothing is activated now).
+6. **Verify**: `/run/current-system` (`--no-switch`: the system profile) must be the out
+   path nixin built; otherwise `verify-failed`.
+7. **Record**: one line appended to `<workspace>/installer/history.jsonl`: `{ts, host,
+   out, generation, commit, message, mode}`. It is committed by the *next* apply that
+   commits, never on its own.
+
+Root steps go through a backend. The default is `sudo -n` (never prompts). When a
+`nixos-switch` executable is on PATH, the host is this machine and the authoritative
+tree is `/etc/nixos`, the switch step (`switch` only) uses that helper instead (19BK's
+Touch ID switch: a transient user unit that leaves `status`/`log`/`auth` in
+`$XDG_RUNTIME_DIR/nixos-switch/`; apply waits up to 4 h for `status`). The pull always
+uses sudo. When sudo refuses for lack of a password, apply stops with `needs-sudo`: the
+`message` and `commands[]` are the exact commands still to run (what a person types,
+without `-n`), and nothing after that point has happened. Running those commands by
+hand finishes the job; so does `sudo -v` and apply again (the commit and the build are
+done and cached by then).
+
+`--dry-run` runs none of the steps. It reads the trees and the caches, probes `sudo -n
+true`, and prints the commands in order.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `committed` | the new commit, or null when nothing was committed; `commit_message` its subject |
+| `authoritative_head` | the authoritative HEAD after the pull (= the workspace HEAD) |
+| `out`, `generation` | the system that now runs (`--no-switch`: the boot default) and its profile generation |
+| `switched`, `mode` | true / `switch`; false / `boot` with `--no-switch` |
+| `previous`, `running` | the `running` block (as in `plan`) before and after |
+| `privileged_commands[]` | the root commands exactly as run (`sudo -n git -C /etc/nixos pull --ff-only /home/me/nixos main`, …) |
+| `backends` | `{pull, switch}`: `sudo` or `nixos-switch` |
+| `diff` | the closure diff from the previous system to `out` (as in `plan`) |
+| `cached` | the out path came from plan's cache |
+| `history` | the line appended to `installer/history.jsonl` |
+| `timings` | seconds: `prepare` (checks), `commit`, `build`, `pull`, `switch`, `total` |
+| `warnings[]` | e.g. the authoritative tree is on another branch name |
+
+With `--dry-run`: `dry_run: true`, `commands[]` (`{step, privileged, argv, command}`;
+privileged steps add `backend` and `by_hand`, the form to type), `commit` (`{files[],
+message}` or null), `out` (null when it would have to build), `cached`, `workspace`,
+`authoritative` (`path`, `relation`), `pending_commits`, `running`, `privilege`
+(`{pull|switch: {backend, ready, why}}`), `diff` (when `out` is known), `warnings[]`.
+
+Errors (`ok: false`; fields after the first root step tell how far it got: `committed`,
+`out`, `authoritative_head`, `privileged_commands[]`): `usage`, `config-not-found`,
+`not-a-workspace`, `unknown-host`, `host-not-local` (apply switches *this* machine;
+`--host` names another), `authoritative-missing` (no git checkout at the authoritative
+path), `authoritative-dirty` (with `files[]`), `authoritative-diverged` (with
+`authoritative_head` and `state`: `behind`, `diverged` or `unknown`; the message has
+the git commands that bring those commits into the workspace), `nothing-to-apply`,
+`eval-failed`, `eval-timeout`, `build-failed`, `needs-sudo` (with `commands[]`),
+`switch-failed` (nixos-rebuild's last lines; the pull has happened), `verify-failed`,
+`git-failed` (a git command failed, e.g. a commit hook or no identity), `busy` (another
+apply holds the lock), `nix-missing`, `internal`.
+
+Costs: git in the workspace (commit) and, read-only, in the authoritative tree; nix
+(plan's build unless cached); two root commands. `nixos-rebuild` evaluates the config
+again as root (its own eval cache) before it switches. Writes: one commit in the
+workspace, the authoritative tree (root's pull), a new system generation, `/boot` (the
+bootloader step), `installer/history.jsonl`, plan's cache.
 
 ### `sync`
 
-Not implemented yet: stub error `not-implemented`. Intended: push/pull the config hub
-repo.
+```
+nixin sync [--pull] [--push] [--remote NAME] [--config DIR] [--authoritative DIR]
+```
+
+`git fetch` of the remote (`--remote`, else the branch's upstream remote, else
+`origin`) into the workspace, then a report. `--pull`: `git pull --ff-only` from that
+remote's branch of the same name (`diverged` if it cannot fast-forward). `--push`: push
+the workspace branch to the same name there (`diverged` if the remote has commits the
+workspace lacks). Both: pull first. The authoritative tree is only read: getting
+commits into it is `apply`'s job.
+
+Result: `done[]` (`fetch`, `pull`, `push`), `workspace` = `{path, branch, head, ahead,
+behind, dirty[]}` (ahead/behind of `<remote>/<branch>`; null when the remote has no such
+branch), `authoritative` = `{path, head, relation, behind_workspace}` (`relation` as in
+`plan`; `behind_workspace`: how many workspace commits an apply would bring in, null
+when unknown), `remote` = `{name, url, head}`, `duration_s`, `warnings[]`.
+
+Errors: `usage` (any positional argument, or no such remote), `config-not-found`,
+`not-a-workspace`, `diverged`, `git-failed` (fetch/pull/push failed otherwise, e.g. the
+network or authentication), `internal`.
+
+Costs: network (the remote), git in the workspace only.
 
 ## Error codes
 
@@ -384,21 +525,21 @@ repo.
 |---|---|---|
 | `usage` | all | bad command line, or the verb's own argument check; exit 2 |
 | `internal` | all | an unexpected exception (a bug, or a source that changed its response shape); the message names the exception and `file:line` |
-| `not-implemented` | apply stubs | `plan`, `apply`, `sync` |
-| `needs-sudo` | apply (reserved) | a step needs root; the message has the command to run. Nothing emits it yet |
+| `not-implemented` | cli | a verb without a handler (none today; kept for UIs built against the stubs) |
+| `needs-sudo` | apply | a root step and `sudo -n` cannot get root without a password; `message` and `commands[]` are what is left to run by hand |
 | `network` | discovery | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON |
 | `http-<status>` | discovery | a 4xx the caller may act on (`http-400`, …) |
 | `bad-channel` | discovery | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source |
 | `not-found` | discovery, truth, writer | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`) |
-| `nix-missing` | all but apply | `nix` (or `nix-instantiate`) is not on PATH |
+| `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
 | `nix-failed` | discovery | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
 | `config-not-found` | truth, writer | no `flake.nix` in the config dir |
 | `not-a-flake` | truth | `nix flake metadata`/`nix flake archive` failed on the config |
 | `unknown-host` | truth, writer | `--host` is not in `nixosConfigurations` |
 | `eval-failed` | truth, writer | the host does not evaluate (assertions, syntax, an untracked file the config imports) |
-| `eval-timeout` | writer | a writer eval took longer than 900 s (truth evals have no limit) |
-| `not-a-workspace` | writer | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree |
+| `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
+| `not-a-workspace` | writer, apply | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
 | `unknown-user` | writer | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value or name does not parse, or an edited file would not parse |
@@ -406,6 +547,17 @@ repo.
 | `import-site-missing` | writer | no module or no `imports = [ … ];` to import the generated file from; `line` to add |
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
 | `invalid-state` | writer | `installer/state.json` is not valid JSON or has the wrong version |
+| `build-failed` | apply | `nix build` of the toplevel failed; the message is the failing builder's block with nix's log tail |
+| `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs |
+| `host-not-local` | apply | `apply --host H` for a host that is not this machine |
+| `authoritative-missing` | apply | no git checkout at the authoritative path |
+| `authoritative-dirty` | apply | the authoritative tree has uncommitted changes (`files[]`); nixin only fast-forwards it |
+| `authoritative-diverged` | apply | root's `git pull --ff-only` could not take the workspace (`state`: `behind`, `diverged`, `unknown`); the message has the commands to fix it |
+| `switch-failed` | apply | `nixos-rebuild` (or the `nixos-switch` helper) failed, or the helper is already running |
+| `verify-failed` | apply | after the switch the system is not the out path nixin built |
+| `git-failed` | apply | a git command failed (or git is not on PATH); the message has git's last lines |
+| `diverged` | apply (`sync`) | `--pull` cannot fast-forward, or `--push` was rejected |
+| `busy` | apply | another `nixin apply` holds the lock |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's
 `sources[...].error` while `ok` is true.
