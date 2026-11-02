@@ -526,6 +526,30 @@ network or authentication), `internal`.
 
 Costs: network (the remote), git in the workspace only.
 
+### `tui`
+
+```
+nixin [--host H] [--config DIR] tui [--channel C]
+nixin-tui [--host H] [--config DIR] [--channel C]
+```
+
+The interactive terminal UI (Textual). It is a consumer of this contract, not part of it:
+every screen renders the documents above, got by calling the verb handlers in-process
+(`cli.document`, the same code `main()` runs), with `--host` and `--config` passed on as
+given. It writes only through `add`/`rm`/`set`/`unset` (after showing their `--dry-run`
+diff) and switches only through `apply` (after `apply --dry-run` and a confirmation).
+
+Under `--json`, or when stdin or stderr is not a terminal (Textual draws on stderr, so
+`nixin tui 2>file` would show nothing), it is a `usage` error (exit 2). When the person
+quits, it prints one line about the session on stdout (`nixin tui: wrote 1: +cowsay (…) ·
+not applied yet (nixin plan, nixin apply)`, `nixin tui: applied: generation 113`) and
+exits 0. While it runs it sets `GIT_TERMINAL_PROMPT=0` (unless already set) so a git
+fetch cannot prompt on the terminal it owns.
+
+Costs: whatever the verbs it calls cost (see each verb). `plan` and `apply` run in human
+mode under the TUI so that nix's build output and nixos-rebuild's log stream into its log
+view; the document is the same apart from `message`.
+
 ## Error codes
 
 | code | from | when |

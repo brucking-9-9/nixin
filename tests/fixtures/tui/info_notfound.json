@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "not-found",
+    "message": "no package or NixOS option or Home Manager option named 'nosuchpackagexyz' on unstable"
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "info"
+}

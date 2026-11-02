@@ -1,0 +1,153 @@
+{
+  "cached": true,
+  "channel": null,
+  "count": 6,
+  "homepage": "https://cowsay.diamonds",
+  "host": "mbp13",
+  "latest": "3.8.4",
+  "license": "GPL-3.0-only",
+  "limit": 6,
+  "ok": true,
+  "package": "cowsay",
+  "programs": [
+    "cowsay"
+  ],
+  "results": [
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2026-10-02",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "cowsay"
+      ],
+      "rev": "55ba7f49ef2962b42cbd126522b7df5f95037679",
+      "source": "nixhub.io",
+      "version": "3.8.4"
+    },
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2024-12-03",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "cowsay"
+      ],
+      "rev": "566e53c2ad750c84f6d31f9ccb9d00f823165550",
+      "source": "nixhub.io",
+      "version": "3.8.3"
+    },
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2024-08-18",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "cowsay"
+      ],
+      "rev": "9aa35efbea27d320d0cdc5f922f0890812affb60",
+      "source": "nixhub.io",
+      "version": "3.8.2"
+    },
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2024-08-16",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "cowsay"
+      ],
+      "rev": "733f5a9806175f86380b14529cb29e953690c148",
+      "source": "nixhub.io",
+      "version": "3.8.1"
+    },
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2024-08-14",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "cowsay"
+      ],
+      "rev": "0cb2fd7c59fed0cd82ef858cbcbdb552b9a33465",
+      "source": "nixhub.io",
+      "version": "3.7.0"
+    },
+    {
+      "attr": "cowsay",
+      "channel": null,
+      "date": "2022-12-17",
+      "kind": "version",
+      "name": "cowsay",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [],
+      "rev": "80c24eeb9ff46aa99617844d0c4168659e35175f",
+      "source": "nixhub.io",
+      "version": "3.04"
+    }
+  ],
+  "rev": null,
+  "source": "nixhub.io",
+  "sources": {
+    "nixhub.io": {
+      "cached": true,
+      "channel": null,
+      "count": 6,
+      "error": null,
+      "homepage": "https://cowsay.diamonds",
+      "kinds": [
+        "version"
+      ],
+      "latest": "3.8.4",
+      "license": "GPL-3.0-only",
+      "programs": [
+        "cowsay"
+      ],
+      "rev": null,
+      "summary": "Program which generates ASCII pictures of a cow with a message",
+      "total": 7
+    }
+  },
+  "summary": "Program which generates ASCII pictures of a cow with a message",
+  "total": 7,
+  "verb": "versions"
+}

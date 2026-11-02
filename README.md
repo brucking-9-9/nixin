@@ -37,6 +37,7 @@ search info versions        discovery   what exists upstream, in which versions
 status where                truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
+tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 ```
 
 With `--json` every invocation prints exactly one document on stdout, nothing on
@@ -73,10 +74,34 @@ which touch the network, run nix or write files, and the cache locations.
 
 Answers and evals are cached under `$XDG_CACHE_HOME/nixin/` (see CONTRACT.md, "Caches").
 
+## TUI
+
+```
+nixin-tui --config ~/nixos          # = nixin --config ~/nixos tui; --host H, --channel stable
+```
+
+A Textual UI that shows the same documents the CLI prints with `--json`: it calls the verb
+handlers in-process, in worker threads, and renders their documents
+(`src/nixin/tui/view.py` turns them into display rows). Search (kind filter, channel,
+typing debounced, the CLI's `source channel@rev` footer) → Details (info, versions, and
+`where` for this host: installed? declared where?) → Add / Remove / Set / Unset, each
+previewed as the writer's `--dry-run` diff before anything is written, with a Home
+Manager user toggle → Pending (`status.pending`, `plan` with nix's build output streamed
+and the closure diff) → Apply (confirm with `apply --dry-run`'s commands and sudo
+readiness, a commit message, the switch log streamed, the new generation; without a sudo
+ticket the exact root commands to copy). Status shows the lock, HEAD, the running system,
+counts and caches. Error documents show as `code` + message.
+
+Keys: `/` search, `p` pending, `s` status, `?` all keys, `ctrl+p` command palette, `esc`
+back, `q` quit (`ctrl+q` while typing or while something runs). It is laid out for a
+phone over ssh (50×25: panes stacked, the description column dropped) as well as 120+
+columns. Colours: `src/nixin/tui/theme.py`. Screenshots of both sizes: `docs/tui/`
+(`scripts/tui-screenshots.py` makes them, from the test fixtures or `--live`).
+
 ## Develop
 
 ```
-nix develop                     # python + requests, pytest, ruff, nixfmt
+nix develop                     # python + requests + textual, pytest, ruff, nixfmt
 pytest                          # offline: fixtures and fakes, no nix, no network
 nix build                       # the same tests in the sandbox (checkPhase)
 ruff check && ruff format --check
@@ -96,8 +121,9 @@ Consume from a config flake: add `nixin` as an input and
 All four layers are in. Discovery, truth and writer were run end to end as one CLI on
 mbp13 (`docs/HANDOFF-integrate.md`: fixes and open questions); the apply layer then
 switched mbp13 for real from its workspace (add → plan → apply → rm → apply, and
-`configurationLimit 2` to free `/boot`): `docs/HANDOFF-apply.md`. See `docs/HANDOFF-*.md`
-for each layer.
+`configurationLimit 2` to free `/boot`): `docs/HANDOFF-apply.md`. The TUI ran the same
+round trip on mbp13 from a 50×25 terminal (generations 113 and 114):
+`docs/HANDOFF-tui.md`. See `docs/HANDOFF-*.md` for each layer.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com

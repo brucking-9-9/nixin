@@ -1,0 +1,55 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 1,
+  "host": "mbp13",
+  "kind": "all",
+  "name": "services.openssh.enable",
+  "ok": true,
+  "results": [
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/1c89083e451e891152365b799595cf7790a43325/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable the OpenSSH secure shell daemon, which allows secure remote logins.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.openssh.enable",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    }
+  ],
+  "rev": null,
+  "source": "all",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 0,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 01, 2026 at 11:12 UTC"
+    },
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 1,
+      "error": null,
+      "kinds": [
+        "pkg",
+        "opt"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "info"
+}

@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, apply, discovery, truth, writer
+from . import __version__, apply, discovery, truth, tui, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -41,6 +41,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "plan": ("apply", "build the pending config and show the closure diff"),
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
+    "tui": ("tui", "interactive terminal UI over the same documents"),
 }
 
 
@@ -84,6 +85,7 @@ def _parser() -> argparse.ArgumentParser:
     truth.register(sub)
     writer.register(sub)
     apply.register(sub)
+    tui.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb
         sp.add_argument(
             "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
@@ -147,26 +149,30 @@ def main(argv: list[str] | None = None) -> int:
             return _usage(argv, UsageError("nixin", "no VERB given (nixin --help lists them)", ""))
         parser.print_help()
         return 2
+    return _emit(ns, document(ns))
+
+
+def document(ns: argparse.Namespace) -> dict:
+    """The verb's document for a parsed command line, without the envelope keys: what
+    main() emits. In-process callers (the TUI) use it to get the --json document without a
+    subprocess; `ns.json` False only adds the human `message` (and lets plan/apply tee
+    nix's output to stderr)."""
     if hasattr(ns, "config") and ns.config is None:
         ns.config = ns.config_before_verb
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
         try:
-            doc = run(ns)
+            return run(ns)
         except Exception as exc:  # noqa: BLE001 -- every failure must become the error document
-            doc = _internal(exc)
-        return _emit(ns, doc)
+            return _internal(exc)
     layer = VERBS[ns.verb][0]
-    return _emit(
-        ns,
-        {
-            "ok": False,
-            "error": {
-                "code": "not-implemented",
-                "message": f"{ns.verb!r} belongs to the {layer} layer, which is not written yet",
-            },
+    return {
+        "ok": False,
+        "error": {
+            "code": "not-implemented",
+            "message": f"{ns.verb!r} belongs to the {layer} layer, which is not written yet",
         },
-    )
+    }
 
 
 if __name__ == "__main__":  # pragma: no cover

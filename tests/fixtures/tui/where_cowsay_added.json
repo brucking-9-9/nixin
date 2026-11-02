@@ -1,0 +1,55 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [],
+    "misses": [
+      "packages",
+      "prefix-nixos-874ee491da"
+    ]
+  },
+  "declared": [
+    {
+      "file": "installer/mbp13.nix",
+      "items": [
+        "<derivation cowsay-3.8.4>"
+      ],
+      "lines": [
+        {
+          "file": "installer/mbp13.nix",
+          "line": 10,
+          "score": 3,
+          "text": "pkgs.cowsay"
+        }
+      ],
+      "option": "environment.systemPackages",
+      "raw": "/nix/store/1x3s0pq2yq0j5kq8a9w6zk4m4v5g8n2r-source/installer/mbp13.nix",
+      "scope": "system",
+      "source": "config",
+      "user": null
+    }
+  ],
+  "host": "mbp13",
+  "installed": [
+    {
+      "name": "cowsay-3.8.4",
+      "pname": "cowsay",
+      "scope": "system",
+      "user": null,
+      "version": "3.8.4"
+    }
+  ],
+  "kind": "package",
+  "mentions": [
+    {
+      "file": "installer/mbp13.nix",
+      "line": 10,
+      "score": 3,
+      "text": "pkgs.cowsay"
+    }
+  ],
+  "name": "cowsay",
+  "ok": true,
+  "programs": [],
+  "verb": "where"
+}
