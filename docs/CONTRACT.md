@@ -23,6 +23,7 @@ nixin --version | --help | VERB --help
 | `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
 | `plan`, `apply`, `sync` | apply | build + closure diff; commit, pull into the authoritative tree and switch (root); git sync with the hub |
+| `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
@@ -30,8 +31,8 @@ nixin --version | --help | VERB --help
   (`socket.gethostname()`), even when `--config` points at a config that has no such
   host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
   still echoes it in the envelope.
-- `--config DIR` (truth, writer and apply verbs; before or after the verb, the verb's own
-  wins; discovery ignores it) is the config flake: `--config`, else
+- `--config DIR` (truth, writer, apply verbs and `outdated`; before or after the verb, the
+  verb's own wins; discovery ignores it) is the config flake: `--config`, else
   `$NIXIN_CONFIG`, else `/etc/nixos`. Truth only reads it. The writer and apply refuse
   `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
@@ -579,6 +580,98 @@ network or authentication), `internal`.
 
 Costs: network (the remote), git in the workspace only.
 
+### `outdated`
+
+```
+nixin outdated [--nixpkgs FLAKEREF|REV | --channel NAME] [--home USER] [--config DIR] [--refresh]
+nixin outdated --published [--channel NAME] [--home USER] [--config DIR] [--refresh]
+```
+
+What needs updating, two ways. Neither builds anything nor writes the config.
+
+**Lock mode** (the default) answers "what would the next `flake.lock` bump change for
+this host". It evaluates the host's `environment.systemPackages` and every Home Manager
+user's `home.packages`, plus `boot.kernelPackages.kernel.version`, twice: once as the
+flake is locked, and once with `--override-input <input> <target>` (plus
+`--no-write-lock-file`). Then it compares the two by pname. These are two package-list
+evals (`outdated.nix`); `system.build.toplevel` is never evaluated. The target is:
+
+| argument | target |
+|---|---|
+| none | the lock's own `original` for the nixpkgs input (`github:nixos/nixpkgs/nixos-unstable` here), as it resolves now: what `nix flake update nixpkgs` would write |
+| `--nixpkgs REV` | a commit (7–40 hex) of the locked repository: `github:<owner>/<repo>/REV` |
+| `--nixpkgs FLAKEREF` | any flakeref (`github:nixos/nixpkgs/nixos-26.05`) |
+| `--channel NAME` | `unstable` → `nixos-unstable`, `NN.MM` → `nixos-NN.MM`, a branch name as is (`nixos-unstable-small`), `stable` → the newest release search.nixos.org lists (one HTTPS call) |
+
+The nixpkgs input is the root input called `nixpkgs`, else the one locked to a `nixpkgs`
+repository. Its lock node is resolved through `flake.lock` (`nixpkgs_2` in this config),
+never assumed. Only that input moves; inputs that `follows` it move with it.
+`nix flake update` without an input name would also move the others (home-manager,
+nixos-hardware), and this comparison does not include them.
+
+Comparison, per scope and pname (a package without a pname is keyed by its derivation
+name, so it never shows as changed): versions present on both sides cancel out. What is
+left pairs up in version order as `changed`. The rest is `removed` (lock side only) or
+`added` (target side only). So `fuse` 2.9.9 + 3.18.2 → 3.18.2 is one removal, and a
+pname nixpkgs renamed shows as one removal and one addition. `direction` uses nix's
+`builtins.compareVersions`.
+
+**`--published`** is brew-outdated style. It compares the installed versions (the lock
+side alone, no second eval) with what search.nixos.org's channel index has: `--channel`,
+default `unstable`. It sends one `terms` query per 50 pnames (`package_pname`), so 3–6
+requests for these hosts. A pname is shared by many attributes (`python3` covers
+python3, python314 and python316 at 3.16.0a1; `git` covers emacsPackages.git at
+20140128), so the newest version for a pname would be wrong. Instead it compares the
+attribute defined in the same nixpkgs file as the installed package (meta.position ↔
+`package_position`). Failing that, the same major version; then the attribute named
+like the pname; then a top-level one; then the shortest name. This is a heuristic: lock
+mode is the exact answer. The kernel is compared with the newest patch of its own series
+(`linuxKernel.kernels.linux_X_Y`), with `linux_latest` as `latest`.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `mode` | `lock` \| `published` |
+| `config` | `path`, then as in `status`: `head`, `dirty`, `source`, `source_hash`, `fingerprint`, `last_modified` |
+| `lock` | the host's nixpkgs as locked: `input` (its name in flake.nix, what `--override-input` takes), `node` (`nixpkgs_2`), `rev`, `short_rev`, `date`, `last_modified`, `flakeref`, `original` (the lock's `original` as a flakeref), `release` (`system.nixos.release`) |
+| `target` | lock mode: `input`, `flakeref` (as asked), `from` (`lock` \| `nixpkgs` \| `channel`), `rev`, `short_rev`, `date`, `last_modified`, `locked` (the fully locked ref given to `--override-input`, with `narHash`), `release`, `days_newer` (target date minus lock date). `--published`: `source` (`search.nixos.org`), `channel` (concrete: `stable` → `26.05`), `index`, `rev` (the commit the index was built from), `short_rev`, `queries`, `cached` |
+| `up_to_date` | lock mode: the target commit is the locked one (no target eval; everything empty) |
+| `changed[]` | lock mode: `{pname, from, to, scope, user, direction}`. `--published`: `{pname, installed, published, attr, alternatives, channel, rev, scope, user, direction}` (`installed`: the versions, comma-separated when several; `attr`: the index's attribute compared; `alternatives`: how many other attributes share the pname). `scope` is `system` \| `home`, `user` null or the HM user; `direction` `up` \| `down` \| `same` (different text, same order) |
+| `added[]`, `removed[]` | lock mode: `{pname, version, scope, user}`. Always `[]` with `--published` |
+| `unpublished[]` | `--published`: installed pnames the channel has no package for (local packages, flake inputs' packages) |
+| `kernel` | `from`, `to`, `changed`; `--published` also `latest` (`to` is null when the series is gone from the channel) |
+| `count` | `len(changed)` |
+| `total` | distinct pnames compared (the lock side, the scopes asked for) |
+| `scopes[]` | `{scope, user, total, changed}` plus `added`, `removed` in lock mode; system first, then each HM user (only `--home USER`'s with `--home`) |
+| `commands[]` | shell lines to take the update. Lock mode: `nix flake update <input> --flake DIR` for the default target, else `nix flake lock DIR --override-input <input> <ref>/<rev>` (writes exactly the commit compared and keeps flake.nix's ref), then `nixin plan`, `nixin apply`. `--published`: `nixin outdated` (the exact answer) first |
+| `notes[]` | for a target other than the lock's ref: how to follow it for good (change `inputs.<input>.url`); `--published`: the attribute caveat |
+| `cache` | as in `status` (`outdated-lock`, `outdated-target`) |
+| `timings` | seconds: `resolve` (the target's `nix flake metadata`), `lock`, `target` (0 when cached), `search` (`--published`), `total` |
+
+Without `--json`: a header (lock → target commit and dates), one aligned `pname  from →
+to` table per scope (`(removed)`, `(added)`, `(older)` marked), a summary line (`57 of 337
+packages would change; kernel 7.2.12 → 7.2.14`), the notes, and `next:` with `commands[]`.
+
+Errors: `usage` (a positional argument, `--nixpkgs` with `--channel`, `--published` with
+`--nixpkgs`), `config-not-found`, `not-a-flake`, `unknown-host`, `unknown-user`
+(`--home`), `not-found` (no readable `flake.lock`, or it locks no nixpkgs input),
+`bad-channel` (an unknown `--channel`, or a target GitHub does not know: HTTP 404/422),
+`network` (resolving the target, or fetching an input for the target eval, failed for
+lack of network; with `--published`, search.nixos.org is unreachable), `http-<status>`
+(`--published`: a 4xx from search.nixos.org), `nix-failed` (`nix flake metadata` on the
+target failed otherwise), `eval-failed` (the lock side as in `status`, or the host does
+not evaluate with the target. The message then says the update would break it and
+carries nix's error, e.g. `undefined variable 'tuxedo'` at `configuration.nix:420` for
+19BK on 26.05), `nix-missing`, `internal`.
+
+Costs: runs nix (no time limit). It reads the config and writes cache files. Network:
+the target's `nix flake metadata` asks GitHub for the branch head (nix caches that for
+its `tarball-ttl`, 1 h). For a commit it does not have yet, nix downloads the nixpkgs
+tarball (about 60 s here). The target eval itself then needs no network. `--published`
+makes HTTPS calls to search.nixos.org and evaluates nothing new. See
+[Costs](#costs-measured).
+
 ### `tui`
 
 ```
@@ -639,20 +732,20 @@ mode, as under `tui`, so their logs stream into the window.
 | `internal` | all | an unexpected exception (a bug, or a source that changed its response shape); the message names the exception and `file:line` |
 | `not-implemented` | cli | a verb without a handler (none today; kept for UIs built against the stubs) |
 | `needs-sudo` | apply | a root step and `sudo -n` cannot get root without a password; `message` and `commands[]` are what is left to run by hand |
-| `network` | discovery | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON |
-| `http-<status>` | discovery | a 4xx the caller may act on (`http-400`, …) |
-| `bad-channel` | discovery | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source |
-| `not-found` | discovery, truth, writer | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`) |
+| `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON |
+| `http-<status>` | discovery, outdated | a 4xx the caller may act on (`http-400`, …) |
+| `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`: a target ref GitHub does not know |
+| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it |
 | `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
-| `nix-failed` | discovery | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON |
+| `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
-| `config-not-found` | truth, writer | no `flake.nix` in the config dir |
-| `not-a-flake` | truth | `nix flake metadata`/`nix flake archive` failed on the config |
-| `unknown-host` | truth, writer | `--host` is not in `nixosConfigurations` |
-| `eval-failed` | truth, writer | the host does not evaluate (assertions, syntax, an untracked file the config imports) |
+| `config-not-found` | truth, writer, outdated | no `flake.nix` in the config dir |
+| `not-a-flake` | truth, outdated | `nix flake metadata`/`nix flake archive` failed on the config |
+| `unknown-host` | truth, writer, outdated | `--host` is not in `nixosConfigurations` |
+| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it) |
 | `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
 | `not-a-workspace` | writer, apply | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
-| `unknown-user` | truth, writer | `--home USER` is not an HM user of the host |
+| `unknown-user` | truth, writer, outdated | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |
 | `ambiguous` | writer | several declarations match; `candidates[]`, repeat with `--where` |
@@ -685,6 +778,10 @@ Truth ran on `~/nixos` for host 19BK, the writer on a clone for mbp13 and 19BK/b
 The apply rows are from later that evening on the same host, quiet (load 0.4–1.4), the
 real `~/nixos` workspace and `/etc/nixos`, plan's cache cold for the first plan.
 
+The `outdated` rows are from 2026-11-02 on mbp13, quiet (load 0.4–0.7), against `~/nixos`
+(lock nixpkgs 3ec6363, target nixos-unstable 0bb2eed): nixin's cache empty, nix's own
+fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too (load 2.4).
+
 | verb | network | runs nix | writes | cold | warm (nixin cache) | peak RSS |
 |---|---|---|---|---|---|---|
 | `search` (pkg, opt, all) | yes | — | cache | 0.9–1.2 s | 0.4 s | 40–50 MiB |
@@ -708,6 +805,8 @@ real `~/nixos` workspace and `/etc/nixos`, plan's cache cold for the first plan.
 | `apply` | — | git, nix (unless cached), sudo | workspace commit, authoritative tree, system profile, /boot | **30–31 s** after `plan` or for a tree plan's cache knows: build 0.4–0.9 s (cache), pull 0.05 s, `nixos-rebuild switch` 29–30 s (root's own eval + activation) | `nothing-to-apply` 0.2 s | — |
 | `apply --dry-run` | — | `nix flake metadata`, `sudo -n true` | — | 1.3 s | — | — |
 | `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
+| `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked) | 410 MiB mbp13, 540 MiB 19BK |
+| `outdated --published` | yes (search.nixos.org: 3–6 queries) | the lock-side eval only (shared with lock mode) | cache | 1.1–1.2 s with the eval cached, 1–3 s for the queries; + 2–3 s for a cold eval | 0.33 s | 43 MiB (+ the eval's) |
 
 nixin streams no progress under `--json` (in human mode `plan`/`apply` tee nix's build
 output and nixos-rebuild's log to stderr). A UI should run the slow verbs (`search
@@ -731,7 +830,7 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `nixhub/<sha1>.json` | NixHub version history | 6 h |
 | `noogle/<sha1>.json` | noogle function data | 1 day |
 | `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers | 30 days, keyed by resolved rev |
-| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where` and `list`), `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary` | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
+| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where` and `list`), `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary`; `outdated`'s `outdated-lock` and `outdated-target` (the target's key also has the target commit) | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
 | `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree and by `apply`); `status.pending` and `nothing-to-apply` read it without nix | last 40 per host |
@@ -739,6 +838,7 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh
-results. The writer has no cache. Plan's cache has no flag: an entry only answers when
+results. `outdated --refresh` does the same for its evals and search.nixos.org answers, and
+passes `--refresh` to the target's `nix flake metadata` (re-asks GitHub for the branch head). The writer has no cache. Plan's cache has no flag: an entry only answers when
 its out path is still in the store, and the build it saves is deterministic. nix keeps its own caches (`~/.cache/nix`, the store).
 Those make a second cold-nixin run of the same eval faster, and nixin does not manage them.

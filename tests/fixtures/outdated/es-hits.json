@@ -1,0 +1,1355 @@
+{
+"hits": [
+{
+"package_attr_name": "attr",
+"package_pname": "attr",
+"package_position": "pkgs/development/libraries/attr/default.nix:47",
+"package_pversion": "2.6.0"
+},
+{
+"package_attr_name": "python313Packages.attr",
+"package_pname": "attr",
+"package_position": "pkgs/development/python-modules/attr/default.nix:30",
+"package_pversion": "0.3.2"
+},
+{
+"package_attr_name": "python314Packages.attr",
+"package_pname": "attr",
+"package_position": "pkgs/development/python-modules/attr/default.nix:30",
+"package_pversion": "0.3.2"
+},
+{
+"package_attr_name": "bind",
+"package_pname": "bind",
+"package_position": "pkgs/by-name/bi/bind/package.nix:159",
+"package_pversion": "9.20.30"
+},
+{
+"package_attr_name": "dig",
+"package_pname": "bind",
+"package_position": "pkgs/by-name/bi/bind/package.nix:159",
+"package_pversion": "9.20.30"
+},
+{
+"package_attr_name": "dnsutils",
+"package_pname": "bind",
+"package_position": "pkgs/by-name/bi/bind/package.nix:159",
+"package_pversion": "9.20.30"
+},
+{
+"package_attr_name": "emacsPackages.bind",
+"package_pname": "bind",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20231001.2051"
+},
+{
+"package_attr_name": "host",
+"package_pname": "bind",
+"package_position": "pkgs/by-name/bi/bind/package.nix:159",
+"package_pversion": "9.20.30"
+},
+{
+"package_attr_name": "blender",
+"package_pname": "blender",
+"package_position": "pkgs/by-name/bl/blender/package.nix:476",
+"package_pversion": "5.2.2"
+},
+{
+"package_attr_name": "blender-oneapi",
+"package_pname": "blender",
+"package_position": "pkgs/by-name/bl/blender/package.nix:476",
+"package_pversion": "5.2.2"
+},
+{
+"package_attr_name": "rPackages.blender",
+"package_pname": "blender",
+"package_position": "pkgs/development/r-modules/default.nix:64",
+"package_pversion": "0.1.2"
+},
+{
+"package_attr_name": "bluetui",
+"package_pname": "bluetui",
+"package_position": "pkgs/by-name/bl/bluetui/package.nix:31",
+"package_pversion": "0.8.2"
+},
+{
+"package_attr_name": "brightnessctl",
+"package_pname": "brightnessctl",
+"package_position": "pkgs/by-name/br/brightnessctl/package.nix:51",
+"package_pversion": "0.5.1"
+},
+{
+"package_attr_name": "btop",
+"package_pname": "btop",
+"package_position": "pkgs/by-name/bt/btop/package.nix:65",
+"package_pversion": "1.4.8"
+},
+{
+"package_attr_name": "btop-cuda",
+"package_pname": "btop",
+"package_position": "pkgs/by-name/bt/btop/package.nix:65",
+"package_pversion": "1.4.8"
+},
+{
+"package_attr_name": "btop-rocm",
+"package_pname": "btop",
+"package_position": "pkgs/by-name/bt/btop/package.nix:65",
+"package_pversion": "1.4.8"
+},
+{
+"package_attr_name": "cachix",
+"package_pname": "cachix",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:129913",
+"package_pversion": "1.12.1"
+},
+{
+"package_attr_name": "haskellPackages.cachix",
+"package_pname": "cachix",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:129913",
+"package_pversion": "1.12.1"
+},
+{
+"package_attr_name": "claude-code",
+"package_pname": "claude-code",
+"package_position": "pkgs/by-name/cl/claude-code/package.nix:103",
+"package_pversion": "2.1.312"
+},
+{
+"package_attr_name": "emacsPackages.claude-code",
+"package_pname": "claude-code",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20260924.1703"
+},
+{
+"package_attr_name": "cliphist",
+"package_pname": "cliphist",
+"package_position": "pkgs/by-name/cl/cliphist/package.nix:54",
+"package_pversion": "0.7.0"
+},
+{
+"package_attr_name": "emacsPackages.cliphist",
+"package_pname": "cliphist",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20220525.1034"
+},
+{
+"package_attr_name": "azure-sdk-for-cpp.curl",
+"package_pname": "curl",
+"package_position": "pkgs/by-name/cu/curlMinimal/package.nix:313",
+"package_pversion": "8.22.0"
+},
+{
+"package_attr_name": "curl",
+"package_pname": "curl",
+"package_position": "pkgs/by-name/cu/curlMinimal/package.nix:313",
+"package_pversion": "8.22.0"
+},
+{
+"package_attr_name": "curlFull",
+"package_pname": "curl",
+"package_position": "pkgs/by-name/cu/curlMinimal/package.nix:313",
+"package_pversion": "8.22.0"
+},
+{
+"package_attr_name": "curlMinimal",
+"package_pname": "curl",
+"package_position": "pkgs/by-name/cu/curlMinimal/package.nix:313",
+"package_pversion": "8.22.0"
+},
+{
+"package_attr_name": "curlWithGnuTls",
+"package_pname": "curl",
+"package_position": "pkgs/by-name/cu/curlMinimal/package.nix:313",
+"package_pversion": "8.22.0"
+},
+{
+"package_attr_name": "haskellPackages.curl",
+"package_pname": "curl",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:177785",
+"package_pversion": "1.3.8"
+},
+{
+"package_attr_name": "ocamlPackages.curl",
+"package_pname": "curl",
+"package_position": "pkgs/development/ocaml-modules/curl/default.nix:28",
+"package_pversion": "0.10.0"
+},
+{
+"package_attr_name": "ocamlPackages_latest.curl",
+"package_pname": "curl",
+"package_position": "pkgs/development/ocaml-modules/curl/default.nix:28",
+"package_pversion": "0.10.0"
+},
+{
+"package_attr_name": "rPackages.curl",
+"package_pname": "curl",
+"package_position": "pkgs/development/r-modules/default.nix:64",
+"package_pversion": "8.0.0"
+},
+{
+"package_attr_name": "dbus",
+"package_pname": "dbus",
+"package_position": "pkgs/by-name/db/dbus/package.nix:182",
+"package_pversion": "1.16.2"
+},
+{
+"package_attr_name": "haskellPackages.dbus",
+"package_pname": "dbus",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:187601",
+"package_pversion": "1.4.2"
+},
+{
+"package_attr_name": "sbclPackages.dbus",
+"package_pname": "dbus",
+"package_position": "pkgs/development/lisp-modules/imported.nix:47254",
+"package_pversion": "20241012-git"
+},
+{
+"package_attr_name": "tcl8Packages.dbus",
+"package_pname": "dbus",
+"package_position": "pkgs/development/tcl-modules/dbus/default.nix:27",
+"package_pversion": "4.1"
+},
+{
+"package_attr_name": "tcl9Packages.dbus",
+"package_pname": "dbus",
+"package_position": "pkgs/development/tcl-modules/dbus/default.nix:27",
+"package_pversion": "4.1"
+},
+{
+"package_attr_name": "discordo",
+"package_pname": "discordo",
+"package_position": "pkgs/by-name/di/discordo/package.nix:55",
+"package_pversion": "0-unstable-2026-08-18"
+},
+{
+"package_attr_name": "dosfstools",
+"package_pname": "dosfstools",
+"package_position": "pkgs/by-name/do/dosfstools/package.nix:64",
+"package_pversion": "4.2"
+},
+{
+"package_attr_name": "dust",
+"package_pname": "du-dust",
+"package_position": "pkgs/by-name/du/dust/package.nix:56",
+"package_pversion": "1.2.6"
+},
+{
+"package_attr_name": "evtest",
+"package_pname": "evtest",
+"package_position": "pkgs/by-name/ev/evtest/package.nix:29",
+"package_pversion": "1.36"
+},
+{
+"package_attr_name": "fastfetch",
+"package_pname": "fastfetch",
+"package_position": "pkgs/by-name/fa/fastfetch-unwrapped/package.nix:158",
+"package_pversion": "2.70.0"
+},
+{
+"package_attr_name": "fd",
+"package_pname": "fd",
+"package_position": "pkgs/by-name/fd/fd/package.nix:52",
+"package_pversion": "10.5.0"
+},
+{
+"package_attr_name": "ffmpeg",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "9.0.2"
+},
+{
+"package_attr_name": "ffmpeg_4",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "4.4.8"
+},
+{
+"package_attr_name": "ffmpeg_6",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "6.1.6"
+},
+{
+"package_attr_name": "ffmpeg_7",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "7.1.5"
+},
+{
+"package_attr_name": "ffmpeg_8",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "8.1.3"
+},
+{
+"package_attr_name": "ffmpeg_9",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"package_pversion": "9.0.2"
+},
+{
+"package_attr_name": "ocamlPackages.ffmpeg",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/ocaml-modules/ffmpeg/default.nix:35",
+"package_pversion": "1.3.0"
+},
+{
+"package_attr_name": "ocamlPackages_latest.ffmpeg",
+"package_pname": "ffmpeg",
+"package_position": "pkgs/development/ocaml-modules/ffmpeg/default.nix:35",
+"package_pversion": "1.3.0"
+},
+{
+"package_attr_name": "file",
+"package_pname": "file",
+"package_position": "pkgs/by-name/fi/file/package.nix:73",
+"package_pversion": "5.48"
+},
+{
+"package_attr_name": "python313Packages.magic",
+"package_pname": "file",
+"package_position": "pkgs/development/python-modules/magic/default.nix:24",
+"package_pversion": "5.48"
+},
+{
+"package_attr_name": "python314Packages.magic",
+"package_pname": "file",
+"package_position": "pkgs/development/python-modules/magic/default.nix:24",
+"package_pversion": "5.48"
+},
+{
+"package_attr_name": "firefox",
+"package_pname": "firefox",
+"package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+"package_pversion": "159.0"
+},
+{
+"package_attr_name": "firefox-esr",
+"package_pname": "firefox",
+"package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+"package_pversion": "153.6.0esr"
+},
+{
+"package_attr_name": "firefox-esr-153",
+"package_pname": "firefox",
+"package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+"package_pversion": "153.6.0esr"
+},
+{
+"package_attr_name": "firefox-mobile",
+"package_pname": "firefox",
+"package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+"package_pversion": "159.0"
+},
+{
+"package_attr_name": "fuse",
+"package_pname": "fuse",
+"package_position": "pkgs/os-specific/linux/fuse/common.nix:90",
+"package_pversion": "3.18.2"
+},
+{
+"package_attr_name": "fuse3",
+"package_pname": "fuse",
+"package_position": "pkgs/os-specific/linux/fuse/common.nix:90",
+"package_pversion": "3.18.2"
+},
+{
+"package_attr_name": "emacsPackages.git",
+"package_pname": "git",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20140128.1041"
+},
+{
+"package_attr_name": "git",
+"package_pname": "git",
+"package_position": "pkgs/by-name/gi/git/package.nix:665",
+"package_pversion": "2.56.0"
+},
+{
+"package_attr_name": "haskellPackages.git",
+"package_pname": "git",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:275969",
+"package_pversion": "0.3.0"
+},
+{
+"package_attr_name": "ocamlPackages.git",
+"package_pname": "git",
+"package_position": "pkgs/development/ocaml-modules/git/default.nix:94",
+"package_pversion": "3.18.0"
+},
+{
+"package_attr_name": "ocamlPackages_latest.git",
+"package_pname": "git",
+"package_position": "pkgs/development/ocaml-modules/git/default.nix:94",
+"package_pversion": "3.18.0"
+},
+{
+"package_attr_name": "rubyPackages.git",
+"package_pname": "git",
+"package_position": "pkgs/development/ruby-modules/gem/default.nix:118",
+"package_pversion": "4.0.6"
+},
+{
+"package_attr_name": "rubyPackages_3_4.git",
+"package_pname": "git",
+"package_position": "pkgs/development/ruby-modules/gem/default.nix:118",
+"package_pversion": "4.0.6"
+},
+{
+"package_attr_name": "rubyPackages_4_0.git",
+"package_pname": "git",
+"package_position": "pkgs/development/ruby-modules/gem/default.nix:118",
+"package_pversion": "4.0.6"
+},
+{
+"package_attr_name": "git-lfs",
+"package_pname": "git-lfs",
+"package_position": "pkgs/by-name/gi/git-lfs/package.nix:107",
+"package_pversion": "3.8.1"
+},
+{
+"package_attr_name": "haskellPackages.git-lfs",
+"package_pname": "git-lfs",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:276732",
+"package_pversion": "1.2.5"
+},
+{
+"package_attr_name": "glow",
+"package_pname": "glow",
+"package_position": "pkgs/by-name/gl/glow/package.nix:43",
+"package_pversion": "3.0.0"
+},
+{
+"package_attr_name": "rPackages.glow",
+"package_pname": "glow",
+"package_position": "pkgs/development/r-modules/default.nix:64",
+"package_pversion": "0.13.0"
+},
+{
+"package_attr_name": "gnome-keyring",
+"package_pname": "gnome-keyring",
+"package_position": "pkgs/by-name/gn/gnome-keyring/package.nix:120",
+"package_pversion": "50.0"
+},
+{
+"package_attr_name": "haskellPackages.gnome-keyring",
+"package_pname": "gnome-keyring",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:282519",
+"package_pversion": "0.3.1.1"
+},
+{
+"package_attr_name": "grim",
+"package_pname": "grim",
+"package_position": "pkgs/by-name/gr/grim/package.nix:56",
+"package_pversion": "1.5.0"
+},
+{
+"package_attr_name": "harper",
+"package_pname": "harper",
+"package_position": "pkgs/by-name/ha/harper/package.nix:61",
+"package_pversion": "3.0.0"
+},
+{
+"package_attr_name": "emacsPackages.helix",
+"package_pname": "helix",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20261005.1637"
+},
+{
+"package_attr_name": "haskellPackages.helix",
+"package_pname": "helix",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:329939",
+"package_pversion": "0.9.5"
+},
+{
+"package_attr_name": "helix",
+"package_pname": "helix",
+"package_position": "pkgs/by-name/he/helix/package.nix:146",
+"package_pversion": "25.07.1"
+},
+{
+"package_attr_name": "jq",
+"package_pname": "jq",
+"package_position": "pkgs/by-name/jq/jq/package.nix:124",
+"package_pversion": "1.8.2"
+},
+{
+"package_attr_name": "python313Packages.jq",
+"package_pname": "jq",
+"package_position": "pkgs/development/python-modules/jq/default.nix:47",
+"package_pversion": "1.12.0"
+},
+{
+"package_attr_name": "python314Packages.jq",
+"package_pname": "jq",
+"package_position": "pkgs/development/python-modules/jq/default.nix:47",
+"package_pversion": "1.12.0"
+},
+{
+"package_attr_name": "jstest-gtk",
+"package_pname": "jstest-gtk",
+"package_position": "pkgs/by-name/js/jstest-gtk/package.nix:34",
+"package_pversion": "0.1.1-unstable-2025-04-03"
+},
+{
+"package_attr_name": "less",
+"package_pname": "less",
+"package_position": "pkgs/by-name/le/less/package.nix:51",
+"package_pversion": "710"
+},
+{
+"package_attr_name": "rPackages.less",
+"package_pname": "less",
+"package_position": "pkgs/development/r-modules/default.nix:64",
+"package_pversion": "0.1.0"
+},
+{
+"package_attr_name": "haskellPackages.libnotify",
+"package_pname": "libnotify",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:431520",
+"package_pversion": "0.2.1"
+},
+{
+"package_attr_name": "libnotify",
+"package_pname": "libnotify",
+"package_position": "pkgs/by-name/li/libnotify/package.nix:70",
+"package_pversion": "0.8.8"
+},
+{
+"package_attr_name": "libqalculate",
+"package_pname": "libqalculate",
+"package_position": "pkgs/by-name/li/libqalculate/package.nix:73",
+"package_pversion": "5.13.2"
+},
+{
+"package_attr_name": "libressl",
+"package_pname": "libressl",
+"package_position": "pkgs/by-name/li/libressl/default.nix:115",
+"package_pversion": "4.3.2"
+},
+{
+"package_attr_name": "libressl_4_2",
+"package_pname": "libressl",
+"package_position": "pkgs/by-name/li/libressl/default.nix:115",
+"package_pversion": "4.2.1"
+},
+{
+"package_attr_name": "libressl_4_3",
+"package_pname": "libressl",
+"package_position": "pkgs/by-name/li/libressl/default.nix:115",
+"package_pversion": "4.3.2"
+},
+{
+"package_attr_name": "netcat",
+"package_pname": "libressl",
+"package_position": "pkgs/top-level/all-packages.nix:2433",
+"package_pversion": "4.3.2"
+},
+{
+"package_attr_name": "linux",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_6_1",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.1.190"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_6_12",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.12.114"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_6_18",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_6_6",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.6.160"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_7_2",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.2.13"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_7_3",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_default",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_latest",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linuxKernel.kernels.linux_testing",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_6_1.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.1.190"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_6_12.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.12.114"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_6_18.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_6_6.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.6.160"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_7_2.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.2.13"
+},
+{
+"package_attr_name": "linuxKernel.packages.linux_7_3.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linuxPackages.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxPackages_custom_tinyconfig_kernel",
+"package_pname": "linux",
+"package_position": null,
+"package_pversion": "6.18.59"
+},
+{
+"package_attr_name": "linuxPackages_latest.kernel",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linux_latest",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "linux_testing",
+"package_pname": "linux",
+"package_position": "pkgs/os-specific/linux/kernel/mainline.nix:34",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "lm_sensors",
+"package_pname": "lm-sensors",
+"package_position": "pkgs/by-name/lm/lm_sensors/package.nix:79",
+"package_pversion": "3.6.2"
+},
+{
+"package_attr_name": "lvm2",
+"package_pname": "lvm2",
+"package_position": "pkgs/os-specific/linux/lvm2/common.nix:238",
+"package_pversion": "2.03.41"
+},
+{
+"package_attr_name": "haskellPackages.lz4",
+"package_pname": "lz4",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:448220",
+"package_pversion": "0.2.3.1"
+},
+{
+"package_attr_name": "lz4",
+"package_pname": "lz4",
+"package_position": "pkgs/by-name/lz/lz4/package.nix:63",
+"package_pversion": "1.10.0"
+},
+{
+"package_attr_name": "python313Packages.lz4",
+"package_pname": "lz4",
+"package_position": "pkgs/development/python-modules/lz4/default.nix:56",
+"package_pversion": "4.4.5"
+},
+{
+"package_attr_name": "python314Packages.lz4",
+"package_pname": "lz4",
+"package_position": "pkgs/development/python-modules/lz4/default.nix:56",
+"package_pversion": "4.4.5"
+},
+{
+"package_attr_name": "mangohud",
+"package_pname": "mangohud",
+"package_position": "pkgs/by-name/ma/mangohud/package.nix:255",
+"package_pversion": "0.8.4"
+},
+{
+"package_attr_name": "markdown-oxide",
+"package_pname": "markdown-oxide",
+"package_position": "pkgs/by-name/ma/markdown-oxide/package.nix:20",
+"package_pversion": "0.25.12"
+},
+{
+"package_attr_name": "freebsd.libncurses",
+"package_pname": "ncurses",
+"package_position": "pkgs/os-specific/bsd/freebsd/pkgs/mkDerivation.nix:39",
+"package_pversion": "15.0.0"
+},
+{
+"package_attr_name": "haskellPackages.ncurses",
+"package_pname": "ncurses",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:488271",
+"package_pversion": "0.2.16"
+},
+{
+"package_attr_name": "libtinfo",
+"package_pname": "ncurses",
+"package_position": "pkgs/development/libraries/ncurses/default.nix:266",
+"package_pversion": "6.6"
+},
+{
+"package_attr_name": "ncurses",
+"package_pname": "ncurses",
+"package_position": "pkgs/development/libraries/ncurses/default.nix:266",
+"package_pversion": "6.6"
+},
+{
+"package_attr_name": "ncurses6",
+"package_pname": "ncurses",
+"package_position": "pkgs/development/libraries/ncurses/default.nix:266",
+"package_pversion": "6.6"
+},
+{
+"package_attr_name": "haskellPackages.nix",
+"package_pname": "nix",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:495623",
+"package_pversion": "0.1.0.0"
+},
+{
+"package_attr_name": "nix",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.34.9"
+},
+{
+"package_attr_name": "nixStatic",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.34.9"
+},
+{
+"package_attr_name": "nixVersions.git",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.36pre20261020_f3f18483"
+},
+{
+"package_attr_name": "nixVersions.latest",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.35.3"
+},
+{
+"package_attr_name": "nixVersions.nix_2_34",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.34.9"
+},
+{
+"package_attr_name": "nixVersions.nix_2_35",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.35.3"
+},
+{
+"package_attr_name": "nixVersions.stable",
+"package_pname": "nix",
+"package_position": "pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"package_pversion": "2.34.9"
+},
+{
+"package_attr_name": "nixd",
+"package_pname": "nixd",
+"package_position": "pkgs/development/tools/language-servers/nixd/default.nix:175",
+"package_pversion": "2.9.3"
+},
+{
+"package_attr_name": "emacsPackages.nixfmt",
+"package_pname": "nixfmt",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20240724.1531"
+},
+{
+"package_attr_name": "haskellPackages.nixfmt",
+"package_pname": "nixfmt",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:496527",
+"package_pversion": "0.6.0"
+},
+{
+"package_attr_name": "nixfmt",
+"package_pname": "nixfmt",
+"package_position": "pkgs/by-name/ni/nixfmt/generated-package.nix:26",
+"package_pversion": "1.5.0"
+},
+{
+"package_attr_name": "nixfmt-tree",
+"package_pname": "nixfmt-tree",
+"package_position": "pkgs/by-name/ni/nixfmt-tree/package.nix:60",
+"package_pversion": "2.6.0"
+},
+{
+"package_attr_name": "nixos-option",
+"package_pname": "nixos-option",
+"package_position": "pkgs/by-name/ni/nixos-option/package.nix:66",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "lixPackageSets.git.nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "lixPackageSets.latest.nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "lixPackageSets.lix_2_95.nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "lixPackageSets.lix_2_96.nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "lixPackageSets.stable.nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "nixos-rebuild-ng",
+"package_pname": "nixos-rebuild-ng",
+"package_position": "pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"package_pversion": "26.11"
+},
+{
+"package_attr_name": "dwarf-fortress-packages.themes.obsidian",
+"package_pname": "obsidian",
+"package_position": "pkgs/games/dwarf-fortress/themes/default.nix:18",
+"package_pversion": "47.05"
+},
+{
+"package_attr_name": "emacsPackages.obsidian",
+"package_pname": "obsidian",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20250220.2245"
+},
+{
+"package_attr_name": "obsidian",
+"package_pname": "obsidian",
+"package_position": "pkgs/by-name/ob/obsidian/package.nix:20",
+"package_pversion": "1.14.5"
+},
+{
+"package_attr_name": "oversteer",
+"package_pname": "oversteer",
+"package_position": "pkgs/by-name/ov/oversteer/package.nix:104",
+"package_pversion": "0.8.3"
+},
+{
+"package_attr_name": "haskellPackages.pandoc-cli",
+"package_pname": "pandoc-cli",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:518245",
+"package_pversion": "3.7.0.2"
+},
+{
+"package_attr_name": "haskellPackages.pandoc-cli_3_9_0_2",
+"package_pname": "pandoc-cli",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:518284",
+"package_pversion": "3.9.0.2"
+},
+{
+"package_attr_name": "pandoc",
+"package_pname": "pandoc-cli",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:518245",
+"package_pversion": "3.7.0.2"
+},
+{
+"package_attr_name": "gnupatch",
+"package_pname": "patch",
+"package_position": "pkgs/by-name/gn/gnupatch/package.nix:39",
+"package_pversion": "2.8"
+},
+{
+"package_attr_name": "haskellPackages.patch",
+"package_pname": "patch",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:525618",
+"package_pversion": "0.0.8.4"
+},
+{
+"package_attr_name": "ocamlPackages.patch",
+"package_pname": "patch",
+"package_position": "pkgs/development/ocaml-modules/patch/default.nix:31",
+"package_pversion": "3.0.0"
+},
+{
+"package_attr_name": "ocamlPackages_latest.patch",
+"package_pname": "patch",
+"package_position": "pkgs/development/ocaml-modules/patch/default.nix:31",
+"package_pversion": "3.0.0"
+},
+{
+"package_attr_name": "patch",
+"package_pname": "patch",
+"package_position": "pkgs/by-name/gn/gnupatch/package.nix:39",
+"package_pversion": "2.8"
+},
+{
+"package_attr_name": "python313Packages.patch",
+"package_pname": "patch",
+"package_position": "pkgs/development/python-modules/patch/default.nix:22",
+"package_pversion": "1.16"
+},
+{
+"package_attr_name": "python314Packages.patch",
+"package_pname": "patch",
+"package_position": "pkgs/development/python-modules/patch/default.nix:22",
+"package_pversion": "1.16"
+},
+{
+"package_attr_name": "texlivePackages.patch",
+"package_pname": "patch",
+"package_position": "pkgs/tools/typesetting/tex/texlive/build-texlive-package.nix:83",
+"package_pversion": "42428"
+},
+{
+"package_attr_name": "pfetch",
+"package_pname": "pfetch",
+"package_position": "pkgs/by-name/pf/pfetch/package.nix:41",
+"package_pversion": "1.11.0"
+},
+{
+"package_attr_name": "emacsPackages.playerctl",
+"package_pname": "playerctl",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20220714.1234"
+},
+{
+"package_attr_name": "playerctl",
+"package_pname": "playerctl",
+"package_position": "pkgs/by-name/pl/playerctl/package.nix:56",
+"package_pversion": "2.4.1"
+},
+{
+"package_attr_name": "polkit_gnome",
+"package_pname": "polkit-gnome",
+"package_position": "pkgs/by-name/po/polkit_gnome/package.nix:39",
+"package_pversion": "0.105"
+},
+{
+"package_attr_name": "protontricks",
+"package_pname": "protontricks",
+"package_position": "pkgs/by-name/pr/protontricks/package.nix:102",
+"package_pversion": "1.15.0"
+},
+{
+"package_attr_name": "protonup-qt",
+"package_pname": "protonup-qt",
+"package_position": "pkgs/by-name/pr/protonup-qt/package.nix:35",
+"package_pversion": "2.15.1"
+},
+{
+"package_attr_name": "pwvucontrol",
+"package_pname": "pwvucontrol",
+"package_position": "pkgs/by-name/pw/pwvucontrol/package.nix:77",
+"package_pversion": "0.5.3"
+},
+{
+"package_attr_name": "buildbotPackages.python",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "mailmanPackages.python3",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "mopidyPackages.python",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "python3",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "python311",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.11.17"
+},
+{
+"package_attr_name": "python312",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.12.15"
+},
+{
+"package_attr_name": "python313",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.13.16"
+},
+{
+"package_attr_name": "python313FreeThreading",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.13.16"
+},
+{
+"package_attr_name": "python313Packages.python",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.13.16"
+},
+{
+"package_attr_name": "python314",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "python314FreeThreading",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "python314Packages.python",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.14.8"
+},
+{
+"package_attr_name": "python315",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.15.0"
+},
+{
+"package_attr_name": "python315FreeThreading",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.15.0"
+},
+{
+"package_attr_name": "python316",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.16.0a1"
+},
+{
+"package_attr_name": "python316FreeThreading",
+"package_pname": "python3",
+"package_position": "pkgs/development/interpreters/python/cpython/default.nix:862",
+"package_pversion": "3.15.0"
+},
+{
+"package_attr_name": "quickemu",
+"package_pname": "quickemu",
+"package_position": "pkgs/by-name/qu/quickemu/package.nix:114",
+"package_pversion": "4.9.9"
+},
+{
+"package_attr_name": "emacsPackages.ripgrep",
+"package_pname": "ripgrep",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20220520.1410"
+},
+{
+"package_attr_name": "ripgrep",
+"package_pname": "ripgrep",
+"package_position": "pkgs/by-name/ri/ripgrep/package.nix:66",
+"package_pversion": "15.2.0"
+},
+{
+"package_attr_name": "slurp",
+"package_pname": "slurp",
+"package_position": "pkgs/by-name/sl/slurp/package.nix:51",
+"package_pversion": "1.5.0"
+},
+{
+"package_attr_name": "slurp-fediverse",
+"package_pname": "slurp",
+"package_position": "pkgs/by-name/sl/slurp-fediverse/package.nix:25",
+"package_pversion": "1.1.1"
+},
+{
+"package_attr_name": "emacsPackages.spotify",
+"package_pname": "spotify",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20250106.1015"
+},
+{
+"package_attr_name": "haskellPackages.spotify",
+"package_pname": "spotify",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:651637",
+"package_pversion": "0.1.0.1"
+},
+{
+"package_attr_name": "spotify",
+"package_pname": "spotify",
+"package_position": "pkgs/by-name/sp/spotify/package.nix:17",
+"package_pversion": "1.2.95.453.g0eeebbed"
+},
+{
+"package_attr_name": "strace",
+"package_pname": "strace",
+"package_position": "pkgs/by-name/st/strace/package.nix:60",
+"package_pversion": "7.3"
+},
+{
+"package_attr_name": "swayidle",
+"package_pname": "swayidle",
+"package_position": "pkgs/by-name/sw/swayidle/package.nix:55",
+"package_pversion": "1.9.1"
+},
+{
+"package_attr_name": "emacsPackages.syncthing",
+"package_pname": "syncthing",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20250612.206"
+},
+{
+"package_attr_name": "syncthing",
+"package_pname": "syncthing",
+"package_position": "pkgs/by-name/sy/syncthing/package.nix:121",
+"package_pversion": "2.1.7"
+},
+{
+"package_attr_name": "python313Packages.tailscale",
+"package_pname": "tailscale",
+"package_position": "pkgs/development/python-modules/tailscale/default.nix:65",
+"package_pversion": "1.0.0"
+},
+{
+"package_attr_name": "python314Packages.tailscale",
+"package_pname": "tailscale",
+"package_position": "pkgs/development/python-modules/tailscale/default.nix:65",
+"package_pversion": "1.0.0"
+},
+{
+"package_attr_name": "tailscale",
+"package_pname": "tailscale",
+"package_position": "pkgs/by-name/ta/tailscale/package.nix:326",
+"package_pversion": "1.104.4"
+},
+{
+"package_attr_name": "terminus_font",
+"package_pname": "terminus-font",
+"package_position": "pkgs/by-name/te/terminus_font/package.nix:46",
+"package_pversion": "4.49.1"
+},
+{
+"package_attr_name": "tlrc",
+"package_pname": "tlrc",
+"package_position": "pkgs/by-name/tl/tlrc/package.nix:29",
+"package_pversion": "1.13.1"
+},
+{
+"package_attr_name": "emacsPackages.tokei",
+"package_pname": "tokei",
+"package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+"package_pversion": "20250621.1500"
+},
+{
+"package_attr_name": "tokei",
+"package_pname": "tokei",
+"package_position": "pkgs/by-name/to/tokei/package.nix:38",
+"package_pversion": "15.0.0"
+},
+{
+"package_attr_name": "tuxedo",
+"package_pname": "tuxedo",
+"package_position": "pkgs/by-name/tu/tuxedo/package.nix:39",
+"package_pversion": "2026.8.1"
+},
+{
+"package_attr_name": "haskellPackages.typst",
+"package_pname": "typst",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:723801",
+"package_pversion": "0.8.0.2"
+},
+{
+"package_attr_name": "haskellPackages.typst_0_9_0_1",
+"package_pname": "typst",
+"package_position": "pkgs/development/haskell-modules/hackage-packages.nix:723874",
+"package_pversion": "0.9.0.1"
+},
+{
+"package_attr_name": "python313Packages.typst",
+"package_pname": "typst",
+"package_position": "pkgs/development/python-modules/typst/default.nix:50",
+"package_pversion": "0.15.1"
+},
+{
+"package_attr_name": "python314Packages.typst",
+"package_pname": "typst",
+"package_position": "pkgs/development/python-modules/typst/default.nix:50",
+"package_pversion": "0.15.1"
+},
+{
+"package_attr_name": "typst",
+"package_pname": "typst",
+"package_position": "pkgs/by-name/ty/typst/package.nix:80",
+"package_pversion": "0.15.1"
+},
+{
+"package_attr_name": "umu-launcher",
+"package_pname": "umu-launcher",
+"package_position": "pkgs/by-name/um/umu-launcher-unwrapped/package.nix:96",
+"package_pversion": "1.4.4"
+},
+{
+"package_attr_name": "ungoogled-chromium",
+"package_pname": "ungoogled-chromium",
+"package_position": "pkgs/applications/networking/browsers/chromium/browser.nix:89",
+"package_pversion": "156.0.8078.73"
+},
+{
+"package_attr_name": "wineWow64Packages.staging",
+"package_pname": "wine-wow64-staging",
+"package_position": "pkgs/applications/emulators/wine/base.nix:375",
+"package_pversion": "11.19"
+},
+{
+"package_attr_name": "wineWow64Packages.stagingFull",
+"package_pname": "wine-wow64-staging",
+"package_position": "pkgs/applications/emulators/wine/base.nix:375",
+"package_pversion": "11.19"
+},
+{
+"package_attr_name": "winetricks",
+"package_pname": "winetricks",
+"package_position": "pkgs/applications/emulators/wine/winetricks.nix:113",
+"package_pversion": "20260125"
+},
+{
+"package_attr_name": "wireplumber",
+"package_pname": "wireplumber",
+"package_position": "pkgs/by-name/wi/wireplumber/package.nix:93",
+"package_pversion": "0.5.18"
+},
+{
+"package_attr_name": "wl-clipboard",
+"package_pname": "wl-clipboard",
+"package_position": "pkgs/by-name/wl/wl-clipboard/package.nix:51",
+"package_pversion": "2.3.0"
+},
+{
+"package_attr_name": "wl-gammarelay-rs",
+"package_pname": "wl-gammarelay-rs",
+"package_position": "pkgs/by-name/wl/wl-gammarelay-rs/package.nix:20",
+"package_pversion": "1.0.1"
+},
+{
+"package_attr_name": "xdg-terminal-exec",
+"package_pname": "xdg-terminal-exec",
+"package_position": "pkgs/by-name/xd/xdg-terminal-exec/package.nix:43",
+"package_pversion": "0.14.4"
+},
+{
+"package_attr_name": "xwayland-satellite",
+"package_pname": "xwayland-satellite",
+"package_position": "pkgs/by-name/xw/xwayland-satellite/package.nix:70",
+"package_pversion": "0.8.3"
+},
+{
+"package_attr_name": "python313Packages.yt-dlp",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "python313Packages.yt-dlp-light",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "python314Packages.yt-dlp",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "python314Packages.yt-dlp-light",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "yt-dlp",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "yt-dlp-light",
+"package_pname": "yt-dlp",
+"package_position": "pkgs/by-name/yt/yt-dlp/package.nix:167",
+"package_pversion": "2026.10.21"
+},
+{
+"package_attr_name": "zapzap",
+"package_pname": "zapzap",
+"package_position": "pkgs/by-name/za/zapzap/package.nix:79",
+"package_pversion": "7.5.1"
+}
+],
+"index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325"
+}

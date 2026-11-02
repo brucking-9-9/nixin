@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, apply, discovery, gui, truth, tui, writer
+from . import __version__, apply, discovery, gui, outdated, truth, tui, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -42,6 +42,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "plan": ("apply", "build the pending config and show the closure diff"),
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
+    "outdated": ("outdated", outdated.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
     "gui": ("gui", "desktop UI (Qt) over the same documents"),
 }
@@ -87,6 +88,7 @@ def _parser() -> argparse.ArgumentParser:
     truth.register(sub)
     writer.register(sub)
     apply.register(sub)
+    outdated.register(sub)
     tui.register(sub)
     gui.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb

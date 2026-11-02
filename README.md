@@ -37,6 +37,7 @@ search info versions        discovery   what exists upstream, in which versions
 status where list           truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
+outdated                    outdated    what a nixpkgs lock update would change; --published: newer on a channel
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
@@ -70,6 +71,15 @@ which touch the network, run nix or write files, and the cache locations.
   now running is the one it built and appends `installer/history.jsonl`. Without a sudo
   ticket it stops with `needs-sudo` and the exact commands; `--dry-run` prints them.
   `sync` fetches the hub and pulls (`--ff-only`) or pushes the workspace branch.
+- **outdated** answers "what needs updating" for a host. By default it evaluates the
+  installed package lists (system and each Home Manager user) and the kernel twice: as
+  locked, and with `--override-input nixpkgs` at the lock's own ref as it resolves now
+  (`--nixpkgs FLAKEREF|REV`, `--channel NAME` pick another). It compares them by pname:
+  `pname  from → to` per scope, added and removed, the kernel, and the commands to take
+  the update (`nix flake update nixpkgs`, `nixin plan`, `nixin apply`). Two package-list
+  evals, no build: about 5 s, plus a nixpkgs tarball download for a new commit.
+  `--published` compares the installed versions with a search.nixos.org channel instead
+  (one query per 50 names; a heuristic, since many attributes share a pname).
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
