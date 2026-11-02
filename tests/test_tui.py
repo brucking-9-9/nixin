@@ -14,7 +14,8 @@ from tui_fake import COWSAY, FakeBackend, load, screen_text
 
 from nixin.cli import main
 from nixin.tui.app import NixinApp
-from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal
+from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, UpdateModal
+from nixin.tui.packages import PackagesScreen
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
 from nixin.ui import backend, view
@@ -336,9 +337,9 @@ def test_tui_verb_has_no_json_form(capsys):
 # --- the app ---------------------------------------------------------------------------------------
 
 
-def drive(script, routes=None, size=DESKTOP):
+def drive(script, routes=None, size=DESKTOP, host="mbp13"):
     """Run `script(app, pilot, fake)` inside App.run_test; returns (app, fake)."""
-    fake = FakeBackend(dict(COWSAY if routes is None else routes))
+    fake = FakeBackend(dict(COWSAY if routes is None else routes), host=host)
     app = NixinApp(fake)
 
     async def go():
@@ -727,6 +728,183 @@ def test_escape_goes_back_and_q_quits():
 
     app, _ = drive(script)
     assert app.return_value == "nixin tui: nothing changed"
+
+
+# --- the Packages screen: installed (`list`), updates (`outdated`), `update` ---------------------
+
+PACKAGES = {
+    "list": "list_19BK",
+    "outdated": "outdated_19BK",
+    "outdated --published": "outdated_19BK_published",
+    "update --dry-run": "update_dry",
+    "update": "update_ok",
+    "status": "status_updated",
+    "info": "info_cowsay",
+    "versions": "versions_cowsay",
+    "where": "where_cowsay",
+}
+
+
+async def open_packages(app, pilot, *keys: str):
+    await pilot.press("escape", *(keys or ("i",)))  # out of the query box first
+    await settle(app, pilot)
+    assert isinstance(app.screen, PackagesScreen)
+    return app.screen
+
+
+def fits(app):
+    w, _ = app.size
+    for widget in app.screen.query("*"):
+        if widget.display and widget.region.width:
+            assert widget.region.right <= w, widget
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_packages_installed_filter_scope_details(size):
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot)
+        table = screen.query_one("#pk-table", DataTable)
+        assert table.row_count == 78 and table.has_focus
+        cols = [str(c.key.value) for c in table.columns.values()]
+        assert cols == (["name", "version", "tag"] + ([] if size == PHONE else ["where"]))
+        assert screen.query_one("#pk-footer", Line).value.startswith(
+            "78 packages: 26 system, 52 home brucking · 67 repeats folded"
+        )
+        assert "acl-2.4.0 · the system · added by a module" in screen_text(app)
+        fits(app)
+        await pilot.press("f", *"zsh")
+        await settle(app, pilot)
+        assert table.row_count == 2
+        await pilot.press("enter", "h", "h")  # to the table; system, then home brucking
+        await settle(app, pilot)
+        assert [r.user for r in screen.shown] == ["brucking"]
+        assert screen.query_one("#pk-footer", Line).value.startswith(
+            "1 of 78 packages matching 'zsh' (home brucking)"
+        )
+        assert "home brucking" in str(screen.query_one("#pk-scope").label)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        details = app.screen
+        assert isinstance(details, DetailsScreen) and details.user == "brucking"
+        assert "home: brucking (h)" in screen_text(app)
+        await pilot.press("r")  # Remove: the writer previews `rm zsh --home brucking`
+        await settle(app, pilot)
+        await pilot.press("escape", "escape")
+        await settle(app, pilot)
+        assert app.screen is screen and table.row_count == 1  # the filter stays
+
+    _, fake = drive(script, PACKAGES, size=size, host="19BK")
+    verbs = fake.verbs()
+    assert verbs[0] == ["list"]  # one eval: filter and scope work on the loaded rows
+    assert ["where", "zsh", "--kind", "package"] in verbs
+    assert ["rm", "zsh", "--home", "brucking", "--dry-run"] in verbs
+    assert verbs.count(["list"]) == 1  # back from Details: the kept document
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_packages_updates_then_update_lock_to_pending(size):
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot)
+        await pilot.press("t")
+        await settle(app, pilot)
+        table = screen.query_one("#up-table", DataTable)
+        assert table.row_count == 14 and table.has_focus
+        assert screen.query_one("#up-kernel", Line).value == "kernel 7.2.12 → 7.2.14"
+        assert screen.query_one("#up-summary", Line).value == (
+            "13 of 325 packages would change; kernel 7.2.12 → 7.2.14"
+        )
+        assert "19BK: nixpkgs (github:nixos/nixpkgs/nixos-unstable) 3ec6363" in (
+            screen.query_one("#up-head", Line).value
+        )
+        text = screen_text(app)
+        assert "firefox" in text and "removed" in text and "Update nixpkgs lock (u)" in text
+        fits(app)
+        await pilot.press("m")  # --published
+        await settle(app, pilot)
+        assert table.row_count == 13
+        assert screen.query_one("#up-kernel", Line).value.endswith("latest 7.3")
+        assert "mode: published (m)" in screen_text(app)
+        fits(app)
+        await pilot.press("m")  # back to the lock: kept, not evaluated again
+        await settle(app, pilot)
+        assert table.row_count == 14
+        await pilot.press("u")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, UpdateModal)
+        text = modal.query_one("#update-fields", Fields).text
+        assert "nix flake update nixpkgs --flake /home/master/nixos" in text
+        assert "nothing is built or switched" in text
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert isinstance(app.screen, PendingScreen)
+        assert "nixpkgs 3ec6363 → 0bb2eed (flake.lock)" in screen_text(app)
+        assert "flake.lock" in app.screen.query_one("#pending", Fields).text
+        await pilot.press("escape")  # back: the lock moved, so both documents are stale
+        await settle(app, pilot)
+        assert app.screen is screen
+
+    app, fake = drive(script, PACKAGES, size=size, host="19BK")
+    assert fake.verbs() == [
+        ["list"],
+        ["outdated"],
+        ["outdated", "--published"],
+        ["update", "--dry-run"],
+        ["update"],
+        ["status"],
+        ["list"],
+        ["outdated"],
+    ]
+    assert app.writes == ["nixpkgs 3ec6363 → 0bb2eed (flake.lock)"]
+    assert app.return_value is None or "nothing changed" not in app.return_value
+
+
+def test_packages_nothing_to_update_and_errors():
+    routes = {
+        **PACKAGES,
+        "outdated": {**load("outdated_19BK"), "up_to_date": True, "changed": [], "count": 0},
+        "outdated --published": {
+            "ok": False,
+            "error": {"code": "network", "message": "search.nixos.org: timed out"},
+        },
+    }
+
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot, "ctrl+backslash")  # ctrl+4, legacy terminal
+        await pilot.press("t")
+        await settle(app, pilot)
+        assert screen.query_one("#up-update").disabled
+        assert screen.query_one("#up-summary", Line).value.endswith("nothing would change")
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert app.screen is screen  # no dry run, no modal
+        await pilot.press("m")
+        await settle(app, pilot)
+        notice = screen.query_one("#up-notice", NoticeBox)
+        assert notice.display and notice.notice.code == "network"
+        assert screen.query_one("#up-table", DataTable).row_count == 0
+
+    _, fake = drive(script, routes)
+    assert fake.verbs() == [["list"], ["outdated"], ["outdated", "--published"]]
+
+
+def test_page_keys_fold_into_one_group_on_a_phone():
+    def footer(size, keys):
+        out = {}
+
+        async def script(app, pilot, fake):
+            await pilot.press("escape", *keys)
+            await settle(app, pilot)
+            out["text"] = screen_text(app).splitlines()[-1]
+
+        drive(script, PACKAGES, size=size)
+        return out["text"]
+
+    assert "i Packages p Pending s Status" in footer(DESKTOP, [])
+    assert footer(PHONE, []).rstrip().endswith("? Keys  i p s go")
+    assert "esc Back t Updates q Quit" in footer(PHONE, ["i"])
+    assert "t Installed" in footer(PHONE, ["i", "t"])
+    assert " i s go" in footer(PHONE, ["p"])  # the page you are on is left out
 
 
 def test_screenshots_export_at_both_sizes():

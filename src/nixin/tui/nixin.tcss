@@ -73,6 +73,56 @@ NoticeBox.-action {
     border-left: thick $secondary;
 }
 
+/* --- packages: installed (list), updates (outdated) */
+
+#pk-tabs {
+    margin: 0 1;
+}
+
+#pk-switch, #pk-installed, #pk-updates {
+    width: 100%;
+    height: 1fr;
+}
+
+#pk-bar {
+    height: 1;
+    margin: 0 1;
+}
+#pk-filter {
+    width: 1fr;
+    border: none;
+    background: $background;
+}
+#pk-filter:focus {
+    background: $boost;
+}
+#pk-scope {
+    width: auto;
+    margin-left: 1;
+}
+
+#pk-table, #up-table {
+    height: 1fr;
+    margin: 0 1;
+    background: $background;
+    scrollbar-size-vertical: 1;
+}
+
+#pk-detail, #up-summary {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+    border-top: hkey $panel;
+}
+#pk-footer, #up-head, #up-kernel, #up-notes {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+}
+Screen.-narrow #up-notes {
+    max-height: 2;
+}
+
 /* --- details, pending, apply, status */
 
 #details-title {
