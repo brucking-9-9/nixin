@@ -76,8 +76,15 @@ def run_nix(args: list[str], *, code: str = "eval-failed", timeout: float | None
     if exe is None:
         raise NixinError("nix-missing", "`nix` is not on PATH")
     cmd = [exe, *args, "--option", "warn-dirty", "false"]
-    try:
-        proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=timeout)
+    try:  # stdin closed: nix must never stop to ask (e.g. about a flake's nixConfig)
+        proc = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+        )
     except subprocess.TimeoutExpired as e:
         raise NixinError("eval-timeout", f"nix did not finish in {timeout:.0f}s") from e
     if proc.returncode != 0:

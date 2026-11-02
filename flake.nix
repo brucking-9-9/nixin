@@ -33,6 +33,24 @@
         };
       });
 
-      formatter = forAll (pkgs: pkgs.nixfmt);
+      # `nix fmt` passes no paths, and bare nixfmt then reads stdin. Without a path
+      # argument (only flags, e.g. `nix fmt -- --check`) this formats the tracked *.nix files.
+      formatter = forAll (
+        pkgs:
+        pkgs.writeShellApplication {
+          name = "nixfmt-tracked";
+          runtimeInputs = [
+            pkgs.nixfmt
+            pkgs.git
+          ];
+          text = ''
+            for a in "$@"; do
+              if [ "$a" = - ] || [ -e "$a" ]; then exec nixfmt "$@"; fi
+            done
+            mapfile -d "" -t files < <(git ls-files -z -- ':(top)*.nix')
+            exec nixfmt "$@" "''${files[@]}"
+          '';
+        }
+      );
     };
 }

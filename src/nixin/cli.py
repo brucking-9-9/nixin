@@ -3,10 +3,12 @@
 Every verb accepts --json and then prints exactly one JSON document on stdout:
 
     {"ok": true,  "verb": "<verb>", "host": "<host>", ...verb-specific fields}
-    {"ok": false, "verb": "<verb>", "error": {"code": "<slug>", "message": "..."}}
+    {"ok": false, "verb": "<verb>", "host": "<host>", "error": {"code": "<slug>", "message": "..."}}
 
 Human-readable output (no --json) is free-form but never interleaved with the
-JSON form. Exit codes: 0 ok, 1 verb failed (JSON error printed), 2 usage.
+JSON form. Exit codes: 0 ok, 1 verb failed (JSON error printed), 2 usage (code
+"usage"; under --json also for argparse's own errors, with "verb" null when no
+verb was recognised). docs/CONTRACT.md has the whole contract.
 Nothing here prompts for input: privileged steps fail with code
 "needs-sudo" and the command to run, so a UI (or an agent) can decide.
 
@@ -18,8 +20,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
+import traceback
 
 from . import __version__, discovery, truth, writer
 
@@ -40,8 +44,23 @@ VERBS: dict[str, tuple[str, str]] = {
 }
 
 
+class UsageError(Exception):
+    """argparse rejected the command line; main() answers it (JSON under --json)."""
+
+    def __init__(self, prog: str, message: str, usage: str) -> None:
+        super().__init__(f"{prog}: {message}")
+        self.prog, self.message, self.usage = prog, message, usage
+
+
+class _Parser(argparse.ArgumentParser):
+    """An ArgumentParser that raises instead of printing and exiting (subparsers inherit it)."""
+
+    def error(self, message: str):  # type: ignore[override]
+        raise UsageError(self.prog, message, self.format_usage())
+
+
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="nixin", description=__doc__.split("\n\n")[0])
+    p = _Parser(prog="nixin", description=__doc__.split("\n\n")[0])
     p.add_argument("--version", action="version", version=f"nixin {__version__}")
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument(
@@ -58,6 +77,11 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("args", nargs="*")
     truth.register(sub)
     writer.register(sub)
+    for sp in sub.choices.values():  # the global flags also work after the verb
+        sp.add_argument(
+            "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
+        )
+        sp.add_argument("--host", default=argparse.SUPPRESS, help="as `nixin --host`")
     return p
 
 
@@ -70,17 +94,59 @@ def _emit(ns: argparse.Namespace, doc: dict) -> int:
         print(doc.get("message", "ok"))
     else:
         print(f"nixin {ns.verb}: {doc['error']['message']}", file=sys.stderr)
-    return 0 if doc["ok"] else 1
+    if doc["ok"]:
+        return 0
+    return 2 if doc["error"]["code"] == "usage" else 1
+
+
+def _internal(exc: Exception) -> dict:
+    """An unexpected exception as the error document: under --json a traceback would leave
+    stdout empty. The message names the exception and where it was raised."""
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f" at {os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
+    return {
+        "ok": False,
+        "error": {"code": "internal", "message": f"{type(exc).__name__}: {exc}{where}"},
+    }
+
+
+def _usage(argv: list[str], e: UsageError) -> int:
+    """argparse's errors (and no verb at all): exit 2; under --json one `usage` document."""
+    head = argv[: argv.index("--")] if "--" in argv else argv
+    if "--json" not in head:
+        sys.stderr.write(e.usage)
+        print(f"{e.prog}: error: {e.message}", file=sys.stderr)
+        return 2
+    host = socket.gethostname()
+    for i, a in enumerate(head):
+        if a == "--host" and i + 1 < len(head):
+            host = head[i + 1]
+        elif a.startswith("--host="):
+            host = a.removeprefix("--host=")
+    verb = next((a for a in head if a in VERBS), None)
+    ns = argparse.Namespace(verb=verb, host=host, json=True)
+    return _emit(ns, {"ok": False, "error": {"code": "usage", "message": str(e)}})
 
 
 def main(argv: list[str] | None = None) -> int:
-    ns = _parser().parse_args(argv)
+    argv = sys.argv[1:] if argv is None else list(argv)
+    parser = _parser()
+    try:
+        ns = parser.parse_args(argv)
+    except UsageError as e:
+        return _usage(argv, e)
     if ns.verb is None:
-        _parser().print_help()
+        if ns.json:
+            return _usage(argv, UsageError("nixin", "no VERB given (nixin --help lists them)", ""))
+        parser.print_help()
         return 2
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
-        return _emit(ns, run(ns))
+        try:
+            doc = run(ns)
+        except Exception as exc:  # noqa: BLE001 -- every failure must become the error document
+            doc = _internal(exc)
+        return _emit(ns, doc)
     layer = VERBS[ns.verb][0]
     return _emit(
         ns,

@@ -44,8 +44,6 @@ def register(sub: argparse._SubParsersAction) -> None:
             p.add_argument("args", nargs="*")
         p.add_argument("--config", help="workspace clone (default: $NIXIN_CONFIG)")
         p.add_argument("--home", metavar="USER", help="the Home Manager user instead of NixOS")
-        p.add_argument("--host", default=argparse.SUPPRESS, help="nixosConfigurations.<host>")
-        p.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
         p.add_argument("--dry-run", action="store_true", help="print the diff, write nothing")
         p.add_argument(
             "--no-eval", action="store_true", help="skip the nix eval checks (text + parse only)"
