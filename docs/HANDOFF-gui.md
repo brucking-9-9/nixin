@@ -218,3 +218,46 @@ On mbp13 from ssh: `XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1
 XDG_SESSION_TYPE=wayland result/bin/nixin-gui --config ~/nixos &`; the kiosk's floating
 panels cover tiled windows, so float and raise it (`hyprctl dispatch setfloating
 address:…`, `alterzorder top,…`) before a grim, and kill it afterwards.
+
+## Packages page (branch `ui-packages`, 2026-11-02, mbp13)
+
+The same page as the TUI's (see HANDOFF-tui.md, "Packages page", for the view-model
+functions, the `update` verb and the live findings), in the window:
+
+- **Nav** entry Packages (`Ctrl+4`, last in the rail so the numbers stay in order).
+- `qml/Nixin/PackagesPage.qml`: left the tabs installed / updates and Refresh; right the
+  shared `DetailsPane` with `owner: "packages"`.
+  - installed: the filter field and the for-whom combo (`for: all`, `system`, `home
+    USER`, from `list`'s `users[]`), the list (`PackageRow.qml`: name, version; for whom
+    in purple for a user, the file:line elided from the left), the CLI's footer. Enter,
+    Space or a click opens the row in the details pane for its user (Remove there
+    previews `rm ATTR --home USER`).
+  - updates: the mode combo ("vs the lock's next commit" / "vs search.nixos.org"),
+    "Update nixpkgs lock…", the head line, the list (`UpdateRow.qml`: `from → to`,
+    removed in pink, an older version in purple), the kernel line, the summary, notes.
+- `UpdateDialog.qml`: `update --dry-run`'s fields, Cancel / Update; while `update` runs
+  it cannot be closed; then the window goes to **Pending** and the notice says what moved.
+- `bridge.py`: `PackagesVM` (state, the three models, slots `setTab`, `setFilter`,
+  `setScope`, `select`, `setMode`, `selectUpdate`, `refresh`, `startUpdate`,
+  `confirmUpdate`, `cancelUpdate`; keeps `list_doc` and one `outdated` document per
+  mode; `stale()` after a write or an update reloads only if the page is still open once
+  the flow is done). `DetailsVM.show(hit, user=, owner=)`: one details object serves
+  both pages; each pane shows only its own page's row (`owner`), so Search keeps its
+  details when Packages selects. `Gui.go("packages")`, `Gui.hm_users()` also from
+  `list`, `mayQuit` treats `updating` like a write. `models.PACKAGE`, `models.UPDATE`
+  (roles `before`/`after`: `new` is reserved in QML).
+- `app.Window.find()` now prefers the visible object when a name is on two pages (the
+  details pane's buttons exist on Search and on Packages).
+- Tests: `tests/test_gui.py` +3 (installed: filter, scope, details for the row's user
+  with the users from `list`, Remove's preview, Search's pane keeps its own; updates →
+  `--published` → back (kept) → dialog → update → Pending, then both documents again;
+  nothing to update / `network` error) and the grab test covers the page and the dialog.
+  qmllint clean, `--self-test` ok (`nix build`).
+- Screenshots: `docs/gui/10-packages.png` … `13-update-confirm.png` (fixtures; 1–9 redrawn
+  for the new rail entry), `live-6-packages.png`, `live-7-updates.png` (mbp13, `~/nixos`,
+  read-only), `live-8-update-confirm-clone.png`, `live-9-update-pending-clone.png` (the
+  round trip on the throwaway clone: update 0.4 s, then Pending shows `status`'s
+  `eval-failed` for gtk2 at 0bb2eed).
+
+How to test the page: `nix develop -c pytest tests/test_gui.py -k packages`; by hand
+`nixin-gui --config ~/nixos`, Ctrl+4 (read-only); Update only on a clone.

@@ -21,7 +21,7 @@ from textual.widgets import Button, ContentSwitcher, DataTable, Input, Tab, Tabs
 
 from ..ui import view
 from .modals import NoticeModal, UpdateModal
-from .screens import Base, DetailsScreen, PendingScreen
+from .screens import Base, DetailsScreen
 from .widgets import Line, NoticeBox, Spinner, cell
 
 if TYPE_CHECKING:
@@ -398,6 +398,3 @@ class PackagesScreen(Base):
             "up-update": self.action_update,
             "up-mode": self.action_mode,
         }[event.button.id or ""]()
-
-
-__all__ = ["PackagesScreen", "PendingScreen"]

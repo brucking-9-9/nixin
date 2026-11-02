@@ -614,20 +614,16 @@ def test_packages_updates_then_update_lock_to_pending(ui):
         "value": "nixpkgs 3ec6363 → 0bb2eed (flake.lock)",
         "style": "accent",
     } in (u.gui.pending.rows("session").rows)
-    open_packages(u)  # the lock moved: both documents again
-    assert u.fake.verbs() == [
-        ["list"],
-        ["outdated"],
-        ["outdated", "--published"],
+    open_packages(u)  # the lock moved: both documents again, in two jobs
+    verbs = u.fake.verbs()
+    assert verbs[:3] == [["list"], ["outdated"], ["outdated", "--published"]]
+    assert sorted(verbs[3:6]) == [  # the details' three jobs, in any order
         ["info", "firefox", "--kind", "pkg", "--channel", "unstable"],
         ["versions", "firefox", "--limit", "8"],
         ["where", "firefox", "--kind", "package"],
-        ["update", "--dry-run"],
-        ["update"],
-        ["status"],
-        ["list"],
-        ["outdated"],
     ]
+    assert verbs[6:-2] == [["update", "--dry-run"], ["update"], ["status"]]
+    assert sorted(verbs[-2:]) == [["list"], ["outdated"]]
 
 
 def test_packages_nothing_to_update_and_errors(ui):

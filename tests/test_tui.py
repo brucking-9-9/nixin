@@ -833,16 +833,16 @@ def test_packages_updates_then_update_lock_to_pending(size):
         assert app.screen is screen
 
     app, fake = drive(script, PACKAGES, size=size, host="19BK")
-    assert fake.verbs() == [
+    verbs = fake.verbs()
+    assert verbs[:-2] == [
         ["list"],
         ["outdated"],
         ["outdated", "--published"],
         ["update", "--dry-run"],
         ["update"],
         ["status"],
-        ["list"],
-        ["outdated"],
     ]
+    assert sorted(verbs[-2:]) == [["list"], ["outdated"]]  # both again, in two workers
     assert app.writes == ["nixpkgs 3ec6363 → 0bb2eed (flake.lock)"]
     assert app.return_value is None or "nothing changed" not in app.return_value
 
