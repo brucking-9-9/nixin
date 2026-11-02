@@ -1,0 +1,244 @@
+{
+  "added": [],
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "outdated-lock"
+    ],
+    "misses": []
+  },
+  "changed": [
+    {
+      "alternatives": 3,
+      "attr": "firefox",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "158.0.1",
+      "pname": "firefox",
+      "published": "159.0",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "system",
+      "user": null
+    },
+    {
+      "alternatives": 0,
+      "attr": "strace",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "7.2",
+      "pname": "strace",
+      "published": "7.3",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "system",
+      "user": null
+    },
+    {
+      "alternatives": 2,
+      "attr": "tailscale",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "1.104.2",
+      "pname": "tailscale",
+      "published": "1.104.4",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "system",
+      "user": null
+    },
+    {
+      "alternatives": 2,
+      "attr": "btop",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "1.4.7",
+      "pname": "btop",
+      "published": "1.4.8",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 1,
+      "attr": "claude-code",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "2.1.308",
+      "pname": "claude-code",
+      "published": "2.1.312",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 1,
+      "attr": "git-lfs",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "3.8.0",
+      "pname": "git-lfs",
+      "published": "3.8.1",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 0,
+      "attr": "harper",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "2.13.0",
+      "pname": "harper",
+      "published": "3.0.0",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 0,
+      "attr": "swayidle",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "1.9.0",
+      "pname": "swayidle",
+      "published": "1.9.1",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 1,
+      "attr": "syncthing",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "2.1.3",
+      "pname": "syncthing",
+      "published": "2.1.7",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 0,
+      "attr": "ungoogled-chromium",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "156.0.8078.47",
+      "pname": "ungoogled-chromium",
+      "published": "156.0.8078.73",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 0,
+      "attr": "xdg-terminal-exec",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "0.14.3",
+      "pname": "xdg-terminal-exec",
+      "published": "0.14.4",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 0,
+      "attr": "xwayland-satellite",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "0.8.2-unstable-2026-09-09",
+      "pname": "xwayland-satellite",
+      "published": "0.8.3",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    },
+    {
+      "alternatives": 5,
+      "attr": "yt-dlp",
+      "channel": "unstable",
+      "direction": "up",
+      "installed": "2026.08.19",
+      "pname": "yt-dlp",
+      "published": "2026.10.21",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "scope": "home",
+      "user": "brucking"
+    }
+  ],
+  "commands": [
+    "nixin outdated --config /home/master/nixos --host 19BK",
+    "nix flake update nixpkgs --flake /home/master/nixos",
+    "nixin plan --config /home/master/nixos --host 19BK",
+    "nixin apply --config /home/master/nixos --host 19BK"
+  ],
+  "config": {
+    "dirty": true,
+    "fingerprint": "0009fd29952762696ad96408bd7da45bf05bdb613253b9f0733678b9c2ae6d03",
+    "head": "e089d2740673139303c35910113e7349b1f4830d",
+    "last_modified": 1793614250,
+    "path": "/home/master/nixos",
+    "source": "/nix/store/x1mmgp3jqq9kmq667qp9lqz16yj2pgzz-source",
+    "source_hash": "x1mmgp3jqq9kmq667qp9lqz16yj2pgzz"
+  },
+  "count": 13,
+  "kernel": {
+    "changed": true,
+    "from": "7.2.12",
+    "latest": "7.3",
+    "to": "7.2.13"
+  },
+  "lock": {
+    "date": "2026-10-23",
+    "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "input": "nixpkgs",
+    "last_modified": 1792773339,
+    "node": "nixpkgs_2",
+    "original": "github:nixos/nixpkgs/nixos-unstable",
+    "release": "26.11",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "short_rev": "3ec6363"
+  },
+  "mode": "published",
+  "notes": [
+    "search.nixos.org has many attributes per pname; the one defined in the same file as the installed package is compared (else the same major version, then the attribute named like the pname). `nixin outdated` without --published is exact."
+  ],
+  "ok": true,
+  "removed": [],
+  "scopes": [
+    {
+      "changed": 3,
+      "scope": "system",
+      "total": 125,
+      "user": null
+    },
+    {
+      "changed": 10,
+      "scope": "home",
+      "total": 150,
+      "user": "brucking"
+    }
+  ],
+  "target": {
+    "cached": true,
+    "channel": "unstable",
+    "index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "queries": 6,
+    "rev": "1c89083e451e891152365b799595cf7790a43325",
+    "short_rev": "1c89083",
+    "source": "search.nixos.org"
+  },
+  "timings": {
+    "lock": 0.0,
+    "search": 0.0,
+    "total": 0.12
+  },
+  "total": 275,
+  "unpublished": [
+    "casual-pre-loader",
+    "csvmusic",
+    "demmanager",
+    "demoman",
+    "nixin"
+  ]
+}

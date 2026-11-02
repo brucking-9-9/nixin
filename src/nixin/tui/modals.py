@@ -1,5 +1,5 @@
-"""Modal screens: the writer's diff preview, setting an option, confirming an apply,
-error notices (with candidates to pick), and the key help."""
+"""Modal screens: the writer's diff preview, setting an option, confirming an apply or a
+nixpkgs update, error notices (with candidates to pick), and the key help."""
 
 from __future__ import annotations
 
@@ -174,11 +174,44 @@ class ApplyModal(Modal):
             self.dismiss(None)
 
 
+class UpdateModal(Modal):
+    """Confirm an `update`: the dry run's command and commits (and what the `outdated` it
+    follows compared). Dismisses with True."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [Binding("u", "update", "Update")]
+
+    def __init__(self, dry: dict, outdated: dict | None = None) -> None:
+        super().__init__()
+        self.dry = dry
+        self.outdated = outdated
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label(f"update {self.dry.get('input')} in flake.lock", classes="dialog-title")
+            with VerticalScroll():
+                yield Fields(id="update-fields", label_width=8)
+            with Horizontal(classes="buttons"):
+                yield Button("Update (u)", id="update", variant="primary", compact=True)
+                yield Button("Cancel (esc)", id="cancel", compact=True)
+
+    def on_mount(self) -> None:
+        fields = view.update_confirm_fields(self.dry, self.outdated)
+        self.query_one("#update-fields", Fields).show(fields)
+        self.query_one("#update", Button).focus()
+
+    def action_update(self) -> None:
+        self.dismiss(True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(True if event.button.id == "update" else None)
+
+
 KEYS = [
     ("everywhere", ""),
     ("q", "quit (ctrl+q while something runs)"),
     ("esc", "back"),
     ("/", "search"),
+    ("i", "packages: installed, updates (ctrl+4)"),
     ("p", "pending: status.pending, plan, apply"),
     ("s", "status"),
     ("ctrl+p", "command palette"),
@@ -193,6 +226,13 @@ KEYS = [
     ("e / u", "set / unset the option"),
     ("h", "Home Manager user (packages: off / user)"),
     ("w", "where again (re-evaluate)"),
+    ("packages", ""),
+    ("t", "installed ↔ updates"),
+    ("f / h", "filter / for whom (all, system, each user)"),
+    ("enter", "details of the row (remove from there)"),
+    ("m", "updates: lock ↔ --published"),
+    ("u", "update the nixpkgs lock (confirm first)"),
+    ("r", "refresh (re-evaluate)"),
     ("pending", ""),
     ("b", "plan: build + closure diff"),
     ("a", "apply… (confirm first)"),

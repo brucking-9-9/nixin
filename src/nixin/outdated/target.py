@@ -180,6 +180,11 @@ def is_network(stderr: str) -> bool:
     return bool(_NETWORK.search(stderr))
 
 
+def is_bad_ref(stderr: str) -> bool:
+    """GitHub does not know the ref (HTTP 404/422), or git has no such revision."""
+    return bool(_BAD_REF.search(stderr))
+
+
 def resolve(
     repo: ConfigRepo, np: Nixpkgs, flakeref: str, source: str, *, refresh: bool = False
 ) -> Target:
@@ -195,7 +200,7 @@ def resolve(
             raise NixinError(
                 "network", f"cannot fetch {flakeref} (the target nixpkgs): {e.message}"
             ) from e
-        if _BAD_REF.search(text):
+        if is_bad_ref(text):
             raise NixinError("bad-channel", f"{flakeref} does not resolve: {e.message}") from e
         raise
     except ValueError as e:

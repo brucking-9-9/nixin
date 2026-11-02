@@ -24,6 +24,7 @@ nixin --version | --help | VERB --help
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
 | `plan`, `apply`, `sync` | apply | build + closure diff; commit, pull into the authoritative tree and switch (root); git sync with the hub |
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
+| `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
 
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
@@ -31,10 +32,10 @@ nixin --version | --help | VERB --help
   (`socket.gethostname()`), even when `--config` points at a config that has no such
   host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
   still echoes it in the envelope.
-- `--config DIR` (truth, writer, apply verbs and `outdated`; before or after the verb, the
-  verb's own wins; discovery ignores it) is the config flake: `--config`, else
-  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth only reads it. The writer and apply refuse
-  `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
+- `--config DIR` (truth, writer, apply verbs, `outdated` and `update`; before or after the
+  verb, the verb's own wins; discovery ignores it) is the config flake: `--config`, else
+  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth and `outdated` only read it. The writer, apply
+  and `update` refuse `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
 - `--authoritative DIR` (apply verbs) is the root-owned clone the system is switched
   from: `--authoritative`, else `$NIXIN_AUTHORITATIVE`, else `/etc/nixos`. nixin only
@@ -672,6 +673,62 @@ tarball (about 60 s here). The target eval itself then needs no network. `--publ
 makes HTTPS calls to search.nixos.org and evaluates nothing new. See
 [Costs](#costs-measured).
 
+### `update`
+
+```
+nixin update [--input NAME] [--to FLAKEREF|REV] [--dry-run] [--config DIR]
+```
+
+Takes the update `outdated` describes: it runs the command `outdated` prints under
+`next:`, in the workspace, and reports the input's locked commit before and after. It
+writes `flake.lock` and nothing else: no build, no commit, no switch (`nixin plan`, then
+`nixin apply`, as for any other change; `status.pending` shows `flake.lock` as changed).
+Like the writer it works only on a workspace clone you own: `/etc/nixos` (also the default
+without `$NIXIN_CONFIG`) and trees you cannot write are `not-a-workspace`.
+
+| argument | runs |
+|---|---|
+| none | `nix flake update <input> --flake DIR`: the input's own ref (flake.nix's `inputs.<input>.url`, the lock's `original`) as it resolves now. What `outdated` compares by default |
+| `--to REV` | `nix flake lock DIR --override-input <input> github:<owner>/<repo>/REV`: exactly that commit of the locked repository (`outdated --nixpkgs`/`--channel`'s pin). nix keeps `original`, so the next plain update goes back to flake.nix's ref |
+| `--to FLAKEREF` | `nix flake lock DIR --override-input <input> FLAKEREF`, the ref as given (nix locks its current commit) |
+| `--input NAME` | another root input of `flake.lock` (default: the nixpkgs input, found as `outdated` finds it) |
+| `--dry-run` | nothing: the document says what would run (`command`), with `to` and `changed` null. Reads `flake.lock` only, no nix |
+
+`--host` is not used (the lock is the flake's, shared by every host) except in the
+`nixin plan`/`apply` lines of `commands[]`.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `input`, `node` | the input moved (its name in flake.nix, what `--override-input` takes) and its lock node (`nixpkgs_2` here) |
+| `original` | the lock's `original` for it as a flakeref (`github:nixos/nixpkgs/nixos-unstable`) |
+| `to_ref` | what it was moved to: `original` (no `--to`), or the `--to` ref as passed to `--override-input` |
+| `command` | the nix command line, as a person would type it |
+| `from`, `to` | the locked input before and after: `rev`, `short_rev`, `date`, `last_modified`, `nar_hash` (all null for what the lock does not record). `to` is null with `--dry-run` |
+| `changed` | whether the locked commit (or narHash) moved; false when the ref still resolves to the locked commit. null with `--dry-run` |
+| `dry_run` | `--dry-run` was given |
+| `config` | the workspace path |
+| `commands[]` | after a change: `nixin plan`, `nixin apply` with `--config`/`--host`; `[]` when nothing changed; with `--dry-run`: `[command]` |
+| `timings` | seconds: `nix` (the update command), `total` |
+
+Without `--json`: `nixpkgs (github:nixos/nixpkgs/nixos-unstable): 3ec6363 (2026-10-23) →
+0bb2eed (2026-11-01)`, `ran: …`, and `next:` (or "already at …; flake.lock unchanged").
+
+Errors: `usage` (a positional argument; `--to REV` for an input that is not on
+github/gitlab/sourcehut), `config-not-found`, `not-a-workspace`, `not-found` (no readable
+`flake.lock`, no nixpkgs input, or `--input` names no root input of the lock), `network`
+(nix could not fetch the new commit for lack of network), `bad-channel` (GitHub does not
+know the ref: HTTP 404/422), `nix-failed` (nix failed otherwise; nix's message),
+`nix-missing`, `internal`.
+
+Costs: runs nix once (no time limit) and writes `flake.lock` in the workspace. Network:
+nix asks GitHub for the ref's head (cached for its `tarball-ttl`, 1 h) and downloads the
+nixpkgs tarball for a commit it has not fetched yet: about 60 s cold, a second or two
+when `outdated` already fetched that commit. See [Costs](#costs-measured). The truth and
+`outdated` caches are keyed by the flake fingerprint, which includes the lock, so the next
+`status`, `list` or `outdated` evaluates the new lock.
+
 ### `tui`
 
 ```
@@ -683,7 +740,11 @@ The interactive terminal UI (Textual). It is a consumer of this contract, not pa
 every screen renders the documents above, got by calling the verb handlers in-process
 (`cli.document`, the same code `main()` runs), with `--host` and `--config` passed on as
 given. It writes only through `add`/`rm`/`set`/`unset` (after showing their `--dry-run`
-diff) and switches only through `apply` (after `apply --dry-run` and a confirmation).
+diff) and `update` (after `update --dry-run` and a confirmation), and switches only
+through `apply` (after `apply --dry-run` and a confirmation). The Packages page shows
+`list` (one call, every scope; its filter and for-whom toggle narrow the loaded rows with
+`--filter`/`--scope` semantics, so they cost nothing) and `outdated` (lock mode, or
+`--published`); both documents are kept until a write or an `update` makes them stale.
 
 Under `--json`, or when stdin or stderr is not a terminal (Textual draws on stderr, so
 `nixin tui 2>file` would show nothing), it is a `usage` error (exit 2). When the person
@@ -706,8 +767,9 @@ nixin-gui [--host H] [--config DIR] [--channel C] [--self-test]
 The desktop UI (Qt 6, PySide6 + QML). Like `tui`, a consumer of this contract: it calls
 the same verb handlers in-process, on a thread pool, and renders their documents through
 the same view-model (`nixin.ui.view`). It writes only through `add`/`rm`/`set`/`unset`
-(after showing their `--dry-run` diff in a dialog) and switches only through `apply`
-(after `apply --dry-run` and a confirmation).
+(after showing their `--dry-run` diff in a dialog) and `update` (after `update --dry-run`
+in a dialog), and switches only through `apply` (after `apply --dry-run` and a
+confirmation). Its Packages page uses `list` and `outdated` as the TUI's does.
 
 Under `--json` it is a `usage` error, and so it is without a display (none of
 `WAYLAND_DISPLAY`, `DISPLAY`, `QT_QPA_PLATFORM` set). `--self-test` loads the window,
@@ -721,7 +783,8 @@ apply)`), and exits 0; if a verb is still running it waits for it first. It sets
 
 Costs: whatever the verbs it calls cost. It loads nothing on start (no `status`): search
 and its details (`info`, `versions`, `where`) when asked, `status` when Pending or
-Status is opened or the Home Manager users are needed. `plan` and `apply` run in human
+Status is opened or the Home Manager users are needed, `list` when Packages is opened,
+`outdated` when its Updates tab is. `plan` and `apply` run in human
 mode, as under `tui`, so their logs stream into the window.
 
 ## Error codes
@@ -732,19 +795,19 @@ mode, as under `tui`, so their logs stream into the window.
 | `internal` | all | an unexpected exception (a bug, or a source that changed its response shape); the message names the exception and `file:line` |
 | `not-implemented` | cli | a verb without a handler (none today; kept for UIs built against the stubs) |
 | `needs-sudo` | apply | a root step and `sudo -n` cannot get root without a password; `message` and `commands[]` are what is left to run by hand |
-| `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON |
+| `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON; `update`: nix could not fetch the new commit |
 | `http-<status>` | discovery, outdated | a 4xx the caller may act on (`http-400`, …) |
-| `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`: a target ref GitHub does not know |
-| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it |
+| `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`, `update`: a target ref GitHub does not know |
+| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
 | `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
-| `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target |
+| `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target; `update`: `nix flake update`/`lock` failed |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
 | `config-not-found` | truth, writer, outdated | no `flake.nix` in the config dir |
 | `not-a-flake` | truth, outdated | `nix flake metadata`/`nix flake archive` failed on the config |
 | `unknown-host` | truth, writer, outdated | `--host` is not in `nixosConfigurations` |
 | `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it) |
 | `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
-| `not-a-workspace` | writer, apply | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
+| `not-a-workspace` | writer, apply, outdated (`update`) | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
 | `unknown-user` | truth, writer, outdated | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |

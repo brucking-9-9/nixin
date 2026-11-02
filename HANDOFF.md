@@ -28,3 +28,30 @@ on merge it moves here.
 - [outdated](docs/HANDOFF-outdated.md) — branch `outdated-verb`: `nixin outdated`, what a
   nixpkgs lock update would change for a host (two package-list evals, by pname, kernel),
   and `--published` against a search.nixos.org channel; run live on mbp13 for both hosts.
+- **ui-packages** — branch `ui-packages`: the **Packages** page in both front ends and the
+  `update` verb behind its one button. Details: the "Packages page" sections of
+  [HANDOFF-tui](docs/HANDOFF-tui.md) and [HANDOFF-gui](docs/HANDOFF-gui.md).
+  - Done: `nixin update [--input nixpkgs] [--to REF|REV] [--dry-run]` (workspace only,
+    `{input, from, to, changed, command}`, never builds; CONTRACT "`update`");
+    view-model rows for `list`/`outdated`/`update` (`ui/view.py`); TUI page (`i`,
+    `ctrl+4`): installed (filter, for whom, Enter → Details for the row's user with
+    Remove) and updates (lock / `--published`, kernel line, summary, `u` → confirm →
+    `update` → Pending), page keys folded into one footer group below 80 cells; GUI page
+    (`Ctrl+4`): the same two views, the details pane per page, the update dialog →
+    Pending. Tests at 50×25 and 120×40 (TUI) and offscreen (GUI) on recorded documents;
+    screenshots in `docs/tui/`, `docs/gui/`. Live on mbp13: both UIs read-only against
+    `~/nixos`; the update round trip on a throwaway clone in both UIs. Nothing switched,
+    no sudo, `~/nixos` untouched. Left behind: the clone `~/nixos-ui-test` and
+    `/tmp/uipk` (the run could not `rm -rf`): `rm -rf ~/nixos-ui-test /tmp/uipk`.
+  - Gates at 9c4f1cf: `nix build` 577 passed, 25 skipped (live), then `nixin gui:
+    self-test ok`; `nix develop -c pytest` the same; `ruff check`, `ruff format
+    --check`, `nix fmt -- --check` clean; qmllint clean (a test).
+  - Half-done: nothing. Not run: Plan/Apply after an update (a new nixpkgs means a long
+    build, and apply's dry run asks sudo).
+  - Found live: at nixos-unstable 0bb2eed mbp13's config no longer evaluates (`gtk+-2.24.33`
+    refused as broken); `outdated` cannot see that (package lists only). Next: an
+    `outdated --check` that evaluates the target's toplevel; find mbp13's gtk2 user
+    before moving its lock; a "revert the lock" action on Pending.
+  - How to test: `nix develop -c pytest tests/test_update.py tests/test_tui.py
+    tests/test_gui.py`; `nix build`; by hand `nixin-tui --config ~/nixos` → `i`, `t`, `m`
+    and `nixin-gui --config ~/nixos` → Ctrl+4 (read-only; use Update only on a clone).

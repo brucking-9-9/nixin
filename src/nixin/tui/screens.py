@@ -245,12 +245,12 @@ class DetailsScreen(Base):
         Binding("w", "where", "Where again", show=False),
     ]
 
-    def __init__(self, hit: view.Hit) -> None:
+    def __init__(self, hit: view.Hit, user: str | None = None) -> None:
         super().__init__()
         self.hit = hit
         self.record = hit.record
         self.where: dict | None = None
-        self.user: str | None = None  # --home USER
+        self.user = user  # --home USER (an installed row opens with its own)
 
     def compose(self) -> ComposeResult:
         h = self.hit
@@ -348,7 +348,7 @@ class DetailsScreen(Base):
         kind = "option" if h.is_option else "package"
         self.nixin.fetch(
             "where",
-            h.target,
+            h.where_target,
             "--kind",
             kind,
             done=self._where,

@@ -26,7 +26,10 @@ from .. import cli
 # verbs whose human mode streams a log worth showing (CONTRACT.md: the slow ones)
 STREAMING = frozenset({"plan", "apply"})
 # verbs that read --config (discovery ignores it)
-CONFIG_VERBS = frozenset({"status", "where", "add", "rm", "set", "unset", "plan", "apply", "sync"})
+CONFIG_VERBS = frozenset(
+    {"status", "where", "list", "add", "rm", "set", "unset", "plan", "apply", "sync"}
+    | {"outdated", "update"}
+)
 
 
 @dataclass

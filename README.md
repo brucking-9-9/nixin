@@ -37,7 +37,7 @@ search info versions        discovery   what exists upstream, in which versions
 status where list           truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
-outdated                    outdated    what a nixpkgs lock update would change; --published: newer on a channel
+outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
@@ -80,6 +80,10 @@ which touch the network, run nix or write files, and the cache locations.
   evals, no build: about 5 s, plus a nixpkgs tarball download for a new commit.
   `--published` compares the installed versions with a search.nixos.org channel instead
   (one query per 50 names; a heuristic, since many attributes share a pname).
+  **update** takes it: it runs the command `outdated` prints (`nix flake update nixpkgs
+  --flake WORKSPACE`, or `nix flake lock --override-input nixpkgs REF` for `--to`) in the
+  workspace only, and returns the input's commit before and after. It never builds or
+  switches: `plan` and `apply` do that, as for any other change.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
@@ -105,10 +109,16 @@ Manager user toggle → Pending (`status.pending`, `plan` with nix's build outpu
 and the closure diff) → Apply (confirm with `apply --dry-run`'s commands and sudo
 readiness, a commit message, the switch log streamed, the new generation; without a sudo
 ticket the exact root commands to copy). Status shows the lock, HEAD, the running system,
-counts and caches. Error documents show as `code` + message.
+counts and caches. Packages shows what is installed (`list`: system and each Home Manager
+user, a filter and a for-whom toggle on the loaded rows; Enter opens the row in Details
+for its user, with Remove) and, on its Updates tab, what a nixpkgs update would change
+(`outdated`, the lock's next commit or `--published`; the kernel line, the summary) with
+"Update nixpkgs lock": `update --dry-run` → confirm → `update` → Pending, where Plan and
+Apply take it as any other change. Error documents show as `code` + message.
 
-Keys: `/` search, `p` pending, `s` status, `?` all keys, `ctrl+p` command palette, `esc`
-back, `q` quit (`ctrl+q` while typing or while something runs). It is laid out for a
+Keys: `/` search, `i` packages (`ctrl+4`), `p` pending, `s` status, `?` all keys, `ctrl+p`
+command palette, `esc` back, `q` quit (`ctrl+q` while typing or while something runs).
+Below 80 cells the footer groups the page keys (`i p s go`). It is laid out for a
 phone over ssh (50×25: panes stacked, the description column dropped) as well as 120+
 columns. Colours: `src/nixin/tui/theme.py`. Screenshots of both sizes: `docs/tui/`
 (`scripts/tui-screenshots.py` makes them, from the test fixtures or `--live`).
@@ -136,10 +146,14 @@ build output streamed, then the closure diff); Apply… opens the apply dialog (
 --dry-run`: what is committed, what root runs, sudo readiness; a commit message; the
 switch log streamed; the new generation; without a sudo ticket the exact root commands,
 with Copy and Retry). **Status** shows the lock, HEAD, the running system, pending,
-counts and caches. Error documents appear as a notice over the page (`code` + message,
-the candidates to pick for an ambiguous write, commands to copy).
+counts and caches. **Packages** has the installed list (`list`: a filter and a for-whom
+combo; the selected row opens in the details pane for its user, with Remove) and Updates
+(`outdated` against the lock's next commit or search.nixos.org, the kernel line, the
+summary; "Update nixpkgs lock…" opens a dialog with `update --dry-run`, then `update`
+runs and the window goes to Pending). Error documents appear as a notice over the page
+(`code` + message, the candidates to pick for an ambiguous write, commands to copy).
 
-Keys: `/` search, `Ctrl+1/2/3` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
+Keys: `/` search, `Ctrl+1/2/3/4` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
 in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).
 The palette is the quickshell one (`src/nixin/gui/qml/Nixin/Theme.qml`: background
 `#120B10`, cyan accent, pink for errors and destructive actions, purple for options), and

@@ -451,6 +451,7 @@ def nixin(capsys, world: World, *argv: str, host: str = "mbp13") -> dict:
         "plan",
         "apply",
         "sync",
+        "update",
     ):
         full += ["--config", str(world.root)]
     rc = main(full)
@@ -697,6 +698,10 @@ SWEEP = [
     ["apply", "--dry-run"],
     ["sync", "--push"],
     ["plan", "extra"],  # usage
+    # update (the fixture copy has no flake.lock: not-found)
+    ["update", "--dry-run"],
+    ["update"],
+    ["update", "extra"],  # usage
     # no verb / unknown verb
     [],
     ["frobnicate"],
@@ -718,6 +723,8 @@ def test_envelope_holds_everywhere(world, capsys, argv):
         (["add", "x", "--config", "/etc/nixos"], "not-a-workspace"),
         (["plan", "--config", "/etc/nixos"], "not-a-workspace"),
         (["apply", "--config", "/nonexistent/nixin"], "config-not-found"),
+        (["update", "--config", "/etc/nixos"], "not-a-workspace"),
+        (["update", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["frobnicate"], "usage"),
     ],
 )

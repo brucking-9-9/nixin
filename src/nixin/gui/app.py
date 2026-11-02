@@ -74,18 +74,18 @@ class Window:
 
     def find(self, name: str) -> QObject | None:
         """A QML object by objectName: in the object tree (popups), else in the visual tree
-        (the delegates of repeaters and views have no QObject parent)."""
+        (the delegates of repeaters and views have no QObject parent). A name on two pages
+        (the details pane of Search and of Packages) finds the one on screen."""
         assert self.window is not None
-        found = self.window.findChild(QObject, name)
-        if found is not None:
-            return found
-        todo: list[QQuickItem] = [self.window.contentItem()]
-        while todo:
-            it = todo.pop()
-            if it.objectName() == name:
-                return it
-            todo += it.childItems()
-        return None
+        found: list[QObject] = list(self.window.findChildren(QObject, name))
+        if not found:
+            todo: list[QQuickItem] = [self.window.contentItem()]
+            while todo:
+                it = todo.pop()
+                if it.objectName() == name:
+                    found.append(it)
+                todo += it.childItems()
+        return next((o for o in found if o.property("visible")), found[0] if found else None)
 
     def grab(self) -> QImage:
         assert self.window is not None

@@ -43,6 +43,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
     "outdated": ("outdated", outdated.HELP),
+    "update": ("outdated", outdated.update.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
     "gui": ("gui", "desktop UI (Qt) over the same documents"),
 }

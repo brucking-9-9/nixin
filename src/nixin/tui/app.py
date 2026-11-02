@@ -3,8 +3,10 @@
 `fetch` is the one way anything gets data: a worker thread calls the backend (the CLI's
 verb handler, in-process) and hands the document to a callback on the UI thread. Writer
 verbs go through `write` (dry run → diff modal → write), apply through `start_apply`
-(dry run → confirm modal → ApplyScreen). Writer, plan and apply runs are serialised by
-`busy`: two writer runs on one workspace race on installer/state.json (CONTRACT.md).
+(dry run → confirm modal → ApplyScreen). Writer, update, plan and apply runs are serialised
+by `busy`: two writer runs on one workspace race on installer/state.json (CONTRACT.md).
+The `list` and `outdated` documents are kept here, so the Packages screen comes back to
+them without another eval until a write or an update makes them stale.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from .. import cli
 from ..ui import view
 from ..ui.backend import Backend
 from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal
+from .packages import PackagesScreen
 from .screens import ApplyScreen, PendingScreen, SearchScreen, StatusScreen, TopBar
 from .theme import THEME
 from .widgets import LogView, Spinner
@@ -29,6 +32,9 @@ from .widgets import LogView, Spinner
 Doc = dict[str, Any]
 
 WRITE_VERBS = ("add", "rm", "set", "unset")
+NARROW = 80  # cells: HORIZONTAL_BREAKPOINTS' -narrow
+# below NARROW the footer has no room for a name per page: the same keys, one group
+PAGE_KEYS = Binding.Group("go")
 WHERE_VERBS = ("rm", "set", "unset")  # accept --where FILE:LINE (pick a candidate)
 
 
@@ -40,8 +46,13 @@ class NixinApp(App[str]):
         Binding("q", "quit_safely", "Quit"),
         Binding("question_mark", "help", "Keys"),
         Binding("slash", "search", "Search", show=False),
+        # ctrl+4 as in the GUI; a terminal without the kitty keyboard protocol sends ctrl+\
+        Binding("i,ctrl+4,ctrl+backslash", "packages", "Packages"),
         Binding("p", "pending", "Pending"),
         Binding("s", "status", "Status"),
+        Binding("i,ctrl+4,ctrl+backslash", "go('packages')", "Packages", group=PAGE_KEYS),
+        Binding("p", "go('pending')", "Pending", group=PAGE_KEYS),
+        Binding("s", "go('status')", "Status", group=PAGE_KEYS),
     ]
 
     def __init__(self, backend: Backend, *, channel: str = "unstable") -> None:
@@ -54,6 +65,9 @@ class NixinApp(App[str]):
         self.status_doc: Doc | None = None
         self.status_stale = True
         self.plan_doc: Doc | None = None
+        self.list_doc: Doc | None = None
+        self.list_stale = True
+        self.outdated_docs: dict[str, Doc] = {}  # mode (lock | published) → document
         self.register_theme(THEME)
         self.theme = THEME.name
 
@@ -149,9 +163,11 @@ class NixinApp(App[str]):
         )
 
     def hm_users(self, where: Doc | None = None) -> list[str]:
-        """Home Manager users of the host: from status, else from a `where` document."""
+        """Home Manager users of the host: from status or list, else from a `where`."""
         if self.status_doc and self.status_doc.get("hm_users"):
             return list(self.status_doc["hm_users"])
+        if self.list_doc and self.list_doc.get("users"):
+            return list(self.list_doc["users"])
         users = []
         for s in (where or {}).get("scopes") or []:
             if s.get("scope") == "home" and s.get("user") and s["user"] not in users:
@@ -195,6 +211,7 @@ class NixinApp(App[str]):
             summary = view.writer_summary(doc)
             self.writes.append(summary)
             self.status_stale = True
+            self.list_stale = True
             self.plan_doc = None
             if view.writer_eval_failed(doc):
                 self.push_screen(DiffModal(doc, f"{verb}: written, but the eval check FAILED"))
@@ -223,6 +240,21 @@ class NixinApp(App[str]):
 
         self.push_screen(SetOptionModal(option, value, user), entered)
 
+    # --- packages: list, outdated, update ------------------------------------------------------
+
+    def list_loaded(self, doc: Doc) -> None:
+        self.list_doc = doc
+        self.list_stale = False
+
+    def updated(self, doc: Doc) -> None:
+        """An `update` ran: a moved lock makes every package document stale."""
+        if doc.get("ok") and doc.get("changed"):
+            self.writes.append(view.update_summary(doc))
+            self.outdated_docs.clear()
+            self.list_stale = True
+            self.status_stale = True
+            self.plan_doc = None
+
     # --- apply flow --------------------------------------------------------------------------
 
     def start_apply(self) -> None:
@@ -248,10 +280,25 @@ class NixinApp(App[str]):
 
     # --- navigation ----------------------------------------------------------------------------
 
+    PAGES: ClassVar[dict[str, type[Screen]]] = {
+        "packages": PackagesScreen,
+        "pending": PendingScreen,
+        "status": StatusScreen,
+    }
+
     def check_action(self, action: str, parameters: tuple) -> bool | None:
-        """The footer leaves out the screen you are on."""
-        here = {"pending": PendingScreen, "status": StatusScreen}.get(action)
-        return here is None or not isinstance(self.screen, here)
+        """The footer leaves out the screen you are on; the page keys go by name from
+        NARROW cells and as one group below (the binding that is off lets the key fall
+        through to the other)."""
+        page = parameters[0] if action == "go" and parameters else action
+        if page not in self.PAGES:
+            return True
+        if isinstance(self.screen, self.PAGES[page]):
+            return False
+        return (action == "go") == (self.size.width < NARROW)
+
+    def on_resize(self) -> None:
+        self.screen.refresh_bindings()  # across NARROW the page keys change form
 
     def _go(self, cls: type[Screen]) -> None:
         for i, s in enumerate(self.screen_stack):
@@ -268,6 +315,12 @@ class NixinApp(App[str]):
     def action_pending(self) -> None:
         self._go(PendingScreen)
 
+    def action_packages(self) -> None:
+        self._go(PackagesScreen)
+
+    def action_go(self, page: str) -> None:
+        self._go(self.PAGES[page])
+
     def action_status(self) -> None:
         self._go(StatusScreen)
 
@@ -276,13 +329,16 @@ class NixinApp(App[str]):
             self.push_screen(HelpModal())
 
     def action_quit_safely(self) -> None:
-        if self.busy in ("writing", "applying"):
+        if self.busy in ("writing", "updating", "applying"):
             self.notify(f"{self.busy} is running; ctrl+q quits anyway", severity="warning")
             return
         self.exit(view.farewell(self.writes, self.applied))
 
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield SystemCommand("Search", "find packages and options", self.action_search)
+        yield SystemCommand(
+            "Packages", "installed (list), updates (outdated)", self.action_packages
+        )
         yield SystemCommand("Pending", "status.pending, plan, apply", self.action_pending)
         yield SystemCommand("Plan", "build the workspace, closure diff", self._palette_plan)
         yield SystemCommand(

@@ -6,20 +6,24 @@ import QtQuick.Layouts
 
 // The selected row: what it is (info), its releases (versions, packages), and where it is
 // on this host (where: installed? declared where? the value). Add / Remove for packages,
-// Set / Unset for options, for the system or a Home Manager user.
+// Set / Unset for options, for the system or a Home Manager user. One details object
+// serves Search and Packages: each page's pane shows the row picked on that page (`owner`).
 Item {
     id: pane
 
     required property var backend
     readonly property var d: backend.details
+    property string owner: "search"
+    property string hint: "Select a result to see what it is, its versions, and where it is on " + backend.host + "."
+    readonly property bool shown: d.present && d.owner === owner
 
     objectName: "details"
 
     Text {
         anchors.centerIn: parent
         width: parent.width - 60
-        visible: !pane.d.present
-        text: "Select a result to see what it is, its versions, and where it is on " + pane.backend.host + "."
+        visible: !pane.shown
+        text: pane.hint
         textFormat: Text.PlainText
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
@@ -30,7 +34,7 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        visible: pane.d.present
+        visible: pane.shown
         spacing: Theme.gap
 
         RowLayout {

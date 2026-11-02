@@ -1,0 +1,998 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [],
+    "misses": [
+      "packages"
+    ]
+  },
+  "count": 78,
+  "filter": null,
+  "folded": 67,
+  "ok": true,
+  "packages": [
+    {
+      "declared": [],
+      "name": "acl-2.4.0",
+      "pname": "acl",
+      "scope": "system",
+      "user": null,
+      "version": "2.4.0"
+    },
+    {
+      "declared": [],
+      "name": "adwaita-icon-theme-50.0",
+      "pname": "adwaita-icon-theme",
+      "scope": "home",
+      "user": "brucking",
+      "version": "50.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/terminal/ai/agent-board.nix",
+          "line": 14,
+          "text": "a.agent-board-collect"
+        }
+      ],
+      "name": "agent-board-collect",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/terminal/ai/agent-board.nix",
+          "line": 15,
+          "text": "a.agent-mbp"
+        }
+      ],
+      "name": "agent-mbp",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/terminal/ai/agent-board.nix",
+          "line": 13,
+          "text": "a.agent-status"
+        }
+      ],
+      "name": "agent-status",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 57,
+          "text": "bat"
+        }
+      ],
+      "name": "bat-0.26.1",
+      "pname": "bat",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0.26.1"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 73,
+          "text": "blender"
+        }
+      ],
+      "name": "blender-5.2.2",
+      "pname": "blender",
+      "scope": "home",
+      "user": "brucking",
+      "version": "5.2.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 418,
+          "text": "bluetui"
+        }
+      ],
+      "name": "bluetui-0.8.2",
+      "pname": "bluetui",
+      "scope": "system",
+      "user": null,
+      "version": "0.8.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 22,
+          "text": "brightnessctl"
+        }
+      ],
+      "name": "brightnessctl-0.5.1",
+      "pname": "brightnessctl",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0.5.1"
+    },
+    {
+      "declared": [],
+      "name": "btop-1.4.7",
+      "pname": "btop",
+      "scope": "home",
+      "user": "brucking",
+      "version": "1.4.7"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 410,
+          "text": "cachix"
+        }
+      ],
+      "name": "cachix-1.12.1",
+      "pname": "cachix",
+      "scope": "system",
+      "user": null,
+      "version": "1.12.1"
+    },
+    {
+      "declared": [],
+      "name": "claude-code-2.1.308",
+      "pname": "claude-code",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2.1.308"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/csvmusic.nix",
+          "line": 5,
+          "text": "(pkgs.callPackage./csvmusic/package.nix{})"
+        }
+      ],
+      "name": "csvmusic-1.7.7",
+      "pname": "csvmusic",
+      "scope": "home",
+      "user": "brucking",
+      "version": "1.7.7"
+    },
+    {
+      "declared": [],
+      "name": "curl-8.22.0",
+      "pname": "curl",
+      "scope": "system",
+      "user": null,
+      "version": "8.22.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 59,
+          "text": "curl"
+        }
+      ],
+      "name": "curl-8.22.0",
+      "pname": "curl",
+      "scope": "home",
+      "user": "brucking",
+      "version": "8.22.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/demoman.nix",
+          "line": 17,
+          "text": "(pkgs.callPackage./demoman/package.nix{})"
+        }
+      ],
+      "name": "demoman-2.2.0",
+      "pname": "demoman",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2.2.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 41,
+          "text": "discordo"
+        }
+      ],
+      "name": "discordo-0-unstable-2026-08-18",
+      "pname": "discordo",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0-unstable-2026-08-18"
+    },
+    {
+      "declared": [
+        {
+          "file": "sim-racing.nix",
+          "line": 43,
+          "text": "evtest"
+        }
+      ],
+      "name": "evtest-1.36",
+      "pname": "evtest",
+      "scope": "system",
+      "user": null,
+      "version": "1.36"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/gaming.nix",
+          "line": 98,
+          "text": "exe-run"
+        }
+      ],
+      "name": "exe-run",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/power/quiet.nix",
+          "line": 627,
+          "text": "fan"
+        }
+      ],
+      "name": "fan",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 416,
+          "text": "fastfetch"
+        }
+      ],
+      "name": "fastfetch-2.70.0",
+      "pname": "fastfetch",
+      "scope": "system",
+      "user": null,
+      "version": "2.70.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 412,
+          "text": "fd"
+        }
+      ],
+      "name": "fd-10.5.0",
+      "pname": "fd",
+      "scope": "system",
+      "user": null,
+      "version": "10.5.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 56,
+          "text": "fd"
+        }
+      ],
+      "name": "fd-10.5.0",
+      "pname": "fd",
+      "scope": "home",
+      "user": "brucking",
+      "version": "10.5.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 421,
+          "text": "ffmpeg"
+        }
+      ],
+      "name": "ffmpeg-9.0.2",
+      "pname": "ffmpeg",
+      "scope": "system",
+      "user": null,
+      "version": "9.0.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 30,
+          "text": "file"
+        }
+      ],
+      "name": "file-5.48",
+      "pname": "file",
+      "scope": "home",
+      "user": "brucking",
+      "version": "5.48"
+    },
+    {
+      "declared": [],
+      "name": "firefox-158.0.1",
+      "pname": "firefox",
+      "scope": "system",
+      "user": null,
+      "version": "158.0.1"
+    },
+    {
+      "declared": [],
+      "name": "fuse-2.9.9",
+      "pname": "fuse",
+      "scope": "system",
+      "user": null,
+      "version": "2.9.9"
+    },
+    {
+      "declared": [],
+      "name": "fuse-3.18.2",
+      "pname": "fuse",
+      "scope": "system",
+      "user": null,
+      "version": "3.18.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/gdoc.nix",
+          "line": 16,
+          "text": "gdoc"
+        }
+      ],
+      "name": "gdoc",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 406,
+          "text": "git"
+        }
+      ],
+      "name": "git-2.56.0",
+      "pname": "git",
+      "scope": "system",
+      "user": null,
+      "version": "2.56.0"
+    },
+    {
+      "declared": [],
+      "name": "git-2.56.0",
+      "pname": "git",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2.56.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 84,
+          "text": "glmark2"
+        }
+      ],
+      "name": "glmark2-2023.01",
+      "pname": "glmark2",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2023.01"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/editors/helix.nix",
+          "line": 50,
+          "text": "pkgs.glow"
+        }
+      ],
+      "name": "glow-3.0.0",
+      "pname": "glow",
+      "scope": "home",
+      "user": "brucking",
+      "version": "3.0.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 23,
+          "text": "grim"
+        }
+      ],
+      "name": "grim-1.5.0",
+      "pname": "grim",
+      "scope": "home",
+      "user": "brucking",
+      "version": "1.5.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/editors/helix.nix",
+          "line": 47,
+          "text": "pkgs.harper"
+        }
+      ],
+      "name": "harper-2.13.0",
+      "pname": "harper",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2.13.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 415,
+          "text": "jq"
+        }
+      ],
+      "name": "jq-1.8.2",
+      "pname": "jq",
+      "scope": "system",
+      "user": null,
+      "version": "1.8.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "sim-racing.nix",
+          "line": 42,
+          "text": "jstest-gtk"
+        }
+      ],
+      "name": "jstest-gtk-0.1.1-unstable-2025-04-03",
+      "pname": "jstest-gtk",
+      "scope": "system",
+      "user": null,
+      "version": "0.1.1-unstable-2025-04-03"
+    },
+    {
+      "declared": [],
+      "name": "kitty-0.49.2",
+      "pname": "kitty",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0.49.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 50,
+          "text": "libnotify"
+        }
+      ],
+      "name": "libnotify-0.8.8",
+      "pname": "libnotify",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0.8.8"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 423,
+          "text": "libqalculate"
+        }
+      ],
+      "name": "libqalculate-5.13.2",
+      "pname": "libqalculate",
+      "scope": "system",
+      "user": null,
+      "version": "5.13.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "sim-racing.nix",
+          "line": 44,
+          "text": "lm_sensors"
+        }
+      ],
+      "name": "lm-sensors-3.6.2",
+      "pname": "lm-sensors",
+      "scope": "system",
+      "user": null,
+      "version": "3.6.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/lock/hyprlock.nix",
+          "line": 44,
+          "text": "lockscreen"
+        }
+      ],
+      "name": "lockscreen",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 422,
+          "text": "lz4"
+        }
+      ],
+      "name": "lz4-1.10.0",
+      "pname": "lz4",
+      "scope": "system",
+      "user": null,
+      "version": "1.10.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/remote-build.nix",
+          "line": 91,
+          "text": "mbp13Builders"
+        }
+      ],
+      "name": "mbp13-builders",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/mbp13-view.nix",
+          "line": 136,
+          "text": "mbp13-ssh-loop"
+        }
+      ],
+      "name": "mbp13-ssh-loop",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/mbp13-view.nix",
+          "line": 135,
+          "text": "mbp13-status"
+        }
+      ],
+      "name": "mbp13-status",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/mbp13-view.nix",
+          "line": 134,
+          "text": "mbp13-view"
+        }
+      ],
+      "name": "mbp13-view",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/editors/helix.nix",
+          "line": 51,
+          "text": "mdexport"
+        }
+      ],
+      "name": "mdexport",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/editors/helix.nix",
+          "line": 52,
+          "text": "mdpreview"
+        }
+      ],
+      "name": "mdpreview",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/remote-build.nix",
+          "line": 94,
+          "text": "nb"
+        }
+      ],
+      "name": "nb",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/bar/quickshell-bottom.nix",
+          "line": 650,
+          "text": "nightSchedule"
+        }
+      ],
+      "name": "night-schedule",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/remote-build.nix",
+          "line": 93,
+          "text": "nixPlan"
+        }
+      ],
+      "name": "nix-plan",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/bar/quickshell-bottom.nix",
+          "line": 651,
+          "text": "nixosSwitch"
+        }
+      ],
+      "name": "nixos-switch",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/power/quiet.nix",
+          "line": 628,
+          "text": "powerCycle"
+        }
+      ],
+      "name": "power-cycle",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 419,
+          "text": "python3"
+        }
+      ],
+      "name": "python3-3.14.8",
+      "pname": "python3",
+      "scope": "system",
+      "user": null,
+      "version": "3.14.8"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/power/quiet.nix",
+          "line": 625,
+          "text": "quiet"
+        }
+      ],
+      "name": "quiet",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/power/quiet.nix",
+          "line": 626,
+          "text": "quietRoot"
+        }
+      ],
+      "name": "quiet-root",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/remote-build.nix",
+          "line": 92,
+          "text": "rbuild"
+        }
+      ],
+      "name": "rbuild",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 413,
+          "text": "ripgrep"
+        }
+      ],
+      "name": "ripgrep-15.2.0",
+      "pname": "ripgrep",
+      "scope": "system",
+      "user": null,
+      "version": "15.2.0"
+    },
+    {
+      "declared": [],
+      "name": "ripgrep-15.2.0",
+      "pname": "ripgrep",
+      "scope": "home",
+      "user": "brucking",
+      "version": "15.2.0"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 404,
+          "text": "spotify"
+        }
+      ],
+      "name": "spotify-1.2.95.453.g0eeebbed",
+      "pname": "spotify",
+      "scope": "system",
+      "user": null,
+      "version": "1.2.95.453.g0eeebbed"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/terminal/spotify-player.nix",
+          "line": 56,
+          "text": "spotify-mini"
+        }
+      ],
+      "name": "spotify-mini",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/terminal/spotify-player.nix",
+          "line": 56,
+          "text": "spotify-viz"
+        }
+      ],
+      "name": "spotify-viz",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [],
+      "name": "starship-1.27.0",
+      "pname": "starship",
+      "scope": "home",
+      "user": "brucking",
+      "version": "1.27.0"
+    },
+    {
+      "declared": [],
+      "name": "steam-1.0.0.87",
+      "pname": "steam",
+      "scope": "system",
+      "user": null,
+      "version": "1.0.0.87"
+    },
+    {
+      "declared": [],
+      "name": "strace-7.2",
+      "pname": "strace",
+      "scope": "system",
+      "user": null,
+      "version": "7.2"
+    },
+    {
+      "declared": [],
+      "name": "syncthing-2.1.3",
+      "pname": "syncthing",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2.1.3"
+    },
+    {
+      "declared": [],
+      "name": "tailscale-1.104.2",
+      "pname": "tailscale",
+      "scope": "system",
+      "user": null,
+      "version": "1.104.2"
+    },
+    {
+      "declared": [
+        {
+          "file": "configuration.nix",
+          "line": 420,
+          "text": "tuxedo"
+        }
+      ],
+      "name": "tuxedo-2026.8.1",
+      "pname": "tuxedo",
+      "scope": "system",
+      "user": null,
+      "version": "2026.8.1"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 38,
+          "text": "ungoogled-chromium"
+        }
+      ],
+      "name": "ungoogled-chromium-156.0.8078.47",
+      "pname": "ungoogled-chromium",
+      "scope": "home",
+      "user": "brucking",
+      "version": "156.0.8078.47"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/bar/quickshell-bottom.nix",
+          "line": 653,
+          "text": "wallpaperAccent"
+        }
+      ],
+      "name": "wallpaper-accent",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/bar/quickshell-bottom.nix",
+          "line": 654,
+          "text": "wallpaperIngest"
+        }
+      ],
+      "name": "wallpaper-ingest",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/tools/vm.nix",
+          "line": 115,
+          "text": "win11"
+        }
+      ],
+      "name": "win11",
+      "pname": null,
+      "scope": "home",
+      "user": "brucking",
+      "version": null
+    },
+    {
+      "declared": [],
+      "name": "wireplumber-0.5.18",
+      "pname": "wireplumber",
+      "scope": "system",
+      "user": null,
+      "version": "0.5.18"
+    },
+    {
+      "declared": [
+        {
+          "file": "home/modules/packages.nix",
+          "line": 60,
+          "text": "yt-dlp"
+        }
+      ],
+      "name": "yt-dlp-2026.08.19",
+      "pname": "yt-dlp",
+      "scope": "home",
+      "user": "brucking",
+      "version": "2026.08.19"
+    },
+    {
+      "declared": [],
+      "name": "zoxide-0.10.0",
+      "pname": "zoxide",
+      "scope": "home",
+      "user": "brucking",
+      "version": "0.10.0"
+    },
+    {
+      "declared": [],
+      "name": "zsh-5.9.2",
+      "pname": "zsh",
+      "scope": "system",
+      "user": null,
+      "version": "5.9.2"
+    },
+    {
+      "declared": [],
+      "name": "zsh-5.9.2",
+      "pname": "zsh",
+      "scope": "home",
+      "user": "brucking",
+      "version": "5.9.2"
+    }
+  ],
+  "scope": "all",
+  "timings": {
+    "declared": 0.11,
+    "packages": 3.21,
+    "total": 3.4
+  },
+  "users": [
+    "brucking"
+  ],
+  "warnings": []
+}

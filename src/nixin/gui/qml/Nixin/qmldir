@@ -5,12 +5,16 @@ TopBar 1.0 TopBar.qml
 NavRail 1.0 NavRail.qml
 SearchPage 1.0 SearchPage.qml
 HitRow 1.0 HitRow.qml
+PackagesPage 1.0 PackagesPage.qml
+PackageRow 1.0 PackageRow.qml
+UpdateRow 1.0 UpdateRow.qml
 DetailsPane 1.0 DetailsPane.qml
 PendingPage 1.0 PendingPage.qml
 StatusPage 1.0 StatusPage.qml
 DiffDialog 1.0 DiffDialog.qml
 SetDialog 1.0 SetDialog.qml
 ApplyDialog 1.0 ApplyDialog.qml
+UpdateDialog 1.0 UpdateDialog.qml
 NoticeBar 1.0 NoticeBar.qml
 FieldList 1.0 FieldList.qml
 SectionHead 1.0 SectionHead.qml

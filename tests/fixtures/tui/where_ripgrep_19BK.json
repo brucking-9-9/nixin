@@ -1,0 +1,127 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages"
+    ],
+    "misses": [
+      "prefix-home-brucking-c2d17369ab",
+      "prefix-home-brucking-cf0103967c",
+      "prefix-nixos-e5a343d1c9"
+    ]
+  },
+  "declared": [
+    {
+      "file": "configuration.nix",
+      "items": [
+        "<derivation ripgrep-15.2.0>"
+      ],
+      "lines": [
+        {
+          "file": "configuration.nix",
+          "line": 413,
+          "score": 3,
+          "text": "ripgrep"
+        }
+      ],
+      "option": "environment.systemPackages",
+      "raw": "/nix/store/x1mmgp3jqq9kmq667qp9lqz16yj2pgzz-source/configuration.nix",
+      "scope": "system",
+      "source": "config",
+      "user": null
+    },
+    {
+      "file": "modules/programs/ripgrep.nix",
+      "items": [
+        "<derivation ripgrep-15.2.0>"
+      ],
+      "option": "home.packages",
+      "raw": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/ripgrep.nix",
+      "scope": "home",
+      "source": "home-manager",
+      "user": "brucking"
+    }
+  ],
+  "host": "19BK",
+  "installed": [
+    {
+      "name": "ripgrep-15.2.0",
+      "pname": "ripgrep",
+      "scope": "system",
+      "user": null,
+      "version": "15.2.0"
+    },
+    {
+      "name": "ripgrep-15.2.0",
+      "pname": "ripgrep",
+      "scope": "home",
+      "user": "brucking",
+      "version": "15.2.0"
+    }
+  ],
+  "kind": "package",
+  "mentions": [
+    {
+      "file": "configuration.nix",
+      "line": 413,
+      "score": 3,
+      "text": "ripgrep"
+    },
+    {
+      "file": "home/modules/monitoring/ripgrep.nix",
+      "line": 4,
+      "score": 2,
+      "text": "programs.ripgrep = {"
+    },
+    {
+      "file": "home/modules/default.nix",
+      "line": 54,
+      "score": 1,
+      "text": "./monitoring/ripgrep.nix"
+    },
+    {
+      "file": "home/modules/monitoring/ripgrep.nix",
+      "line": 1,
+      "score": 0,
+      "text": "# \u2500\u2500 ripgrep \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+    }
+  ],
+  "name": "ripgrep",
+  "ok": true,
+  "programs": [
+    {
+      "declarations": [
+        {
+          "column": 7,
+          "file": "modules/programs/ripgrep.nix",
+          "line": 18,
+          "raw": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/ripgrep.nix",
+          "source": "home-manager"
+        }
+      ],
+      "definitions": [
+        {
+          "file": "home/modules/monitoring/ripgrep.nix",
+          "line": 5,
+          "line_heuristic": true,
+          "raw": "/nix/store/x1mmgp3jqq9kmq667qp9lqz16yj2pgzz-source/home/modules/monitoring/ripgrep.nix",
+          "source": "config",
+          "text": "enable    = true;",
+          "value": true
+        }
+      ],
+      "description": "Whether to enable Ripgrep.",
+      "highestPrio": 100,
+      "isDefined": true,
+      "name": "programs.ripgrep.enable",
+      "option": "programs.ripgrep.enable",
+      "scope": "home",
+      "type": "boolean",
+      "user": "brucking",
+      "value": true,
+      "value_found": true
+    }
+  ],
+  "verb": "where"
+}

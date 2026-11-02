@@ -31,6 +31,8 @@ FIELD = ("label", "value", "style")
 SPAN = ("text", "style")
 HIT = ("kind", "badge", "name", "target", "detail", "description", "isOption")
 CLOSURE = ("sign", "name", "version", "size", "style")
+PACKAGE = ("name", "drv", "version", "tag", "where", "isHome")
+UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome")
 LINE = ("text",)
 
 
@@ -146,6 +148,35 @@ def hits(xs: Iterable[view.Hit]) -> list[Row]:
             "isOption": h.is_option,
         }
         for h in xs
+    ]
+
+
+def packages(xs: Iterable[view.PackageRow]) -> list[Row]:
+    return [
+        {
+            "name": r.name,
+            "drv": r.drv,
+            "version": r.version,
+            "tag": r.tag,
+            "where": r.where,
+            "isHome": r.user is not None,
+        }
+        for r in xs
+    ]
+
+
+def updates(xs: Iterable[view.UpdateRow]) -> list[Row]:
+    return [
+        {
+            "name": r.pname,
+            "before": r.old,
+            "after": r.new,
+            "tag": r.tag,
+            "note": r.note,
+            "style": r.style,
+            "isHome": r.user is not None,
+        }
+        for r in xs
     ]
 
 

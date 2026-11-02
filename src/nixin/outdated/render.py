@@ -55,7 +55,8 @@ def _dir_note(r: dict[str, Any]) -> str:
     return {"down": "(older)", "same": "(same order)"}.get(r.get("direction") or "", "")
 
 
-def _kernel(k: dict[str, Any], mode: str) -> str:
+def kernel(k: dict[str, Any], mode: str) -> str:
+    """`kernel 7.2.12 → 7.2.14`, `kernel 7.2.12 (unchanged)`, … (the UIs show it too)."""
     if not k.get("from"):
         return "kernel unknown"
     if mode == "published":
@@ -96,42 +97,55 @@ def _next(commands: list[str]) -> list[str]:
     return out
 
 
-def outdated(doc: dict[str, Any], host: str) -> str:
-    lock, target, mode = doc["lock"], doc["target"], doc["mode"]
+def header(doc: dict[str, Any], host: str) -> str:
+    """The first line: what was compared with what."""
+    lock, target = doc["lock"], doc["target"]
     have = _when(lock.get("short_rev"), lock.get("date"))
-    lines: list[str] = []
-    if mode == "lock":
+    if doc["mode"] == "lock":
         days = target.get("days_newer")
         newer = f", {days:g} days newer" if days else ""
-        lines.append(
+        return (
             f"{host}: {lock['input']} ({target['flakeref']}) {have} {ARROW} "
             f"{_when(target.get('short_rev'), target.get('date'))}{newer}"
         )
-        if doc.get("up_to_date"):
-            lines += ["", f"the lock already has {target['short_rev']}: nothing would change"]
-            return "\n".join(lines)
-        verb = "would change"
-    else:
-        lines.append(
-            f"{host}: installed ({lock['input']} {have}) vs {target['source']} "
-            f"{target['channel']} (index {target.get('short_rev') or '?'})"
-        )
-        verb = f"differ on {target['channel']}"
+    return (
+        f"{host}: installed ({lock['input']} {have}) vs {target['source']} "
+        f"{target['channel']} (index {target.get('short_rev') or '?'})"
+    )
+
+
+def _verb(doc: dict[str, Any]) -> str:
+    return "would change" if doc["mode"] == "lock" else f"differ on {doc['target']['channel']}"
+
+
+def scope_line(doc: dict[str, Any], s: dict[str, Any]) -> str:
+    """`home brucking: 9 of 187 would change (1 removed)` for one of `scopes[]`."""
+    label = "system" if s["user"] is None else f"home {s['user']}"
+    extra = [f"{s[k]} {k}" for k in ("added", "removed") if s.get(k)]
+    tail = f" ({', '.join(extra)})" if extra else ""
+    return f"{label}: {s['changed']} of {s['total']} {_verb(doc)}{tail}"
+
+
+def summary(doc: dict[str, Any]) -> str:
+    """`13 of 325 packages would change; kernel 7.2.12 → 7.2.14`."""
+    if doc.get("up_to_date"):
+        return f"the lock already has {doc['target']['short_rev']}: nothing would change"
+    text = f"{doc['count']} of {doc['total']} packages {_verb(doc)}; "
+    text += kernel(doc["kernel"], doc["mode"])
+    if doc["mode"] == "published" and doc.get("unpublished"):
+        text += f"; {len(doc['unpublished'])} not on {doc['target']['source']}"
+    return text
+
+
+def outdated(doc: dict[str, Any], host: str) -> str:
+    mode = doc["mode"]
+    lines = [header(doc, host)]
+    if doc.get("up_to_date"):
+        return "\n".join([*lines, "", summary(doc)])
     for s in doc["scopes"]:
-        rows = _scope_rows(doc, s["scope"], s["user"])
-        label = "system" if s["user"] is None else f"home {s['user']}"
-        extra = []
-        if s.get("added"):
-            extra.append(f"{s['added']} added")
-        if s.get("removed"):
-            extra.append(f"{s['removed']} removed")
-        tail = f" ({', '.join(extra)})" if extra else ""
-        lines += ["", f"{label}: {s['changed']} of {s['total']} {verb}{tail}"]
-        lines += _table(rows)
-    summary = f"{doc['count']} of {doc['total']} packages {verb}; {_kernel(doc['kernel'], mode)}"
-    if mode == "published" and doc.get("unpublished"):
-        summary += f"; {len(doc['unpublished'])} not on {target['source']}"
-    lines += ["", summary]
+        lines += ["", scope_line(doc, s)]
+        lines += _table(_scope_rows(doc, s["scope"], s["user"]))
+    lines += ["", summary(doc)]
     if mode == "lock":  # --published's caveat is in the document; the text says "as attr"
         lines += [textwrap.fill(n, 88) for n in doc.get("notes") or []]
     if doc.get("commands"):

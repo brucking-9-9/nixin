@@ -215,3 +215,92 @@ nix run .#default -- --config ~/nixos tui         # or result/bin/nixin-tui --co
 A phone-sized check from a desktop: `tmux new-session -x 50 -y 25 'result/bin/nixin-tui
 --config ~/nixos'`. Do not redirect stderr (`2>file`): Textual draws there, and the TUI
 refuses to start.
+
+## Packages page (branch `ui-packages`, 2026-11-02, mbp13)
+
+`list` and `outdated` were not in the front ends; now they are, in both, with `update`
+(new verb, `src/nixin/outdated/update.py`, CONTRACT "`update`") as the one button that
+changes something. The view-model is shared (`ui/view.py`: `package_rows`,
+`filter_packages`, `package_scopes`, `package_columns`/`cells`, `list_footer`,
+`package_hit`; `update_rows`, `update_columns`/`cells`, `outdated_head`, `kernel_line`,
+`outdated_summary`, `outdated_notes`, `update_args`; `update_confirm_fields`,
+`update_fields`, `update_summary`).
+
+- **Screen** `tui/packages.py` (`PackagesScreen`): `i` from anywhere (also `ctrl+4`; a
+  terminal without the kitty keyboard protocol sends that as `ctrl+\`, bound too). Tabs
+  **installed** / **updates** (`t` names the other one in the footer).
+  - installed: one `list` on entry (every scope); the filter box (`f`) and the for-whom
+    button (`h`: all → system → each HM user) narrow the loaded rows with `list
+    --filter`/`--scope` semantics, so they never evaluate again. Columns name, version,
+    FOR (when several scopes show), LISTED IN (from 80 cells: the first `declared`
+    file:line, the path's head clipped so the file and line stay). Under the table the
+    highlighted row (`ripgrep-15.2.0 · home brucking · listed in …`, or "added by a
+    module") and the CLI's own footer (`78 packages: 26 system, 52 home brucking · 67
+    repeats folded · cached`). Enter opens **Details** for the row's user
+    (`DetailsScreen(hit, user=)`): info/versions take the attribute from `declared`,
+    `where` the pname (`Hit.where_target`), Remove previews `rm ATTR --home USER`.
+  - updates: `outdated` on first view (lock mode); `m` toggles `--published` (each
+    mode's document is kept); the head line (`mbp13: nixpkgs (…nixos-unstable) 3ec6363
+    (2026-10-23) → 0bb2eed (2026-11-01), 8.9 days newer`), the table (package, from, to,
+    FOR, and the note from 80 cells: `(older)`, `as kdePackages.x`; removed in pink),
+    the kernel line, the summary, notes. `u` / the button: `update --dry-run` →
+    `UpdateModal` (the command, the commit now, the one it moves to with what
+    `outdated` said, "nothing is built or switched", what comes next, the cost) → `u` or
+    Enter runs `update` (busy `updating`; `q` refuses while it runs) → the session's
+    writes get `nixpkgs 3ec6363 → 0bb2eed (flake.lock)` → **Pending**. A moved lock
+    makes `list`, both `outdated` documents, `status` and the plan stale. An `outdated`
+    that failed (offline) leaves Update enabled (the lock can move without a
+    comparison); `up_to_date` disables it.
+  - `r` re-evaluates (`--refresh`) the tab you are on; `?` lists the keys.
+- **Footer at phone width**: with `i` the footers no longer fit 50 cells (`s Status` was
+  cut). Below 80 cells the page keys show as one group, `i p s go`; from 80 by name.
+  Two bindings per key, `check_action` enables one by width and the key falls through to
+  the other (`app.py`: `PAGE_KEYS`, `on_resize` refreshes the footer).
+- **Hidden tables**: a table filled while its tab is hidden has no width; it gets a
+  guess and its columns are planned again once it has one (`_width`, `_replan`).
+- `app.hm_users()` also takes `list`'s `users[]`, so Details knows the HM users without
+  a `status`.
+- Tests: `tests/test_tui.py` +6 (installed with filter, scope and Details/Remove at both
+  sizes; updates → `--published` → back (kept) → update → Pending at both sizes;
+  nothing to update / `network` error; the folded footer), on `tui_fake.PACKAGES`:
+  19BK's `list`/`outdated`/`update` documents recorded on mbp13, plus ripgrep's real
+  `where`/`info`/`versions` (19BK). Screenshots `docs/tui/{phone,desktop}-8…12-*.svg`;
+  every other fixture SVG was redrawn (the footers carry the page keys).
+
+### Live on mbp13
+
+- Read-only on `~/nixos` (`scripts/tui-screenshots.py --live --config ~/nixos --host
+  mbp13`): the Packages page lists mbp13's packages and the updates tab says `57 of 337
+  packages would change; kernel 7.2.12 → 7.2.14` (`outdated` 4 s with the target cached).
+  `docs/tui/live-{phone,desktop}-4-packages.svg`, `-5-updates.svg`. `~/nixos` unchanged
+  (`git status` and the `flake.lock` hash compared before and after).
+- The update round trip on a throwaway clone (`git clone ~/nixos ~/nixos-ui-test`; still
+  there, with the moved `flake.lock`: this run's settings deny `rm -rf`, so remove it by
+  hand, with `/tmp/uipk`), driven at 50×25 on the real backend: list 2.0 s, where 2.2 s,
+  outdated 4.4 s, `--published` 0.9 s, `update --dry-run` 0.02 s, `update` 0.3 s (the
+  tarball was already in the store; ~60 s cold), then Pending: **`status` failed with
+  `eval-failed`**: at 0bb2eed nixpkgs refuses `gtk+-2.24.33` (gtk2 is marked broken
+  ahead of its removal, nixpkgs#410814), and something in mbp13's closure still uses
+  it. The TUI shows that as the notice it should be; `outdated` did not see it (next
+  point). Back on Packages: "the lock already has 0bb2eed: nothing would change", Update
+  disabled. `docs/tui/live-phone-6-update-confirm-clone.svg`, `-7-update-pending-clone.svg`.
+  Apply was not run: its dry run asks `sudo -n true`, and this run had no sudo at all.
+
+### Gaps found (not changed here)
+
+1. `outdated` reads package lists (`pname`/`version`) and never forces the toplevel, so it
+   says "57 would change" for an update whose config no longer evaluates (a package
+   newly marked broken or insecure). A `--check` that evaluates the target's
+   `system.build.toplevel.drvPath` (≈ `status`'s eval, 15–60 s) would say so before the
+   lock moves. Today the first to notice is `status`/`plan` after `update`.
+2. mbp13 at nixos-unstable 0bb2eed: gtk2 is refused (above). Find the user (`nix why-depends`
+   or `--show-trace`) before moving mbp13's lock, or allow it
+   (`nixpkgs.config.problems.handlers."gtk+".broken = "warn"`) knowingly.
+3. `update` cannot be undone from the UIs: the way back is `git -C WORKSPACE checkout
+   flake.lock` (or `update --to <old rev>`). A "revert the lock" button on Pending would
+   be one call.
+4. Selecting an Updates row opens Details with the pname as the attribute (no `declared`
+   there); for `kdePackages.*` and other nested attributes `info`/`versions` may miss.
+
+How to test the page: `nix develop -c pytest tests/test_tui.py -k "packages or page_keys"`;
+by hand `nixin-tui --config ~/nixos`, `i`, `t`, `m` (read-only); `u` only on a clone.

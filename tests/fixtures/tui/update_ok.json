@@ -1,0 +1,33 @@
+{
+  "changed": true,
+  "command": "nix flake update nixpkgs --flake /home/master/nixos",
+  "commands": [
+    "nixin plan --config /home/master/nixos --host 19BK",
+    "nixin apply --config /home/master/nixos --host 19BK"
+  ],
+  "config": "/home/master/nixos",
+  "dry_run": false,
+  "from": {
+    "date": "2026-10-23",
+    "last_modified": 1792773339,
+    "nar_hash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "short_rev": "3ec6363"
+  },
+  "input": "nixpkgs",
+  "node": "nixpkgs_2",
+  "ok": true,
+  "original": "github:nixos/nixpkgs/nixos-unstable",
+  "timings": {
+    "nix": 0.46,
+    "total": 0.46
+  },
+  "to": {
+    "date": "2026-11-01",
+    "last_modified": 1793540411,
+    "nar_hash": "sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE=",
+    "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+    "short_rev": "0bb2eed"
+  },
+  "to_ref": "github:nixos/nixpkgs/nixos-unstable"
+}

@@ -1,0 +1,91 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 1,
+  "host": "mbp13",
+  "kind": "pkg",
+  "name": "ripgrep",
+  "ok": true,
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Utility that combines the usability of The Silver Searcher with the raw speed of grep",
+      "homepage": "https://github.com/BurntSushi/ripgrep",
+      "kind": "pkg",
+      "license": [
+        "Unlicense",
+        "MIT"
+      ],
+      "main_program": "rg",
+      "matched_by": "attr",
+      "name": "ripgrep",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "x86_64-solaris",
+        "s390x-linux",
+        "x86_64-netbsd",
+        "armv6l-netbsd",
+        "riscv64-netbsd",
+        "x86_64-openbsd",
+        "mips-linux",
+        "aarch64-netbsd",
+        "riscv32-linux",
+        "armv7a-linux",
+        "powerpc-netbsd",
+        "i686-openbsd",
+        "armv5tel-linux",
+        "mips64el-linux",
+        "x86_64-freebsd",
+        "powerpc-linux",
+        "riscv64-linux",
+        "i686-linux",
+        "x86_64-windows",
+        "riscv32-none",
+        "x86_64-redox",
+        "aarch64-darwin",
+        "powerpc64-linux",
+        "mipsel-netbsd",
+        "loongarch64-linux",
+        "m68k-linux",
+        "aarch64-linux",
+        "powerpc64le-linux",
+        "x86_64-linux",
+        "wasm32-wasip1",
+        "armv7l-linux",
+        "i686-windows",
+        "armv7l-netbsd",
+        "i686-netbsd",
+        "mips64-linux",
+        "mipsel-linux",
+        "armv6l-linux",
+        "i686-freebsd"
+      ],
+      "pname": "ripgrep",
+      "position": "pkgs/by-name/ri/ripgrep/package.nix:66",
+      "programs": [
+        "rg"
+      ],
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "15.2.0"
+    }
+  ],
+  "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+  "source": "search.nixos.org",
+  "sources": {
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 1,
+      "error": null,
+      "kinds": [
+        "pkg"
+      ],
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+    }
+  },
+  "verb": "info"
+}

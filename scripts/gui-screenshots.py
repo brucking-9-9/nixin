@@ -6,11 +6,13 @@
 
 Default: the cowsay flow on the recorded documents in tests/fixtures/tui (offline,
 reproducible): search, details, the add preview, plan, the apply confirmation,
-`needs-sudo`, status, an option with the Set dialog, an error notice. --live drives the
-real verb handlers instead (network for discovery, nix against --config): search,
-details with `where`, the `add --dry-run` preview, an option's details and Set dialog; it
-writes nothing (the dialogs are cancelled). OUTDIR defaults to docs/gui. Files are named
-<n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
+`needs-sudo`, status, an option with the Set dialog, an error notice; then Packages on
+19BK's documents: installed with a row in details, updates (lock, --published), the
+update confirmation. --live drives the real verb handlers instead (network for
+discovery, nix against --config): search, details with `where`, the `add --dry-run`
+preview, an option's details and Set dialog, Packages (`list`, `outdated`); it writes
+nothing (the dialogs are cancelled, `update` is never run). OUTDIR defaults to docs/gui.
+Files are named <n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
 """
 
 from __future__ import annotations
@@ -123,6 +125,31 @@ def fixtures(outdir: Path) -> None:
     g.details.remove()  # rm's preview answers `ambiguous`: the notice with candidates
     s.shot("9-notice")
     s.done()
+    packages(outdir)
+
+
+def packages(outdir: Path) -> None:
+    from tui_fake import PACKAGES, FakeBackend
+
+    gui = Gui(FakeBackend(dict(PACKAGES), host="19BK"))
+    s = Shooter(gui, outdir)
+    g = gui
+    g.go("packages")
+    s.settle()
+    names = [r.name for r in g.packages.shown]
+    g.packages.select(names.index("ripgrep"))
+    s.shot("10-packages")
+    g.packages.setTab("updates")
+    s.settle()
+    s.shot("11-updates")
+    g.packages.setMode("published")
+    s.shot("12-updates-published")
+    g.packages.setMode("lock")
+    s.settle()
+    g.packages.startUpdate()
+    s.shot("13-update-confirm")
+    g.packages.cancelUpdate()
+    s.done()
 
 
 def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str) -> None:
@@ -145,6 +172,13 @@ def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str
     g.details.editOption()
     s.shot("5-set-option")
     g.writer.cancelSet()
+    g.go("packages")  # list, then outdated: they read the config, nothing more
+    s.settle(1.0)
+    if g.packages.shown:
+        g.packages.select(0)
+    s.shot("6-packages")
+    g.packages.setTab("updates")
+    s.shot("7-updates")
     s.done()
 
 
