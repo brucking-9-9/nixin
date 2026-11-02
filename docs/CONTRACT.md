@@ -214,7 +214,8 @@ Result:
 | `cache` | `dir`, `enabled` (false with `--refresh`), `hits[]`, `misses[]` |
 | `timings` | seconds per eval (`toplevel`, `packages`) and `total` |
 
-Errors: `config-not-found`, `not-a-flake`, `unknown-host`, `eval-failed` (the last
+Errors: `usage` (any positional argument), `config-not-found`, `not-a-flake`,
+`unknown-host`, `eval-failed` (the last
 `error:` block of nix's stderr, traces stripped; e.g. failed assertions, or a file that
 git does not track yet), `nix-missing`, `internal`.
 
@@ -258,7 +259,7 @@ shaped like option entries plus `scope`/`user`), `declared[]` (files whose
 files, lowest confidence; files under another host's directory are left out). A package
 that is not installed is `ok: true` with empty lists.
 
-Errors: `usage` (no NAME), `not-found` (an option NAME that no scope has),
+Errors: `usage` (no NAME, or more than one), `not-found` (an option NAME that no scope has),
 `config-not-found`, `not-a-flake`, `unknown-host`, `eval-failed`, `nix-missing`,
 `internal`.
 
