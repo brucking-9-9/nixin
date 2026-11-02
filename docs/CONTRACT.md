@@ -94,6 +94,11 @@ them; the decision on unifying them is open (`docs/HANDOFF-integrate.md`).
 | nothing there | `not-found` error | `where OPTION`: `not-found` error. `where PACKAGE`: `ok: true` with empty `installed`/`declared`/`programs` | `rm`/`unset`: `not-found` error with `hints[]` |
 | `--config` unset | — | `$NIXIN_CONFIG`, else reads `/etc/nixos` | `$NIXIN_CONFIG`, else `/etc/nixos`, which is refused (`not-a-workspace`) |
 
+The apply layer follows the writer for `--config` (a workspace; `not-a-workspace`
+otherwise), says `nixos` nowhere (it builds the whole host), reports nix failures as
+`eval-failed` / `eval-timeout` / `build-failed`, and keeps its own cache (plan's out
+paths, no flag).
+
 ## Verbs
 
 Each verb lists its arguments, its result fields (besides `ok`/`verb`/`host`), its error
@@ -572,6 +577,9 @@ were). Three other agent sessions were running nix evals, so the 1-minute load w
 for the cold runs. Treat the times as upper bounds; peak RSS does not depend on load.
 Truth ran on `~/nixos` for host 19BK, the writer on a clone for mbp13 and 19BK/brucking.
 
+The apply rows are from later that evening on the same host, quiet (load 0.4–1.4), the
+real `~/nixos` workspace and `/etc/nixos`, plan's cache cold for the first plan.
+
 | verb | network | runs nix | writes | cold | warm (nixin cache) | peak RSS |
 |---|---|---|---|---|---|---|
 | `search` (pkg, opt, all) | yes | — | cache | 0.9–1.2 s | 0.4 s | 40–50 MiB |
@@ -590,11 +598,16 @@ Truth ran on `~/nixos` for host 19BK, the writer on a clone for mbp13 and 19BK/b
 | `add`, `rm` (NixOS) | — | 1–2 evals | workspace + git index | 5–7 s (2.4–3.3 s at load 2.6) | — | 350 MiB |
 | `add`, `rm --home` (HM) | — | 1–2 evals | workspace + git index | 8–10 s | — | 440 MiB |
 | `set`, `unset` | — | 1 eval | workspace + git index | 3–3.5 s | — | 200 MiB |
-| `plan`, `apply`, `sync` | — | — | — | 0.4 s (stub) | — | — |
+| `plan` | — | nix eval + build | nix store, plan cache | **38 s** no-op tree (eval 32 s, build 5 s); **85 s** with cowsay (39 derivations: three `system-path`s, units, etc); 37 s for `configurationLimit` | 0.6–1.1 s (cached; also a tree that only adds `history.jsonl`) | — |
+| `apply` | — | git, nix (unless cached), sudo | workspace commit, authoritative tree, system profile, /boot | **30–31 s** after `plan` or for a tree plan's cache knows: build 0.4–0.9 s (cache), pull 0.05 s, `nixos-rebuild switch` 29–30 s (root's own eval + activation) | `nothing-to-apply` 0.2 s | — |
+| `apply --dry-run` | — | `nix flake metadata`, `sudo -n true` | — | 1.3 s | — | — |
+| `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
 
-nixin streams no progress. A UI should run the slow verbs (`search --nixpkgs` on a new
-rev, cold `status`, `status --full`) in the background with a spinner and say up front
-that they can take minutes. `status` reports `timings` and `cache.hits`/`misses`.
+nixin streams no progress under `--json` (in human mode `plan`/`apply` tee nix's build
+output and nixos-rebuild's log to stderr). A UI should run the slow verbs (`search
+--nixpkgs` on a new rev, cold `status`, `status --full`, `plan`, `apply`) in the
+background with a spinner and say up front that they can take minutes (a kernel change
+in `plan`: hours). `status` reports `timings` and `cache.hits`/`misses`.
 Discovery adds a `notes[]` line after a slow first `nix search`. A cold `where` or writer
 verb takes seconds. Everything else is sub-second warm. Concurrent runs are safe for the
 caches (per-process temp files). Two writer runs on one workspace are not safe: they race
@@ -614,8 +627,12 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers | 30 days, keyed by resolved rev |
 | `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages`, `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary` | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
 | `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
+| `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
+| `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree and by `apply`); `status.pending` and `nothing-to-apply` read it without nix | last 40 per host |
+| `apply/apply.lock` | `flock` held while `apply` runs (`busy`) | — |
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh
-results. The writer has no cache. nix keeps its own caches (`~/.cache/nix`, the store).
+results. The writer has no cache. Plan's cache has no flag: an entry only answers when
+its out path is still in the store, and the build it saves is deterministic. nix keeps its own caches (`~/.cache/nix`, the store).
 Those make a second cold-nixin run of the same eval faster, and nixin does not manage them.
