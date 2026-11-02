@@ -358,9 +358,22 @@ def _sync_generated(ctx: Ctx) -> None:
 
 
 def _validate_value(expr: str) -> None:
-    err = TOOLS.parse(expr)
-    if err is not None:
-        raise NixinError("invalid-nix", f"not a Nix expression: {err}")
+    """Syntax only. A value lands inside a module, so it may name the module's arguments
+    (`pkgs`, `lib`, `config`, specialArgs such as `inputs`); a bare `nix-instantiate
+    --parse` resolves names while parsing and rejects those as undefined variables. Under
+    `with { };` every free name is a dynamic lookup and the grammar is unchanged, so this
+    accepts exactly the well-formed expressions. Names are checked where the value lands
+    (the edited file is parsed before anything is written), types and semantics by the
+    eval after the write (checks.eval)."""
+    err = TOOLS.parse(f"with {{ }};\n{expr}")
+    if err is None:
+        return
+    err = TOOLS.parse(expr) or err  # the same syntax error, positions in the user's own text
+    raise NixinError(
+        "invalid-nix",
+        f"not a Nix expression: {err}\n(only the syntax is checked here; whether the value "
+        "suits the option is shown by the eval after the write: checks.eval, warnings)",
+    )
 
 
 def _finish(ctx: Ctx, fields: dict[str, Any], summary: str, check=None) -> dict[str, Any]:
