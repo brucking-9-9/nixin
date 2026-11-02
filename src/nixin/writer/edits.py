@@ -40,7 +40,13 @@ def removal(text: str, start: int, end: int) -> Edit:
     ls, le = _line_bounds(text, start, end)
     before, after = text[ls:start], text[end:le]
     if not before.strip() and (not after.strip() or after.lstrip().startswith("#")):
-        return Edit(ls, min(le + 1, len(text)), "")
+        end = min(le + 1, len(text))
+        prev_ls = text.rfind("\n", 0, max(ls - 1, 0)) + 1
+        next_le = text.find("\n", end)
+        blank_before = ls > 0 and not text[prev_ls : ls - 1].strip()
+        if blank_before and next_le != -1 and not text[end:next_le].strip():
+            end = next_le + 1  # do not leave two blank lines where there was one around it
+        return Edit(ls, end, "")
     e = end
     while e < le and text[e] in " \t":
         e += 1

@@ -13,6 +13,7 @@ writes nothing, `--dry-run` prints the diff and writes nothing.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -549,8 +550,9 @@ def _check_packages(ctx: Ctx, added: list[str], removed: list[str]):
             "present": present,
             "absent": [k for k in removed if k not in still],
         }
-        notes = [f"{n} in {sc.list_option[-1]}" for n in present.values()]
-        notes += [f"{k} no longer in {sc.list_option[-1]}" for k in doc["absent"]]
+        opt = ".".join(sc.list_option)
+        notes = [f"{n} in {opt}" for n in present.values()]
+        notes += [f"{k} no longer in {opt}" for k in doc["absent"]]
         if still:
             doc["still_installed"] = still
             notes += [
@@ -595,7 +597,7 @@ def _check_option(ctx: Ctx, parts: list[str]):
                 "defined": False,
                 "note": f"{attr_key(parts)} has no value",
             }
-        shown = repr(got) if not isinstance(got, (dict, list)) else "…"
+        shown = json.dumps(got) if not isinstance(got, (dict, list)) else "{…}"
         return {"ok": True, "attr": attr, "value": got, "note": f"{attr_key(parts)} = {shown}"}
 
     return check
@@ -631,8 +633,9 @@ def _package_hints(ctx: Ctx, key: str) -> list[str]:
                 flag = f"--home {o.name}" if o.kind == "home" else "without --home"
                 hints.append(f"declared in {'.'.join(o.list_option)} at {f.where} (use {flag})")
     files = {m.file for m in sc.mods}
+    cited = {h.split(" at ", 1)[1].split(":", 1)[0] for h in hints if " at " in h}
     for m in scan.grep_package(ws.root, leaf, limit=200):
-        if m.file in files and m.score >= 2 and len(hints) < 6:
+        if m.file in files and m.file not in cited and m.score >= 2 and len(hints) < 6:
             hints.append(f"mentioned at {m.file}:{m.line}: {m.text.strip()[:80]}")
     return hints
 
@@ -721,10 +724,13 @@ def _rm(ns: argparse.Namespace) -> dict[str, Any]:
     entry = state.entry(sc.kind, sc.name)
     removed: list[str] = []
     in_state = False
+    unused = set(where)
     for key in keys:
         hits = [f for f in declared if _matches_pkg(f, key)]
         # --where applies to the packages it names a declaration of
-        picked = _pick(hits, [w for w in where if any((h.file, h.line) == w for h in hits)], key)
+        mine = [w for w in where if any((h.file, h.line) == w for h in hits)]
+        unused.difference_update(mine)
+        picked = _pick(hits, mine, key)
         if not picked and key not in entry["packages"]:
             raise _not_found(key, sc, _package_hints(ctx, key))
         for f in picked:
@@ -739,6 +745,14 @@ def _rm(ns: argparse.Namespace) -> dict[str, Any]:
             in_state = True
             ctx.actions.append({"name": key, "action": "removed", "file": sc.gen})
         removed.append(key)
+    if unused:
+        raise WriterError(
+            "not-found",
+            "--where names no declaration of "
+            + ", ".join(keys)
+            + ": "
+            + ", ".join(f"{f}:{n}" for f, n in sorted(unused)),
+        )
     if in_state:
         _sync_generated(ctx)
     places = sorted({a["file"] for a in ctx.actions})
