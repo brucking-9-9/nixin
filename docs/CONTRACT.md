@@ -1016,6 +1016,10 @@ Truth ran on `~/nixos` for host 19BK, the writer on a clone for mbp13 and 19BK/b
 The apply rows are from later that evening on the same host, quiet (load 0.4–1.4), the
 real `~/nixos` workspace and `/etc/nixos`, plan's cache cold for the first plan.
 
+The `history`/`rollback` rows and the boot check are from 2026-11-02 on mbp13 (load 0.9),
+the real workspace and `/etc/nixos`: one cowsay apply (gen 121: 101 s, build 72 s,
+switch 30 s) and the rollback to gen 120.
+
 The `outdated` rows are from 2026-11-02 on mbp13, quiet (load 0.4–0.7), against `~/nixos`
 (lock nixpkgs 3ec6363, target nixos-unstable 0bb2eed): nixin's cache empty, nix's own
 fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too (load 2.4).
@@ -1042,6 +1046,10 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `plan` | — | nix eval + build | nix store, plan cache | **38 s** no-op tree (eval 32 s, build 5 s); **85 s** with cowsay (39 derivations: three `system-path`s, units, etc); 37 s for `configurationLimit` | 0.6–1.1 s (cached; also a tree that only adds `history.jsonl`) | — |
 | `apply` | — | git, nix (unless cached), sudo | workspace commit, authoritative tree, system profile, /boot | **30–31 s** after `plan` or for a tree plan's cache knows: build 0.4–0.9 s (cache), pull 0.05 s, `nixos-rebuild switch` 29–30 s (root's own eval + activation) | `nothing-to-apply` 0.2 s | — |
 | `apply --dry-run` | — | `nix flake metadata`, `sudo -n true` | — | 1.3 s | — | — |
+| boot check (in `plan`, `apply`, `rollback`) | — | — (reads two toplevels, the profile's generations' kernel links, the installer scripts up to the builder, `statvfs /boot`) | — | under 0.1 s | — | — |
+| `history` | — | — | — | 0.2 s (35 generations) | — | — |
+| `rollback --dry-run` | — | `sudo -n true`, `nix store diff-closures` | — | 1.3 s | — | — |
+| `rollback` | — | git, sudo (no nix eval or build: the generation is in the store) | workspace commit, system profile, /boot, authoritative tree | **2.9 s** (switch-to-configuration 1.7 s, pull 0.05 s); `nixos-rebuild`'s root eval is skipped | `nothing-to-apply` 0.2 s | — |
 | `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
 | `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked) | 410 MiB mbp13, 540 MiB 19BK |
 | `outdated --published` | yes (search.nixos.org: 3–6 queries) | the lock-side eval only (shared with lock mode) | cache | 1.1–1.2 s with the eval cached, 1–3 s for the queries; + 2–3 s for a cold eval | 0.33 s | 43 MiB (+ the eval's) |
