@@ -21,7 +21,7 @@ talks to the first few and borrows the local-eval idea from NüschtOS.
 | **discovery** | what exists, in which versions | search.nixos.org (packages, NixOS options, programs), Home Manager options, NixHub version history, noogle; `nix search` on the host's *locked* nixpkgs as the exact-rev fallback |
 | **truth** | what *this* host has | `nix eval` of the config flake: installed packages, every option's current value and `declarations` (file:line), lock rev, generation |
 | **writer** | how to change it | new things go to generated `installer/*.nix` (nixfmt'd, from `state.json`); removing or changing something a hand-written module declares edits that module in place |
-| **apply** | make it so | `plan` = build the workspace + `nix store diff-closures`; `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo |
+| **apply** | make it so | `plan` = build the workspace + `nix store diff-closures` + a boot check (reboot needed? fits on /boot?); `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo; `history` = the system generations with the commits nixin applied; `rollback` = back to a generation, the config reverted with it |
 
 Why two kinds of search: search.nixos.org indexes channel-*latest*, so a hit can
 name a version your `flake.lock` does not have yet. The truth layer evaluates
@@ -36,7 +36,8 @@ nixin [--json] [--host H] VERB [ARGS...]
 search info versions        discovery   what exists upstream, in which versions
 status where list           truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
-plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
+plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch; hub sync
+history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
@@ -70,7 +71,19 @@ which touch the network, run nix or write files, and the cache locations.
   `sudo -n` (or 19BK's `nixos-switch` helper for the switch). It checks that the system
   now running is the one it built and appends `installer/history.jsonl`. Without a sudo
   ticket it stops with `needs-sudo` and the exact commands; `--dry-run` prints them.
-  `sync` fetches the hub and pulls (`--ff-only`) or pushes the workspace branch.
+  `plan` and `apply` also compare the new system's kernel, initrd, modules, kernel
+  params, bootspec and specialisations with the running one: `reboot_needed` and a
+  "needs a reboot" line; and they add up the new kernel/initrd files the bootloader will
+  copy to /boot (systemd-boot's `configurationLimit` window, read from the built system)
+  against `df /boot`: a warning above 80 %, and `apply` refuses (`boot-space`) when they
+  do not fit. `sync` fetches the hub and pulls (`--ff-only`) or pushes the workspace
+  branch. `history` lists the generations (date, kernel, NixOS version, `*` running, `b`
+  booted) with the commit and message from `installer/history.jsonl`. `rollback [GEN]`
+  (default: the previous generation) runs `nix-env --switch-generation GEN` and GEN's
+  `switch-to-configuration switch` as root, and when nixin knows the commit GEN was built
+  from (history, plan's cache) it makes one revert commit in the workspace back to that
+  tree and pulls it into `/etc/nixos`, so the next `apply` does not switch back; without
+  such a commit it says so and leaves the config.
 - **outdated** answers "what needs updating" for a host. By default it evaluates the
   installed package lists (system and each Home Manager user) and the kernel twice: as
   locked, and with `--override-input nixpkgs` at the lock's own ref as it resolves now

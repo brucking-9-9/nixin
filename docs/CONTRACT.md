@@ -8,7 +8,7 @@ in one of them. `tests/test_integration.py` checks the envelope rules and the er
 list against this file.
 
 Status: all four layers are implemented: discovery, truth, writer and apply (`plan`,
-`apply`, `sync`).
+`apply`, `sync`, `history`, `rollback`).
 
 ## Invocation
 
@@ -22,7 +22,8 @@ nixin --version | --help | VERB --help
 | `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
 | `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
-| `plan`, `apply`, `sync` | apply | build + closure diff; commit, pull into the authoritative tree and switch (root); git sync with the hub |
+| `plan`, `apply`, `sync` | apply | build + closure diff + boot check; commit, pull into the authoritative tree and switch (root); git sync with the hub |
+| `history`, `rollback` | apply | this machine's system generations with the commits nixin applied; switch back to one (root) and revert the config with it |
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 | `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
 
@@ -39,10 +40,11 @@ nixin --version | --help | VERB --help
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
 - `--authoritative DIR` (apply verbs) is the root-owned clone the system is switched
   from: `--authoritative`, else `$NIXIN_AUTHORITATIVE`, else `/etc/nixos`. nixin only
-  reads it; root `git pull --ff-only`s the workspace into it during `apply`.
+  reads it; root `git pull --ff-only`s the workspace into it during `apply` and
+  `rollback`.
 - Nothing prompts, ever. nix and git run with stdin closed, sudo always as `sudo -n`. A
   step that needs root and cannot get it fails with `needs-sudo` and the commands to run
-  (only `apply` needs root).
+  (only `apply` and `rollback` need root).
 - `--help` and `--version` print text to stdout and exit 0, with or without `--json`.
 
 ## Envelope
@@ -459,7 +461,44 @@ Result:
 | `running` | `store_path` (`/run/current-system`), `generation` (the newest system profile generation pointing at it, or null), `profile_generation`, `profile` |
 | `pending_commits` | `[{commit, subject}]` the workspace has and the authoritative tree does not; null when `relation` is `diverged`/`unknown` |
 | `diff` | `{added: [{name, version, size}], removed: [{name, version, size}], changed: [{name, from, to, size_delta}], size_delta}` from `nix store diff-closures`; sizes in bytes, null where nix printed none (it omits deltas under 8 KiB); `from`/`to` are nix's version sets as one string (`"6.7.5, 6.7.5-qt5"`), both null for a size-only change; `unparsed[]` if nix printed a line nixin could not read. null for another host (`--host` is not this machine) |
-| `warnings[]` | e.g. untracked files, another host |
+| `reboot_needed` | `boot.reboot_needed`; null for another host |
+| `boot` | what the new system does to boot, against `/run/current-system` ([The boot block](#the-boot-block)); null for another host |
+| `warnings[]` | e.g. untracked files, another host, the boot block's `warnings[]` (needs a reboot, /boot tight or too small) |
+
+#### The boot block
+
+`plan`, `apply` (and its `--dry-run`) and `rollback` compare the new toplevel with
+`/run/current-system`, reading both (no nix, no root):
+
+| field | meaning |
+|---|---|
+| `kernel` | `{changed, from, to, from_path, to_path}`: the `kernel` links; `from`/`to` the release (`7.2.12`, as `uname -r`: the directory under `kernel-modules/lib/modules`) |
+| `initrd`, `modules` | `{changed, from_path, to_path}`: the `initrd` and `kernel-modules` links |
+| `kernel_params` | `{changed, from[], to[]}`: `kernel-params` |
+| `bootloader` | `{bootspec, changed, keys[]}`: the `boot.json` keys that differ (paths that differ for every system left out) |
+| `specialisations[]` | `{name, state, changed[]}` per `specialisation/*`: `state` `same`, `changed` (then `changed[]` names `kernel`/`initrd`/`modules`, and `kernel: {from, to}`), `added`, `removed` |
+| `reboot_needed`, `reasons[]` | the default entry's kernel, initrd, module tree or kernel params change: they take effect at the next boot (`reasons`: `kernel`, `initrd`, `modules`, `kernel_params`) |
+| `pending_reboot` | the running system's kernel/initrd/modules already differ from `/run/booted-system`'s (a reboot is owed anyway) |
+| `boot_space` | `{path, limit, window[], files[], needed, freed, free, total, ratio, state}` (below) |
+| `boot_entry` | rollback only: whether the target is among the generations the bootloader keeps (`window`); `false`: it gets no boot entry and the next boot starts the newest generation. null when unknown or not a rollback |
+| `warnings[]` | the human sentences for the above (also in the verb's `warnings[]`) |
+
+`boot_space` models systemd-boot's install step. `limit` is the `configurationLimit`
+built into the new system (its `bin/switch-to-configuration` → installer script →
+builder's `CONFIGURATION_LIMIT`; 0 = no limit, null = not systemd-boot or not found).
+The builder keeps the newest `limit` generations (`window`, the numbers after the
+switch), first deletes the kernel/initrd files none of them uses, then copies the
+missing ones. On /boot now = the files of the newest generations as the *running*
+system's limit kept them; after = the newest `limit - 1` plus the new system (a
+rollback: the newest `limit`, it adds no generation). `files[]` = `{path, size, for[]}`
+of every distinct store file (by path) after minus now, `for` naming the entries
+(`default`, a specialisation) that use it; `needed` their sum in bytes; `freed` what
+the builder deletes first; `free`/`total` from `statvfs` (`df /boot`'s Avail/Size);
+`ratio` = needed / (free + freed). `state`: `ok`; `warn` above 80 %; `full` when it
+does not fit (`apply` and `rollback` refuse with `boot-space`; `plan` and `--dry-run`
+report it); `unknown` when /boot cannot be read. With `limit` null, on /boot now = the
+running system's files and nothing counts as freed. A user cannot list /boot; the
+model assumes the last bootloader install ran after the newest generation was made.
 
 Errors: `usage` (any positional argument), `config-not-found`, `not-a-workspace` (also: not
 a git checkout, detached HEAD), `unknown-host`, `eval-failed`, `eval-timeout` (900 s),
@@ -487,6 +526,10 @@ The one privileged step. In order:
    tree already has the workspace HEAD, and `/run/current-system` already is its build.
    (Running a different system, e.g. after a failed switch, re-switches.)
 3. **Build**: plan's out path (cache), else the same build as `plan`.
+   **Boot check** ([the boot block](#the-boot-block)): `boot-space` when the new
+   kernels/initrds do not fit on /boot. When plan's cache already knows the out path
+   this runs before the commit (nothing has happened); otherwise after the build, before
+   anything runs as root (the commit stays; `committed` in the error).
 4. **Pull** (root): `git -C <authoritative> pull --ff-only <workspace> <branch>`.
    Refused before anything runs when that cannot fast-forward
    (`authoritative-diverged`) or when the authoritative tree has uncommitted changes
@@ -527,6 +570,7 @@ Result:
 | `backends` | `{pull, switch}`: `sudo` or `nixos-switch` |
 | `switch_log` | the last 20 lines nixos-rebuild printed (human mode streams all of it to stderr) |
 | `diff` | the closure diff from the previous system to `out` (as in `plan`) |
+| `boot`, `reboot_needed` | [the boot block](#the-boot-block) from the previous system to `out` |
 | `cached` | the out path came from plan's cache |
 | `history` | the line appended to `installer/history.jsonl` |
 | `timings` | seconds: `prepare` (checks), `commit`, `build`, `pull`, `switch`, `total` |
@@ -536,7 +580,8 @@ With `--dry-run`: `dry_run: true`, `commands[]` (`{step, privileged, argv, comma
 privileged steps add `backend` and `by_hand`, the form to type), `commit` (`{files[],
 message}` or null), `out` (null when it would have to build), `cached`, `workspace`,
 `authoritative` (`path`, `relation`), `pending_commits`, `running`, `privilege`
-(`{pull|switch: {backend, ready, why}}`), `diff` (when `out` is known), `warnings[]`.
+(`{pull|switch: {backend, ready, why}}`), `diff`, `boot`, `reboot_needed` (when `out`
+is known; a `full` /boot is reported, not refused), `warnings[]`.
 
 Errors (`ok: false`; fields after the first root step tell how far it got: `committed`,
 `out`, `authoritative_head`, `privileged_commands[]`): `usage`, `config-not-found`,
@@ -548,7 +593,8 @@ the git commands that bring those commits into the workspace), `nothing-to-apply
 `eval-failed`, `eval-timeout`, `build-failed`, `needs-sudo` (with `commands[]`),
 `switch-failed` (nixos-rebuild's last lines; the pull has happened), `verify-failed`,
 `git-failed` (a git command failed, e.g. a commit hook or no identity), `busy` (another
-apply holds the lock), `nix-missing`, `internal`.
+apply or rollback holds the lock), `boot-space` (with `boot_space`), `nix-missing`,
+`internal`.
 
 Costs: git in the workspace (commit) and, read-only, in the authoritative tree; nix
 (plan's build unless cached); two root commands. `nixos-rebuild` evaluates the config
@@ -580,6 +626,132 @@ Errors: `usage` (any positional argument, or no such remote), `config-not-found`
 network or authentication), `internal`.
 
 Costs: network (the remote), git in the workspace only.
+
+### `history`
+
+```
+nixin history [--limit N] [--config DIR] [--authoritative DIR]
+```
+
+This machine's system generations, newest first, joined with
+`<config>/installer/history.jsonl` (the workspace's: `--config`, `$NIXIN_CONFIG`, else
+`/etc/nixos`, which is read-only here and works, but its copy lags the workspace's by one
+apply). `--limit N`: the newest N (default 20; 0: all). No nix, no root, no network.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `generations[]` | one row per `/nix/var/nix/profiles/system-N-link`, newest first (below) |
+| `total` | how many generations there are (`generations[]` has at most `--limit`) |
+| `current`, `booted`, `default` | the generation `/run/current-system` is, the one `/run/booted-system` is, the profile's (the boot default); null when unknown |
+| `history` | `{path, entries, unmatched}`: the file, its well-formed lines, and how many name an out path no generation has any more (deleted generations) |
+| `warnings[]` | no history file; the config is the authoritative tree |
+
+A row: `generation`, `date` (the link's mtime, UTC ISO 8601), `store_path`,
+`current`/`booted`/`default` (bools), `kernel` (the release), `nixos_version`, and from
+the history line that matches: `commit`, `message`, `mode` (`switch`, `boot`,
+`rollback`), `applied` (its `ts`), `applied_host`, `match` (`generation`: a line for this
+generation; `out`: a line for another generation with the same store path, which is then
+`match_generation`; null: none), `entries[]` (every line for this generation, oldest
+first: an apply and later rollbacks to it). Two generations can share a store path (a
+rollback or a revert rebuilds an older tree): `current` prefers the profile's generation,
+`booted` the newest one made before `/run/booted-system` was.
+
+Human output: a table (`*` runs now, `b` was booted, `d` boot default when it is not the
+running one) with date (local time), kernel, NixOS version, commit and subject;
+`(= gen N)` marks a match by store path, `[mode]` a mode other than `switch`.
+
+Errors: `usage` (a positional argument, `--limit` below 0), `config-not-found`,
+`host-not-local` (`--host` is not this machine), `internal`.
+
+Costs: reads the profile links, each generation's toplevel (a few symlinks and files) and
+the history file. ~0.1 s for 34 generations.
+
+### `rollback`
+
+```
+nixin rollback [GEN] [--dry-run] [--config DIR] [--authoritative DIR]
+```
+
+Back to system generation GEN (default: the one before the running one), the config
+with it. Two halves; the root commands go through the same backend as `apply` (`sudo -n`;
+`needs-sudo` with `commands[]` when it cannot get root):
+
+1. **Config** (in the workspace, as you; before anything runs as root): which commit
+   builds GEN? First the `installer/history.jsonl` lines for GEN's store path (its own
+   generation's first), then plan's commit cache over the first 200 first-parent
+   ancestors of HEAD. It must be an ancestor of the workspace HEAD. If one is found and
+   the workspace's tree differs from it (`installer/history.jsonl` aside), ONE new commit
+   makes the tree that commit's again: `git restore --source=C --staged --worktree -- .
+   ':(exclude)installer/history.jsonl'` and `git commit` (workspace identity and hooks).
+   One reverted commit: `Revert "<its subject>"`; more: `nixin: rollback to generation
+   N: revert K commits`; the body lists them. Never a reset or a force push.
+   Refused first when the workspace has uncommitted changes (`workspace-dirty`, with
+   `files[]`), has commits that are not applied yet and would be reverted
+   (`workspace-dirty`, with `commits[]`), or cannot fast-forward the authoritative tree
+   (`authoritative-diverged`, `authoritative-dirty`, `authoritative-missing`).
+2. **System** (root): `nix-env --profile /nix/var/nix/profiles/system
+   --switch-generation GEN`, then GEN's own `<store path>/bin/switch-to-configuration
+   switch` (activation and the bootloader, as `nixos-rebuild switch --rollback` does).
+   Refused before anything runs when GEN's kernels do not fit on /boot (`boot-space`).
+3. **Pull** (root), when the config half made or has a commit to bring in: `git -C
+   <authoritative> pull --ff-only <workspace> <branch>`, so the authoritative tree builds
+   what runs again and the next `apply` does not switch back.
+4. **Verify**: `/run/current-system` is GEN's store path, the profile is at GEN, the
+   authoritative HEAD is the workspace HEAD.
+5. **Record**: a line in `installer/history.jsonl`: `{ts, host, out, generation, commit,
+   message, mode: "rollback", from_generation, config}` (`commit`: the authoritative
+   HEAD that builds it, null when the config was left as it is). The commit map of plan's
+   cache gets the authoritative HEAD → GEN's out, so `apply` answers `nothing-to-apply`
+   and `status.pending.running_matches` is true without nix.
+
+When no commit is known to build GEN, the system rolls back and the config is left as
+it is: `config.state` is `untouched` with `why`, and a warning says that the next
+`apply` would switch back to the config's system. A step that already happened is
+skipped on a retry with the same GEN (`nixin rollback GEN` after a `needs-sudo` or a
+failed activation finishes the rest). `nothing-to-apply` when GEN runs, is the boot
+default and the config builds it (or has no commit for it).
+
+`--dry-run` runs nothing: it reads the profile, the trees and the caches, probes `sudo -n
+true`, and prints the commands in order (`[user]` the revert, `[root]` the rest).
+
+Result:
+
+| field | meaning |
+|---|---|
+| `generation`, `from_generation`, `out` | the target, the generation that ran before, GEN's store path |
+| `switched` | the system half ran (false on a retry that only had the pull left) |
+| `previous`, `running` | the `running` block (as in `plan`) before and after |
+| `config` | `{state, why, commit, source, revert_commit, reverted[], authoritative_head}`: `state` `reverted` (the authoritative tree moved back), `in-sync` (it already builds GEN), `untouched` (`why`: `no-mapping`, nixin knows no commit for GEN; `not-in-workspace`, the history names commits the workspace's branch does not contain, listed in `candidates[]`); `commit` the commit that builds GEN, `source` `history` or `plan-cache`; `revert_commit` the commit made now (null on a retry that found it made); `reverted[]` `{commit, subject}` |
+| `privileged_commands[]`, `backends` | the root commands as run; `{profile, activate, pull}` → `sudo` |
+| `switch_log` | the last 20 lines of switch-to-configuration |
+| `diff` | the closure diff from the previous system to GEN (null when the system half did not run) |
+| `boot`, `reboot_needed` | [the boot block](#the-boot-block) from the running system to GEN, with `boot_entry` |
+| `history` | the line appended |
+| `timings` | seconds: `prepare`, `commit`, `switch`, `pull`, `total` |
+| `warnings[]` | config untouched; the boot block's |
+
+With `--dry-run`: `dry_run: true`, `generation`, `from_generation`, `out`, `switched`
+(the system half would run), `commands[]` (as `apply --dry-run`'s; steps `revert`,
+`profile`, `activate`, `pull`), `commit` (`{message}` or null), `config`, `running`,
+`privilege` (`{profile|activate|pull: {backend, ready, why}}`), `boot`, `reboot_needed`,
+`diff`, `duration_s`, `warnings[]`.
+
+Errors (`ok: false`; after the revert commit: `committed`, `generation`,
+`privileged_commands[]`): `usage` (GEN not a number, more than one), `config-not-found`,
+`not-a-workspace`, `unknown-host`, `host-not-local`, `unknown-generation` (no such
+generation, or none before the running one), `nothing-to-apply`, `workspace-dirty`,
+`authoritative-missing`, `authoritative-dirty`, `authoritative-diverged`, `boot-space`
+(with `boot_space`), `needs-sudo` (with `commands[]`), `switch-failed` (nix-env or
+switch-to-configuration failed; the message says whether `/run/current-system` already
+is GEN and to run `nixin rollback GEN` again), `verify-failed`, `git-failed` (the revert
+commit, or the pull: then GEN already runs), `busy`, `internal`.
+
+Costs: git in the workspace (one commit) and, read-only, in the authoritative tree; no
+nix evaluation or build (GEN is in the store); three root commands. Writes: a commit in
+the workspace, the system profile, `/run/current-system`, `/boot` (the bootloader step),
+the authoritative tree, `installer/history.jsonl`, plan's cache.
 
 ### `outdated`
 
@@ -816,16 +988,19 @@ mode, as under `tui`, so their logs stream into the window.
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
 | `invalid-state` | writer | `installer/state.json` is not valid JSON or has the wrong version |
 | `build-failed` | apply | `nix build` of the toplevel failed; the message is the failing builder's block with nix's log tail |
-| `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs |
-| `host-not-local` | apply | `apply --host H` for a host that is not this machine |
+| `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
+| `host-not-local` | apply | `apply`, `rollback`, `history` with `--host H` for a host that is not this machine |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
 | `authoritative-dirty` | apply | the authoritative tree has uncommitted changes (`files[]`); nixin only fast-forwards it |
 | `authoritative-diverged` | apply | root's `git pull --ff-only` could not take the workspace (`state`: `behind`, `diverged`, `unknown`); the message has the commands to fix it |
-| `switch-failed` | apply | `nixos-rebuild` (or the `nixos-switch` helper) failed, or the helper is already running |
+| `switch-failed` | apply | `nixos-rebuild` (or the `nixos-switch` helper) failed, or the helper is already running; `rollback`: nix-env or switch-to-configuration failed |
 | `verify-failed` | apply | after the switch the system is not the out path nixin built |
 | `git-failed` | apply | a git command failed (or git is not on PATH); the message has git's last lines |
 | `diverged` | apply (`sync`) | `--pull` cannot fast-forward, or `--push` was rejected |
-| `busy` | apply | another `nixin apply` holds the lock |
+| `busy` | apply | another `nixin apply` or `rollback` holds the lock |
+| `boot-space` | apply | `apply`/`rollback`: the new system's kernels and initrds do not fit on /boot (`boot_space` has the numbers); nothing ran as root |
+| `unknown-generation` | apply | `rollback GEN`: no such system generation, or none before the running one |
+| `workspace-dirty` | apply | `rollback`: the workspace has uncommitted changes (`files[]`) or unapplied commits (`commits[]`) its revert would sweep in or drop |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's
 `sources[...].error` while `ok` is true.
@@ -896,8 +1071,8 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where` and `list`), `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary`; `outdated`'s `outdated-lock` and `outdated-target` (the target's key also has the target commit) | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
 | `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
-| `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree and by `apply`); `status.pending` and `nothing-to-apply` read it without nix | last 40 per host |
-| `apply/apply.lock` | `flock` held while `apply` runs (`busy`) | — |
+| `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree, by `apply`, and by `rollback` for the authoritative HEAD it leaves); `status.pending`, `nothing-to-apply` and rollback's commit lookup read it without nix | last 40 per host |
+| `apply/apply.lock` | `flock` held while `apply` or `rollback` runs (`busy`) | — |
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh
