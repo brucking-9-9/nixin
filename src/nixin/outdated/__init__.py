@@ -29,10 +29,10 @@ from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError
 from ..truth.cache import TruthCache
-from . import compare, render
+from . import compare, render, update
 from . import target as tgt
 
-VERBS = ("outdated",)
+VERBS = ("outdated", "update")  # update: outdated/update.py, registered with it
 HELP = "what a nixpkgs lock update would change; --published: newer versions on a channel"
 HELPER = files("nixin.outdated") / "outdated.nix"
 BATCH = 50  # pnames per search.nixos.org query
@@ -77,6 +77,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="ignore cached evals and answers; re-resolve the target branch",
     )
     p.set_defaults(run=outdated)
+    update.register(sub)
 
 
 def outdated(ns: argparse.Namespace) -> dict[str, Any]:
