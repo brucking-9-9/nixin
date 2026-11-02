@@ -9,3 +9,5 @@ on merge it moves here.
 - [writer](docs/HANDOFF-writer.md) — merged; acceptance list verified on mbp13 against a clone of the config.
 - [integrate](docs/HANDOFF-integrate.md) — the merged CLI run end to end on mbp13; envelope fixes,
   `docs/CONTRACT.md`, integration tests, open judgement calls.
+- [apply](docs/HANDOFF-apply.md) — branch `apply`: `plan`, `apply`, `sync`, `status.pending`;
+  mbp13 switched for real from its workspace (gens 110–112), `/boot` freed to 81M.
