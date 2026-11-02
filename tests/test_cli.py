@@ -66,3 +66,14 @@ def test_usage_error_without_json_is_argparse_text(capsys):
     out, err = capsys.readouterr()
     assert out == ""
     assert err.startswith("usage: nixin search") and "nixin search: error:" in err
+
+
+def test_unexpected_exception_is_internal(monkeypatch, capsys):
+    def boom(ns):
+        raise KeyError("surprise")
+
+    monkeypatch.setattr(truth, "status", boom)
+    rc = main(["--json", "--host", "testhost", "status"])
+    doc, err = _one_doc(capsys)
+    assert rc == 1 and err == ""
+    assert doc["error"]["code"] == "internal" and "KeyError" in doc["error"]["message"]

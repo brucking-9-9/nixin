@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
+import traceback
 
 from . import __version__, discovery, truth, writer
 
@@ -97,6 +99,17 @@ def _emit(ns: argparse.Namespace, doc: dict) -> int:
     return 2 if doc["error"]["code"] == "usage" else 1
 
 
+def _internal(exc: Exception) -> dict:
+    """An unexpected exception as the error document: under --json a traceback would leave
+    stdout empty. The message names the exception and where it was raised."""
+    frames = traceback.extract_tb(exc.__traceback__)
+    where = f" at {os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
+    return {
+        "ok": False,
+        "error": {"code": "internal", "message": f"{type(exc).__name__}: {exc}{where}"},
+    }
+
+
 def _usage(argv: list[str], e: UsageError) -> int:
     """argparse's errors (and no verb at all): exit 2; under --json one `usage` document."""
     head = argv[: argv.index("--")] if "--" in argv else argv
@@ -129,7 +142,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
-        return _emit(ns, run(ns))
+        try:
+            doc = run(ns)
+        except Exception as exc:  # noqa: BLE001 -- every failure must become the error document
+            doc = _internal(exc)
+        return _emit(ns, doc)
     layer = VERBS[ns.verb][0]
     return _emit(
         ns,
