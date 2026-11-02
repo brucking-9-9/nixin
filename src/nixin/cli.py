@@ -147,26 +147,30 @@ def main(argv: list[str] | None = None) -> int:
             return _usage(argv, UsageError("nixin", "no VERB given (nixin --help lists them)", ""))
         parser.print_help()
         return 2
+    return _emit(ns, document(ns))
+
+
+def document(ns: argparse.Namespace) -> dict:
+    """The verb's document for a parsed command line, without the envelope keys: what
+    main() emits. In-process callers (the TUI) use it to get the --json document without a
+    subprocess; `ns.json` False only adds the human `message` (and lets plan/apply tee
+    nix's output to stderr)."""
     if hasattr(ns, "config") and ns.config is None:
         ns.config = ns.config_before_verb
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
         try:
-            doc = run(ns)
+            return run(ns)
         except Exception as exc:  # noqa: BLE001 -- every failure must become the error document
-            doc = _internal(exc)
-        return _emit(ns, doc)
+            return _internal(exc)
     layer = VERBS[ns.verb][0]
-    return _emit(
-        ns,
-        {
-            "ok": False,
-            "error": {
-                "code": "not-implemented",
-                "message": f"{ns.verb!r} belongs to the {layer} layer, which is not written yet",
-            },
+    return {
+        "ok": False,
+        "error": {
+            "code": "not-implemented",
+            "message": f"{ns.verb!r} belongs to the {layer} layer, which is not written yet",
         },
-    )
+    }
 
 
 if __name__ == "__main__":  # pragma: no cover
