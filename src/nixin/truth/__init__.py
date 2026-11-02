@@ -133,6 +133,9 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     }
     if not ns.json:
         doc["message"] = render.status(doc, host)
+    from .. import apply  # the pending block (late import: apply imports truth.render)
+
+    apply.annotate_status(doc, repo, host)
     return doc
 
 

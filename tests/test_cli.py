@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from nixin import __version__, truth, writer
+from nixin import __version__, apply, truth, writer
 from nixin.cli import VERBS, main
 from nixin.discovery import VERBS as DISCOVERY_VERBS
 
@@ -25,7 +25,7 @@ def test_no_verb_is_usage(capsys):
 def test_every_verb_speaks_json(verb, after, capsys):
     flags = ["--json", "--host", "testhost"]
     argv = [verb, *flags] if after else [*flags, verb]
-    configured = verb in truth.VERBS or verb in writer.VERBS
+    configured = verb in truth.VERBS or verb in writer.VERBS or verb in apply.VERBS
     if configured:
         argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests
     rc = main(argv)
@@ -77,3 +77,25 @@ def test_unexpected_exception_is_internal(monkeypatch, capsys):
     doc, err = _one_doc(capsys)
     assert rc == 1 and err == ""
     assert doc["error"]["code"] == "internal" and "KeyError" in doc["error"]["message"]
+
+
+@pytest.mark.parametrize("verb", ["status", "add", "plan"])
+def test_config_before_the_verb(verb, capsys):
+    """`nixin --config DIR VERB` = `nixin VERB --config DIR`; the verb's own flag wins."""
+    argv = ["--json", "--config", "/nonexistent/nixin-a", verb]
+    if verb == "add":
+        argv.append("x")
+    main(argv)
+    doc = json.loads(capsys.readouterr().out)
+    assert doc["error"]["code"] == "config-not-found" and "nixin-a" in doc["error"]["message"]
+    main([*argv, "--config", "/nonexistent/nixin-b"])
+    doc = json.loads(capsys.readouterr().out)
+    assert "nixin-b" in doc["error"]["message"]
+
+
+def test_config_before_a_verb_without_one_is_ignored(capsys, monkeypatch):
+    monkeypatch.setattr(
+        "nixin.discovery.run_search", lambda ns: {"ok": True, "seen": "config" in ns}
+    )
+    assert main(["--json", "--config", "/x", "search", "q"]) == 0
+    assert json.loads(capsys.readouterr().out)["seen"] is False

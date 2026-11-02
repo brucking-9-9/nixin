@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, discovery, truth, writer
+from . import __version__, apply, discovery, truth, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -68,6 +68,12 @@ def _parser() -> argparse.ArgumentParser:
         default=socket.gethostname(),
         help="nixosConfigurations.<host> to act on (default: this machine)",
     )
+    p.add_argument(  # a verb's own --config wins; verbs without one ignore it
+        "--config",
+        dest="config_before_verb",
+        metavar="DIR",
+        help="config flake for the verbs that take one (as `VERB --config DIR`)",
+    )
     sub = p.add_subparsers(dest="verb", metavar="VERB")
     discovery.register(sub)
     for verb, (_layer, help_) in VERBS.items():
@@ -77,6 +83,7 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("args", nargs="*")
     truth.register(sub)
     writer.register(sub)
+    apply.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb
         sp.add_argument(
             "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
@@ -140,6 +147,8 @@ def main(argv: list[str] | None = None) -> int:
             return _usage(argv, UsageError("nixin", "no VERB given (nixin --help lists them)", ""))
         parser.print_help()
         return 2
+    if hasattr(ns, "config") and ns.config is None:
+        ns.config = ns.config_before_verb
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
         try:

@@ -21,7 +21,7 @@ talks to the first few and borrows the local-eval idea from NüschtOS.
 | **discovery** | what exists, in which versions | search.nixos.org (packages, NixOS options, programs), Home Manager options, NixHub version history, noogle; `nix search` on the host's *locked* nixpkgs as the exact-rev fallback |
 | **truth** | what *this* host has | `nix eval` of the config flake: installed packages, every option's current value and `declarations` (file:line), lock rev, generation |
 | **writer** | how to change it | new things go to generated `installer/*.nix` (nixfmt'd, from `state.json`); removing or changing something a hand-written module declares edits that module in place |
-| **apply** | make it so | `plan` = build + `nix store diff-closures`; `apply` = commit into the authoritative checkout + switch (sudo); `sync` = push/pull the config hub repo |
+| **apply** | make it so | `plan` = build the workspace + `nix store diff-closures`; `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo |
 
 Why two kinds of search: search.nixos.org indexes channel-*latest*, so a hit can
 name a version your `flake.lock` does not have yet. The truth layer evaluates
@@ -36,7 +36,7 @@ nixin [--json] [--host H] VERB [ARGS...]
 search info versions        discovery   what exists upstream, in which versions
 status where                truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
-plan apply sync             apply       not implemented yet (`not-implemented`)
+plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
 ```
 
 With `--json` every invocation prints exactly one document on stdout, nothing on
@@ -56,6 +56,15 @@ which touch the network, run nix or write files, and the cache locations.
   `/etc/nixos`) with the host's own `nix`. `status` reports the lock, the running
   generation, package/program counts, and with `--full` the option index. `where NAME`
   traces a package or option to the files that declare and define it, with values.
+- **apply** builds the workspace host (`plan`: a git+file flake, i.e. what a commit would
+  contain; the out path is cached by content, so `apply` right after does not rebuild)
+  and diffs its closure against `/run/current-system`. `apply` commits the workspace,
+  then runs the only two root commands nixin has: `git -C /etc/nixos pull --ff-only
+  <workspace> <branch>` and `nixos-rebuild switch --flake /etc/nixos#<host>`, through
+  `sudo -n` (or 19BK's `nixos-switch` helper for the switch). It checks that the system
+  now running is the one it built and appends `installer/history.jsonl`. Without a sudo
+  ticket it stops with `needs-sudo` and the exact commands; `--dry-run` prints them.
+  `sync` fetches the hub and pulls (`--ff-only`) or pushes the workspace branch.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
@@ -84,10 +93,11 @@ Consume from a config flake: add `nixin` as an input and
 
 ## Status
 
-Discovery, truth and writer are merged and were run end to end as one CLI on mbp13 against
-the real config (discovery and truth read only, the writer on a clone): see
-`docs/HANDOFF-*.md` for each layer and `docs/HANDOFF-integrate.md` for the integration
-pass, its fixes and the open questions. The apply layer is next.
+All four layers are in. Discovery, truth and writer were run end to end as one CLI on
+mbp13 (`docs/HANDOFF-integrate.md`: fixes and open questions); the apply layer then
+switched mbp13 for real from its workspace (add → plan → apply → rm → apply, and
+`configurationLimit 2` to free `/boot`): `docs/HANDOFF-apply.md`. See `docs/HANDOFF-*.md`
+for each layer.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com

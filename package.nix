@@ -8,6 +8,7 @@
   requests,
   pytestCheckHook,
   nixfmt,
+  git,
 }:
 let
   project = (lib.importTOML ./pyproject.toml).project;
@@ -22,10 +23,12 @@ buildPythonApplication {
   build-system = [ setuptools ];
   dependencies = [ requests ];
 
-  # nixfmt also in the check: the writer's render test formats for real
+  # nixfmt also in the check: the writer's render test formats for real;
+  # git: the apply tests run real git on temp repos (nix, sudo and nixos-rebuild are faked)
   nativeCheckInputs = [
     pytestCheckHook
     nixfmt
+    git
   ];
 
   # The writer formats the files it generates. nix and git are deliberately
