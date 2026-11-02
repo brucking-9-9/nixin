@@ -64,6 +64,8 @@ def status(ns: argparse.Namespace) -> dict[str, Any]:
 def _status(ns: argparse.Namespace) -> dict[str, Any]:
     t0 = time.monotonic()
     repo = ConfigRepo.locate(ns.config)
+    if ns.args:
+        raise NixinError("usage", f"status takes no arguments (got {' '.join(ns.args)!r})")
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
@@ -143,8 +145,8 @@ def where(ns: argparse.Namespace) -> dict[str, Any]:
 
 def _where(ns: argparse.Namespace) -> dict[str, Any]:
     repo = ConfigRepo.locate(ns.config)
-    if not ns.args:
-        raise NixinError("usage", "where NAME  (a package attribute or an option path)")
+    if len(ns.args) != 1:
+        raise NixinError("usage", "where NAME  (one package attribute or option path)")
     name = ns.args[0]
     host = ns.host
     hosts = repo.hosts()

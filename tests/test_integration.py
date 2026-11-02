@@ -595,6 +595,8 @@ SWEEP = [
     ["where", X11],
     ["where", "services.nosuch.option"],  # not-found
     ["where"],  # usage
+    ["where", "kitty", "git"],  # usage: one NAME
+    ["status", "extra"],  # usage
     ["where", "x", "--kind", "pkg"],  # usage (truth says package|option)
     # writer
     ["add", "cowsay", "--dry-run"],
