@@ -159,3 +159,69 @@ By hand, on a throwaway clone (never `~/nixos`): `git clone -q ~/nixos ~/nixin-t
 then e.g. `nix run . -- --host 19BK add --home brucking cowsay --config ~/nixin-test-config`
 (`--dry-run` to only see the diff, `--json` for the contract), and `git -C
 ~/nixin-test-config status` to see that `rm` puts everything back.
+
+## Fixes
+
+### `set` values are checked by syntax, not as closed expressions (branch `fix-set-validation`, mbp13, 2026-11-01)
+
+Found live on mbp13: `nixin --config ~/nixos set boot.kernelPackages 'pkgs.linuxPackages_7_2'`
+gave `invalid-nix: not a Nix expression: undefined variable 'pkgs'`. `_validate_value` ran
+`nix-instantiate --parse` on the bare value, and nix resolves names as part of parsing,
+so every value that names a module argument (`pkgs.…`, `lib.mkForce …`, `config.…`, the
+normal case) was rejected. The tests' fake parser (our own scanner) does not resolve
+names, so the suite never saw it.
+
+- **Fix** (`95c45c7`): the value is parsed as `with { };⏎VALUE`. Under `with` every free
+  name is a dynamic lookup, and `with e; expr` is a top-level expression, so the grammar
+  is exactly that of the bare value: only malformed text is `invalid-nix`. There are no
+  wrapper parens for a `)` in the value to close (`1) (2` stays an error). On rejection
+  the bare value is parsed again for the message, so position and snippet are the user's
+  own text; the message adds that only syntax is checked and that the eval after the
+  write (`checks.eval`, `warnings`) judges the value. The text written is still the
+  user's expression verbatim.
+  Not `{ pkgs, lib, config, ... }: (VALUE)` as first suggested: that still rejects
+  `inputs`/`options`/`osConfig` (specialArgs a hand-written module may bind), and a `)`
+  in the value closes its paren.
+- **Names are still checked, where the value lands**: the existing parse of each edited
+  `.nix` file before anything is written knows that file's real scope. `set
+  services.openssh.enable 'lib.mkForce false'` on 19BK edits `ssh.nix` (`{ ... }:`) →
+  `invalid-nix`, `file: ssh.nix`, "undefined variable 'lib'"; `inputs.…` into the
+  generated module (it binds `config`, `lib`, `pkgs` only) likewise. Nothing is written.
+- **Found on the way** (`cee45f1`): once such values got through, the eval check
+  after the write failed on them. `_check_option` handed the whole option value to `nix
+  eval --json`, and a package set is full of functions ("cannot convert a function to
+  JSON"), so a correct `set boot.kernelPackages …` said `eval FAILED`. `SHOW_VALUE` now
+  renders the value JSON-safe with truth's placeholders: `<function>` and `<derivation
+  NAME>` at any depth (nested derivations used to be serialised as their outPath, i.e.
+  instantiated), `<package set>` for an attrset with `callPackage` (not walked; nixpkgs'
+  package sets carry no `recurseForDerivations` to tell them by), `<…>` past depth 5 or 60
+  items. Builtins only, so it is tested without nixpkgs.
+- **Tests** (`dfe30d4`, `cee45f1`): on the real `nix-instantiate`, storeless
+  (`NIX_REMOTE=dummy://`): `set boot.kernelPackages pkgs.linuxPackages_7_2`, `set x
+  lib.mkForce true` (two argv words), `set y config.networking.hostName` accepted,
+  rendered verbatim, in state.json, generated file parses; `set z 'pkgs.foo ['` →
+  `invalid-nix` with `1| pkgs.foo [` and `checks.eval` in the message, nothing written;
+  the two file-scope rejections above; `SHOW_VALUE` on functions, a fake derivation, a
+  package set whose `callPackage` throws (never forced), a path, a 61-item list, depth 6.
+  All five `set` tests fail against the old check. `package.nix`: `nix` in
+  `nativeCheckInputs` (parse and pure evals only, no store), so they run in `nix build`.
+- **Live** on a clone of `~/nixos` @ 7b6f7d6 (`~/nixos` only read; it had
+  `installer/history.jsonl` modified by another session), host mbp13, with eval:
+
+  | command | result |
+  |---|---|
+  | `set boot.kernelPackages 'pkgs.linuxPackages_7_2'` | the report's command: `unchanged` (already so at `hosts/mbp13/default.nix:105`), no files changed |
+  | `set boot.kernelPackages pkgs.linuxPackages_6_12`, then back to `_7_2` | edited in place, trailing comment kept; eval ok `"<package set>"`, 1.2–1.6 s |
+  | `set services.openssh.settings.X11Forwarding lib.mkForce true` | `installer/mbp13.nix` + import; eval ok `true` |
+  | `set 'environment.etc."nixin-test".text' config.networking.hostName` | eval ok `"mbp13"` |
+  | `set environment.etc.nixin-test2 '{ text = "x"; }'` | eval ok; `source` shown as `<derivation etc-nixin-test2>` |
+  | `set services.openssh.settings.X11Forwarding '"yes"'` | written, `checks.eval.ok: false` + warning (the type error is the eval's to find) |
+  | `set z 'pkgs.foo ['` | `invalid-nix`, exit 1, nothing written |
+
+- Totals: `pytest` 391 passed / 22 skipped in the dev shell and in the `nix build`
+  sandbox alike; `ruff check`, `ruff format --check`, `nix fmt -- --check` clean (`nix
+  fmt` works now; the limit above about it is stale).
+- Left as is: the generated module binds only `config`, `lib`, `pkgs`, so `set` of a
+  value using `inputs`/`options`/`modulesPath` into it is `invalid-nix` (correct: the
+  file would not parse). Binding more would mean knowing the host's specialArgs. The
+  eval `note` still says `{…}` for a list value.

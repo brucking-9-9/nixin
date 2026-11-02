@@ -69,7 +69,8 @@ which touch the network, run nix or write files, and the cache locations.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
-  or change what they declare. Each write is re-parsed and proven by one eval. It
+  or change what they declare. A `set` value is checked for syntax only, so it can use
+  `pkgs`, `lib` and `config`. Each write is re-parsed and proven by one eval. It
   refuses `/etc/nixos`: it edits a clone you own.
 
 Answers and evals are cached under `$XDG_CACHE_HOME/nixin/` (see CONTRACT.md, "Caches").

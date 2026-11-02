@@ -358,9 +358,22 @@ def _sync_generated(ctx: Ctx) -> None:
 
 
 def _validate_value(expr: str) -> None:
-    err = TOOLS.parse(expr)
-    if err is not None:
-        raise NixinError("invalid-nix", f"not a Nix expression: {err}")
+    """Syntax only. A value lands inside a module, so it may name the module's arguments
+    (`pkgs`, `lib`, `config`, specialArgs such as `inputs`); a bare `nix-instantiate
+    --parse` resolves names while parsing and rejects those as undefined variables. Under
+    `with { };` every free name is a dynamic lookup and the grammar is unchanged, so this
+    accepts exactly the well-formed expressions. Names are checked where the value lands
+    (the edited file is parsed before anything is written), types and semantics by the
+    eval after the write (checks.eval)."""
+    err = TOOLS.parse(f"with {{ }};\n{expr}")
+    if err is None:
+        return
+    err = TOOLS.parse(expr) or err  # the same syntax error, positions in the user's own text
+    raise NixinError(
+        "invalid-nix",
+        f"not a Nix expression: {err}\n(only the syntax is checked here; whether the value "
+        "suits the option is shown by the eval after the write: checks.eval, warnings)",
+    )
 
 
 def _finish(ctx: Ctx, fields: dict[str, Any], summary: str, check=None) -> dict[str, Any]:
@@ -570,6 +583,37 @@ def _check_packages(ctx: Ctx, added: list[str], removed: list[str]):
     return check
 
 
+# checks.eval shows an option's value as JSON, and `nix eval --json` cannot convert
+# functions, which package sets (boot.kernelPackages = pkgs.linuxPackages_7_2) are full of.
+# Placeholders as in truth/options.nix; a package set (it has `callPackage`) is not walked.
+# Builtins only, so the tests can run it without nixpkgs.
+SHOW_VALUE = """
+let
+  cap = 60;
+  take = xs: builtins.genList (builtins.elemAt xs) (
+    if builtins.length xs > cap then cap else builtins.length xs);
+  more = xs: builtins.length xs - cap;
+  show = d: v:
+    if builtins.isFunction v then "<function>"
+    else if builtins.isAttrs v then
+      if (v.type or null) == "derivation" then "<derivation ${v.name or "?"}>"
+      else if v ? callPackage then "<package set>"
+      else if d >= 5 then "<…>"
+      else
+        let ns = builtins.attrNames v; in
+        builtins.listToAttrs (map (k: { name = k; value = show (d + 1) v.${k}; }) (take ns))
+        // (if more ns > 0 then { "<…>" = "${toString (more ns)} more attributes"; } else { })
+    else if builtins.isList v then
+      if d >= 5 then "<…>"
+      else map (show (d + 1)) (take v)
+        ++ (if more v > 0 then [ "<… ${toString (more v)} more>" ] else [ ])
+    else if builtins.isPath v then toString v
+    else v;
+in
+show 0
+"""
+
+
 def _check_option(ctx: Ctx, parts: list[str]):
     sc = ctx.scope
     base = "c.config" if sc.kind == "nixos" else f"c.config.home-manager.users.{nix_attr(sc.name)}"
@@ -579,9 +623,7 @@ def _check_option(ctx: Ctx, parts: list[str]):
             "c: let lib = c.pkgs.lib; "
             f"r = builtins.tryEval (lib.attrByPath {nix_value(parts)} {{ __nixinUnset = true; }} {base}); "
             "v = r.value; in "
-            "if !r.success then { __nixinError = true; } "
-            'else if builtins.isFunction v then "<function>" '
-            'else if lib.isDerivation v then "<derivation ${v.name}>" else v'
+            f"if !r.success then {{ __nixinError = true; }} else ({SHOW_VALUE}) v"
         )
         got, err = _eval_or_error(ctx, apply)
         attr = f"{ctx.ws.repo.host_attr(sc.host)}.{base.removeprefix('c.')}.{attr_key(parts)}"
