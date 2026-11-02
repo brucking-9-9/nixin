@@ -376,6 +376,10 @@ def _finish(ctx: Ctx, fields: dict[str, Any], summary: str, check=None) -> dict[
     for rel in changed:
         if not ws.inside(rel):
             raise NixinError("not-a-workspace", f"{rel} resolves outside {ws.root}")
+        p = ws.abspath(rel)
+        target = p if p.exists() else next(d for d in p.parents if d.exists())
+        if not os.access(target, os.W_OK):
+            raise NixinError("not-a-workspace", f"{rel} is not writable by you")
         text = txn.final(rel)
         if rel.endswith(".nix") and text is not None:
             err = TOOLS.parse(text)

@@ -398,6 +398,16 @@ def test_not_a_workspace(cfg, tmp_path):
         ro.chmod(0o755)
 
 
+def test_read_only_module_inside_a_workspace_is_refused_before_writing(cfg):
+    if os.geteuid() == 0:
+        pytest.skip("running as root")
+    before = snapshot(cfg)
+    (cfg / "hosts/mbp13/default.nix").chmod(0o444)
+    rc, d = run(cfg, "add", "cowsay")
+    assert rc == 1 and d["error"]["code"] == "not-a-workspace"
+    assert snapshot(cfg) == before
+
+
 def test_hand_edited_generated_file_is_rerendered_with_a_warning(cfg):
     run(cfg, "add", "cowsay")
     p = cfg / "installer/mbp13.nix"
