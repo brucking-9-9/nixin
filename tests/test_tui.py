@@ -273,6 +273,27 @@ def test_typing_is_debounced_and_kind_and_channel_rerun():
     ]
 
 
+def test_no_results_leave_the_keys_usable():
+    empty = {**load("search_pkg_firefox"), "results": [], "count": 0}
+
+    async def script(app, pilot, fake):
+        await pilot.press(*"services.openssh.enable", "enter")
+        await settle(app, pilot)
+        screen = app.screen
+        assert screen.query_one("#results", DataTable).has_focus  # not the text box
+        assert "k: other kinds" in screen.query_one("#preview", Line).value
+        await pilot.press("k")  # a key, not a letter in the query
+        await settle(app, pilot)
+        await pilot.press("escape", "escape", "s")  # Esc twice stays out of the text box
+        await settle(app, pilot)
+        assert not isinstance(app.screen, SearchScreen)
+        assert screen.query_one("#query").value == "services.openssh.enable"
+
+    _, fake = drive(script, {"search": empty, "status": "status_clean"})
+    assert [v[1:3] for v in fake.verbs()[:2]] == [["--kind", "pkg"], ["--kind", "opt"]]
+    assert fake.verbs()[-1] == ["status"]
+
+
 @pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
 def test_details_add_with_diff_preview(size):
     async def script(app, pilot, fake):

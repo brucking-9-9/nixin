@@ -235,3 +235,12 @@ Screen.-narrow .dialog VerticalScroll {
 .key-row {
     height: 1;
 }
+
+/* Textual tints a focused table/list 5% lighter: a big block over the terminal's
+   background. The cursor row already says where the focus is. */
+DataTable:focus, OptionList:focus {
+    background-tint: $foreground 0%;
+}
+DataTable:focus > .datatable--header {
+    background-tint: $foreground 0%;
+}

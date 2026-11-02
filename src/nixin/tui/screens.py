@@ -69,9 +69,9 @@ class Base(Screen):
 
 class SearchScreen(Base):
     BINDINGS: ClassVar[list[BindingType]] = [
-        Binding("slash", "focus_query", "Search", show=False),
+        Binding("slash", "focus_query", "Query"),
         Binding("k", "next_kind", "Kind"),
-        Binding("c", "channel", "Channel"),
+        Binding("c", "channel", "Channel", show=False),  # the top bar shows the channel
         Binding("escape", "escape", "Back", show=False),
         Binding("down", "results", "Results", show=False),
     ]
@@ -139,12 +139,9 @@ class SearchScreen(Base):
         self.query_one("#query", Input).focus()
 
     def action_escape(self) -> None:
-        """From the query to the results (so p, s, q work), and back."""
-        q = self.query_one("#query", Input)
-        if q.has_focus:
-            self.query_one("#results", DataTable).focus()
-        else:
-            q.focus()
+        """From the query to the results, so the keys (k, p, s, q) work. Not back: a second
+        Esc must not put the person into the text box, where keys become text (/ does)."""
+        self.query_one("#results", DataTable).focus()
 
     def action_results(self) -> None:
         if self.query_one("#query", Input).has_focus and self.hits:
@@ -181,7 +178,7 @@ class SearchScreen(Base):
         self.query_one("#notice", NoticeBox).show(notice)
         self.hits = view.hits(doc) if doc and doc.get("ok") else []
         self.render_table()
-        if self._jump and self.hits:
+        if self._jump:  # also with no hits: k (another kind) must work right away
             self.query_one("#results", DataTable).focus()
         self._jump = False
         src = self.query_one("#source", Line)
@@ -212,7 +209,7 @@ class SearchScreen(Base):
         h = self.current()
         if h is None:
             if self.doc and self.doc.get("ok") and not self.hits:
-                prev.show("no results", "dim")
+                prev.show("no results · k: other kinds · /: edit the query", "dim")
             return
         if h.description:
             prev.show(view.clip(h.description, 400))
