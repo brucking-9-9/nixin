@@ -1,0 +1,62 @@
+[
+ {
+  "declarationPositions": [
+   {
+    "column": 5,
+    "file": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix",
+    "line": 106
+   }
+  ],
+  "declarations": [
+   "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix"
+  ],
+  "definitionValues": [
+   {
+    "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/home/modules/terminal/kitty.nix",
+    "value": true
+   }
+  ],
+  "definitions": [
+   "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/home/modules/terminal/kitty.nix"
+  ],
+  "description": "Whether to enable Kitty terminal emulator.",
+  "highestPrio": 100,
+  "internal": false,
+  "isDefined": true,
+  "name": "programs.kitty.enable",
+  "readOnly": false,
+  "type": "boolean",
+  "value": true,
+  "visible": true
+ },
+ {
+  "declarationPositions": [
+   {
+    "column": 5,
+    "file": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix",
+    "line": 108
+   }
+  ],
+  "declarations": [
+   "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix"
+  ],
+  "definitionValues": [
+   {
+    "file": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix",
+    "value": "<derivation kitty-0.49.2>"
+   }
+  ],
+  "definitions": [
+   "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix"
+  ],
+  "description": "The kitty package to use.",
+  "highestPrio": 1500,
+  "internal": false,
+  "isDefined": true,
+  "name": "programs.kitty.package",
+  "readOnly": false,
+  "type": "null or package",
+  "value": "<derivation kitty-0.49.2>",
+  "visible": true
+ }
+]

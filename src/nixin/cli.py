@@ -21,7 +21,7 @@ import json
 import socket
 import sys
 
-from . import __version__
+from . import __version__, discovery, truth
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -50,9 +50,13 @@ def _parser() -> argparse.ArgumentParser:
         help="nixosConfigurations.<host> to act on (default: this machine)",
     )
     sub = p.add_subparsers(dest="verb", metavar="VERB")
+    discovery.register(sub)
     for verb, (_layer, help_) in VERBS.items():
+        if verb in sub.choices:  # a layer registered it with its own arguments
+            continue
         sp = sub.add_parser(verb, help=help_)
         sp.add_argument("args", nargs="*")
+    truth.register(sub)
     return p
 
 
@@ -73,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
     if ns.verb is None:
         _parser().print_help()
         return 2
+    run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
+    if run is not None:
+        return _emit(ns, run(ns))
     layer = VERBS[ns.verb][0]
     return _emit(
         ns,

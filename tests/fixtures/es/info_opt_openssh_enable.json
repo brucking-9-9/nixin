@@ -1,0 +1,21 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "option_default": "false",
+     "option_description": "<rendered-html><p>Whether to enable the OpenSSH secure shell daemon, which allows\nsecure remote logins.</p>\n</rendered-html>",
+     "option_example": null,
+     "option_name": "services.openssh.enable",
+     "option_source": "nixos/modules/services/networking/ssh/sshd.nix",
+     "option_type": "boolean"
+    }
+   }
+  ],
+  "total": {
+   "relation": "eq",
+   "value": 1
+  }
+ }
+}

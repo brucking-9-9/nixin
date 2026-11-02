@@ -1,0 +1,285 @@
+{
+ "builtinTypes": {},
+ "data": [
+  {
+   "content": {
+    "content": "\nConcatenate a list of strings with a separator between each element\n\n# Inputs\n\n`sep`\n: Separator to add between elements\n\n`list`\n: List of input strings\n\n# Type\n\n```\nconcatStringsSep :: String -> [String] -> String\n```\n\n# Examples\n:::{.example}\n## `lib.strings.concatStringsSep` usage example\n\n```nix\nconcatStringsSep \"/\" [\"usr\" \"local\" \"bin\"]\n=> \"usr/local/bin\"\n```\n\n:::\n",
+    "source": {
+     "path": [
+      "lib",
+      "strings",
+      "concatStringsSep"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/strings.nix",
+      "line": 225
+     }
+    }
+   },
+   "meta": {
+    "aliases": [
+     [
+      "lib",
+      "concatStringsSep"
+     ],
+     [
+      "lib",
+      "join"
+     ],
+     [
+      "lib",
+      "strings",
+      "concatStringsSep"
+     ],
+     [
+      "lib",
+      "strings",
+      "join"
+     ]
+    ],
+    "attr_expr": null,
+    "attr_position": null,
+    "content_meta": {
+     "path": [
+      "lib",
+      "strings",
+      "concatStringsSep"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/strings.nix",
+      "line": 225
+     }
+    },
+    "count_applied": 0,
+    "is_functor": null,
+    "is_primop": true,
+    "lambda_expr": null,
+    "lambda_position": null,
+    "path": [
+     "builtins",
+     "concatStringsSep"
+    ],
+    "primop_meta": {
+     "args": [
+      "separator",
+      "list"
+     ],
+     "arity": 2,
+     "experimental": false,
+     "name": "concatStringsSep"
+    },
+    "signature": "concatStringsSep :: String -> [String] -> String\n",
+    "title": "builtins.concatStringsSep"
+   }
+  },
+  {
+   "content": {
+    "content": "Apply the function *f* to each element in the list *list*. For\nexample,\n\n```nix\nmap (x: \"foo\" + x) [ \"bar\" \"bla\" \"abc\" ]\n```\n\nevaluates to `[ \"foobar\" \"foobla\" \"fooabc\" ]`.\n\nHas `O(n)` time complexity, where `n` is the size of the *list*.\nNote that no calls to *f* are performed by the builtin, but *f* itself is evaluated and its type is checked eagerly.\nThe function *f* is called on demand when a resulting list element is evaluated.",
+    "source": {
+     "path": [
+      "builtins",
+      "map"
+     ],
+     "pos_type": "Lambda",
+     "position": null
+    }
+   },
+   "meta": {
+    "aliases": [
+     [
+      "lib",
+      "map"
+     ],
+     [
+      "lib",
+      "lists",
+      "map"
+     ]
+    ],
+    "attr_expr": null,
+    "attr_position": null,
+    "content_meta": {
+     "path": [
+      "builtins",
+      "map"
+     ],
+     "pos_type": "Lambda",
+     "position": null
+    },
+    "count_applied": 0,
+    "is_functor": null,
+    "is_primop": true,
+    "lambda_expr": null,
+    "lambda_position": null,
+    "path": [
+     "builtins",
+     "map"
+    ],
+    "primop_meta": {
+     "args": [
+      "f",
+      "list"
+     ],
+     "arity": 2,
+     "experimental": false,
+     "name": "map"
+    },
+    "signature": null,
+    "title": "builtins.map"
+   }
+  },
+  {
+   "content": {
+    "content": "\nApply a function to each element in an attribute set, creating a new attribute set.\n\n# Inputs\n\n`f`\n\n: A function that takes an attribute name and its value, and returns the new value for the attribute.\n\n`attrset`\n\n: The attribute set to iterate through.\n\n# Type\n\n```\nmapAttrs :: (String -> a -> b) -> { [String] :: a } -> { [String] :: b }\n```\n\n# Examples\n:::{.example}\n## `lib.attrsets.mapAttrs` usage example\n\n```nix\nmapAttrs (name: value: name + \"-\" + value)\n   { x = \"foo\"; y = \"bar\"; }\n=> { x = \"x-foo\"; y = \"y-bar\"; }\n```\n\n:::\n",
+    "source": {
+     "path": [
+      "lib",
+      "attrsets",
+      "mapAttrs"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/attrsets.nix",
+      "line": 1010
+     }
+    }
+   },
+   "meta": {
+    "aliases": [
+     [
+      "builtins",
+      "mapAttrs"
+     ],
+     [
+      "lib",
+      "mapAttrs"
+     ]
+    ],
+    "attr_expr": "mapAttrs = builtins.mapAttrs;",
+    "attr_position": {
+     "column": 3,
+     "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/attrsets.nix",
+     "line": 1010
+    },
+    "content_meta": {
+     "path": [
+      "lib",
+      "attrsets",
+      "mapAttrs"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/attrsets.nix",
+      "line": 1010
+     }
+    },
+    "count_applied": 0,
+    "is_functor": null,
+    "is_primop": true,
+    "lambda_expr": null,
+    "lambda_position": null,
+    "path": [
+     "lib",
+     "attrsets",
+     "mapAttrs"
+    ],
+    "primop_meta": {
+     "args": [
+      "f",
+      "attrset"
+     ],
+     "arity": 2,
+     "experimental": false,
+     "name": "mapAttrs"
+    },
+    "signature": "mapAttrs :: (String -> a -> b) -> { [String] :: a } -> { [String] :: b }\n",
+    "title": "lib.attrsets.mapAttrs"
+   }
+  },
+  {
+   "content": {
+    "content": "\nConcatenate a list of strings with a separator between each element\n\n# Inputs\n\n`sep`\n: Separator to add between elements\n\n`list`\n: List of input strings\n\n# Type\n\n```\nconcatStringsSep :: String -> [String] -> String\n```\n\n# Examples\n:::{.example}\n## `lib.strings.concatStringsSep` usage example\n\n```nix\nconcatStringsSep \"/\" [\"usr\" \"local\" \"bin\"]\n=> \"usr/local/bin\"\n```\n\n:::\n",
+    "source": {
+     "path": [
+      "lib",
+      "strings",
+      "concatStringsSep"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/strings.nix",
+      "line": 225
+     }
+    }
+   },
+   "meta": {
+    "aliases": [
+     [
+      "builtins",
+      "concatStringsSep"
+     ],
+     [
+      "lib",
+      "concatStringsSep"
+     ],
+     [
+      "lib",
+      "join"
+     ],
+     [
+      "lib",
+      "strings",
+      "join"
+     ]
+    ],
+    "attr_expr": "concatStringsSep = builtins.concatStringsSep;",
+    "attr_position": {
+     "column": 3,
+     "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/strings.nix",
+     "line": 225
+    },
+    "content_meta": {
+     "path": [
+      "lib",
+      "strings",
+      "concatStringsSep"
+     ],
+     "pos_type": "Attribute",
+     "position": {
+      "column": 3,
+      "file": "/nix/store/6hzl4gdi79vm3hcj6pfrbgzj0pk5ffyk-source/lib/strings.nix",
+      "line": 225
+     }
+    },
+    "count_applied": 0,
+    "is_functor": null,
+    "is_primop": true,
+    "lambda_expr": null,
+    "lambda_position": null,
+    "path": [
+     "lib",
+     "strings",
+     "concatStringsSep"
+    ],
+    "primop_meta": {
+     "args": [
+      "separator",
+      "list"
+     ],
+     "arity": 2,
+     "experimental": false,
+     "name": "concatStringsSep"
+    },
+    "signature": "concatStringsSep :: String -> [String] -> String\n",
+    "title": "lib.strings.concatStringsSep"
+   }
+  }
+ ]
+}

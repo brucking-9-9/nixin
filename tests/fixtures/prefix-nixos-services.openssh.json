@@ -1,0 +1,123 @@
+[
+ {
+  "declarationPositions": [
+   {
+    "column": 7,
+    "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+    "line": 247
+   }
+  ],
+  "declarations": [
+   "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+  ],
+  "definitionValues": [
+   {
+    "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix",
+    "value": true
+   }
+  ],
+  "definitions": [
+   "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix"
+  ],
+  "description": "Whether to enable the OpenSSH secure shell daemon, which allows secure remote logins. ",
+  "highestPrio": 100,
+  "internal": false,
+  "isDefined": true,
+  "name": "services.openssh.enable",
+  "readOnly": false,
+  "type": "boolean",
+  "value": true,
+  "visible": true
+ },
+ {
+  "declarationPositions": [
+   {
+    "column": 7,
+    "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+    "line": 304
+   }
+  ],
+  "declarations": [
+   "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+  ],
+  "definitionValues": [
+   {
+    "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+    "value": [
+     22
+    ]
+   }
+  ],
+  "definitions": [
+   "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+  ],
+  "description": "Specifies on which ports the SSH daemon listens. ",
+  "highestPrio": 1500,
+  "internal": false,
+  "isDefined": true,
+  "name": "services.openssh.ports",
+  "readOnly": false,
+  "type": "list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+  "value": [
+   22
+  ],
+  "visible": true
+ },
+ {
+  "declarationPositions": [
+   {
+    "column": 7,
+    "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+    "line": 475
+   }
+  ],
+  "declarations": [
+   "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+  ],
+  "definitionValues": [
+   {
+    "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix",
+    "value": {
+     "AllowUsers": [
+      "brucking"
+     ],
+     "KbdInteractiveAuthentication": false,
+     "PasswordAuthentication": false,
+     "PermitRootLogin": "no"
+    }
+   },
+   {
+    "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+    "value": {
+     "AuthorizedPrincipalsFile": {
+      "_type": "if",
+      "condition": false,
+      "content": "/etc/ssh/authorized_principals.d/%u"
+     }
+    }
+   }
+  ],
+  "definitions": [
+   "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix",
+   "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+  ],
+  "description": "Configuration for `sshd_config(5)`.",
+  "highestPrio": 100,
+  "internal": false,
+  "isDefined": true,
+  "name": "services.openssh.settings",
+  "readOnly": false,
+  "type": "open submodule of attribute set of (atom (null, bool, int, float or string))",
+  "value": {
+   "AllowUsers": [
+    "brucking"
+   ],
+   "KbdInteractiveAuthentication": false,
+   "PasswordAuthentication": false,
+   "PermitRootLogin": "no",
+   "X11Forwarding": false,
+   "LogLevel": "INFO"
+  },
+  "visible": true
+ }
+]

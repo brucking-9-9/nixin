@@ -1,0 +1,212 @@
+[
+ {
+  "commit_hash": "8edc0c72e3a38faf5434e40d1f19431125fe4b30",
+  "homepage": "http://www.mozilla.com/en-US/firefox/",
+  "last_updated": 1791487292,
+  "license": "MPL-2.0",
+  "name": "firefox",
+  "platforms": [
+   "aarch64-darwin",
+   "aarch64-linux",
+   "x86_64-linux"
+  ],
+  "summary": "Web browser built from Firefox source tree",
+  "systems": {
+   "aarch64-darwin": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "7dd199b0e2993e37b4775ed66b1c291699608c9f",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1791336361,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-157.0.1",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "dfbkazygcrajz3k7xr9gsb5vqa15z3qd",
+    "store_name": "firefox",
+    "store_version": "157.0.1",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "aarch64-darwin",
+    "version": "157.0.1"
+   },
+   "x86_64-linux": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "8edc0c72e3a38faf5434e40d1f19431125fe4b30",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1791487292,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-157.0.1",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "a6d0xgdw14rjpw84frvyxcqhyf8qmbwy",
+    "store_name": "firefox",
+    "store_version": "157.0.1",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "x86_64-linux",
+    "version": "157.0.1"
+   }
+  },
+  "version": "157.0.1"
+ },
+ {
+  "commit_hash": "55ba7f49ef2962b42cbd126522b7df5f95037679",
+  "homepage": "http://www.mozilla.com/en-US/firefox/",
+  "last_updated": 1790981744,
+  "license": "MPL-2.0",
+  "name": "firefox",
+  "platforms": [
+   "aarch64-darwin",
+   "aarch64-linux",
+   "x86_64-linux"
+  ],
+  "summary": "Web browser built from Firefox source tree",
+  "systems": {
+   "aarch64-darwin": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "55ba7f49ef2962b42cbd126522b7df5f95037679",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1790981744,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-157.0",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "ywwj0dzi6vispcafrzxp0s7x35mm3xic",
+    "store_name": "firefox",
+    "store_version": "157.0",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "aarch64-darwin",
+    "version": "157.0"
+   },
+   "x86_64-linux": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "55ba7f49ef2962b42cbd126522b7df5f95037679",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1790981744,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-157.0",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "lgbq880lk5n71rgji3x2drap4515argh",
+    "store_name": "firefox",
+    "store_version": "157.0",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "x86_64-linux",
+    "version": "157.0"
+   }
+  },
+  "version": "157.0"
+ },
+ {
+  "commit_hash": "c27cdad491a991b11ed731760aa2ef8db0cb0410",
+  "homepage": "http://www.mozilla.com/en-US/firefox/",
+  "last_updated": 1787814960,
+  "license": "MPL-2.0",
+  "name": "firefox",
+  "platforms": [
+   "aarch64-darwin",
+   "aarch64-linux",
+   "x86_64-linux"
+  ],
+  "summary": "Web browser built from Firefox source tree",
+  "systems": {
+   "aarch64-darwin": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "c27cdad491a991b11ed731760aa2ef8db0cb0410",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1787814960,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-154.0.1",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "kh989b3xgdd3j24w865h9w4ymjr8lv54",
+    "store_name": "firefox",
+    "store_version": "154.0.1",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "aarch64-darwin",
+    "version": "154.0.1"
+   },
+   "x86_64-linux": {
+    "attr_paths": [
+     "firefox"
+    ],
+    "commit_hash": "c27cdad491a991b11ed731760aa2ef8db0cb0410",
+    "homepage": "http://www.mozilla.com/en-US/firefox/",
+    "last_updated": 1787814960,
+    "license": "MPL-2.0",
+    "meta_name": "firefox-unwrapped-154.0.1",
+    "meta_version": [
+     ""
+    ],
+    "platforms": [
+     "aarch64-darwin",
+     "aarch64-linux",
+     "x86_64-linux"
+    ],
+    "programs": [
+     "firefox"
+    ],
+    "store_hash": "4zgp0fbr62c5bkhjl2bxabq0am4km4k4",
+    "store_name": "firefox",
+    "store_version": "154.0.1",
+    "summary": "Web browser built from Firefox source tree",
+    "system": "x86_64-linux",
+    "version": "154.0.1"
+   }
+  },
+  "version": "154.0.1"
+ }
+]
