@@ -1,0 +1,604 @@
+{
+"home": {
+"brucking": [
+{
+"name": "agent-status",
+"pname": null,
+"position": "/nix/store/582lhbjqqgw80yanahyzhj6l4xkv2c39-source/hosts/mbp13/agents/packages.nix:23",
+"version": null
+},
+{
+"name": "agent-board-collect",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/build-support/trivial-builders/default.nix:260",
+"version": null
+},
+{
+"name": "agent-mbp",
+"pname": null,
+"position": "/nix/store/582lhbjqqgw80yanahyzhj6l4xkv2c39-source/hosts/mbp13/agents/packages.nix:69",
+"version": null
+},
+{
+"name": "demmanager-0.1.0",
+"pname": "demmanager",
+"position": "/nix/store/wslyfpln0ylk5sl7d2hhid91nin8ljq8-source/flake.nix:51",
+"version": "0.1.0"
+},
+{
+"name": "xwayland-satellite-0.8.2-unstable-2026-09-09",
+"pname": "xwayland-satellite",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/xw/xwayland-satellite/package.nix:70",
+"version": "0.8.2-unstable-2026-09-09"
+},
+{
+"name": "quiet",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/build-support/trivial-builders/default.nix:260",
+"version": null
+},
+{
+"name": "wl-gammarelay-rs-1.0.1",
+"pname": "wl-gammarelay-rs",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/wl/wl-gammarelay-rs/package.nix:20",
+"version": "1.0.1"
+},
+{
+"name": "csvmusic-1.7.7",
+"pname": "csvmusic",
+"position": "/nix/store/582lhbjqqgw80yanahyzhj6l4xkv2c39-source/home/modules/tools/csvmusic/package.nix:96",
+"version": "1.7.7"
+},
+{
+"name": "casual-pre-loader-2.3.1-unstable-2026-10-14",
+"pname": "casual-pre-loader",
+"position": "/nix/store/582lhbjqqgw80yanahyzhj6l4xkv2c39-source/home/modules/tools/casual-preloader/package.nix:158",
+"version": "2.3.1-unstable-2026-10-14"
+},
+{
+"name": "demoman-2.2.0",
+"pname": "demoman",
+"position": "/nix/store/582lhbjqqgw80yanahyzhj6l4xkv2c39-source/home/modules/tools/demoman/package.nix:93",
+"version": "2.2.0"
+},
+{
+"name": "quickemu-4.9.9",
+"pname": "quickemu",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/qu/quickemu/package.nix:114",
+"version": "4.9.9"
+},
+{
+"name": "wine-wow64-staging-11.19",
+"pname": "wine-wow64-staging",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/applications/emulators/wine/base.nix:375",
+"version": "11.19"
+},
+{
+"name": "winetricks-20260125",
+"pname": "winetricks",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/applications/emulators/wine/winetricks.nix:113",
+"version": "20260125"
+},
+{
+"name": "umu-launcher-1.4.4",
+"pname": "umu-launcher",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/um/umu-launcher-unwrapped/package.nix:96",
+"version": "1.4.4"
+},
+{
+"name": "mangohud-0.8.4",
+"pname": "mangohud",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ma/mangohud/package.nix:255",
+"version": "0.8.4"
+},
+{
+"name": "markdown-oxide-0.25.12",
+"pname": "markdown-oxide",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ma/markdown-oxide/package.nix:20",
+"version": "0.25.12"
+},
+{
+"name": "harper-3.0.0",
+"pname": "harper",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ha/harper/package.nix:61",
+"version": "3.0.0"
+},
+{
+"name": "pandoc-cli-3.7.0.2",
+"pname": "pandoc-cli",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/haskell-modules/hackage-packages.nix:518293",
+"version": "3.7.0.2"
+},
+{
+"name": "typst-0.15.1",
+"pname": "typst",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ty/typst/package.nix:80",
+"version": "0.15.1"
+},
+{
+"name": "glow-3.0.0",
+"pname": "glow",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gl/glow/package.nix:43",
+"version": "3.0.0"
+},
+{
+"name": "brightnessctl-0.5.1",
+"pname": "brightnessctl",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/br/brightnessctl/package.nix:51",
+"version": "0.5.1"
+},
+{
+"name": "grim-1.5.0",
+"pname": "grim",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gr/grim/package.nix:56",
+"version": "1.5.0"
+},
+{
+"name": "slurp-1.5.0",
+"pname": "slurp",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/sl/slurp/package.nix:51",
+"version": "1.5.0"
+},
+{
+"name": "wl-clipboard-2.3.0",
+"pname": "wl-clipboard",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/wl/wl-clipboard/package.nix:51",
+"version": "2.3.0"
+},
+{
+"name": "pwvucontrol-0.5.3",
+"pname": "pwvucontrol",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/pw/pwvucontrol/package.nix:77",
+"version": "0.5.3"
+},
+{
+"name": "playerctl-2.4.1",
+"pname": "playerctl",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/pl/playerctl/package.nix:56",
+"version": "2.4.1"
+},
+{
+"name": "file-5.48",
+"pname": "file",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/fi/file/package.nix:73",
+"version": "5.48"
+},
+{
+"name": "obsidian-1.14.5",
+"pname": "obsidian",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ob/obsidian/package.nix:20",
+"version": "1.14.5"
+},
+{
+"name": "ungoogled-chromium-156.0.8078.79",
+"pname": "ungoogled-chromium",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/applications/networking/browsers/chromium/browser.nix:89",
+"version": "156.0.8078.79"
+},
+{
+"name": "discordo-0-unstable-2026-08-18",
+"pname": "discordo",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/di/discordo/package.nix:55",
+"version": "0-unstable-2026-08-18"
+},
+{
+"name": "zapzap-7.5.1",
+"pname": "zapzap",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/za/zapzap/package.nix:79",
+"version": "7.5.1"
+},
+{
+"name": "polkit-gnome-0.105",
+"pname": "polkit-gnome",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/po/polkit_gnome/package.nix:39",
+"version": "0.105"
+},
+{
+"name": "libnotify-0.8.8",
+"pname": "libnotify",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/li/libnotify/package.nix:70",
+"version": "0.8.8"
+},
+{
+"name": "terminus-font-4.49.1",
+"pname": "terminus-font",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/te/terminus_font/package.nix:46",
+"version": "4.49.1"
+},
+{
+"name": "tlrc-1.13.1",
+"pname": "tlrc",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/tl/tlrc/package.nix:29",
+"version": "1.13.1"
+},
+{
+"name": "curl-8.22.0",
+"pname": "curl",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/cu/curlMinimal/package.nix:313",
+"version": "8.22.0"
+},
+{
+"name": "yt-dlp-2026.10.21",
+"pname": "yt-dlp",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/yt/yt-dlp/package.nix:167",
+"version": "2026.10.21"
+},
+{
+"name": "blender-5.2.2",
+"pname": "blender",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/bl/blender/package.nix:476",
+"version": "5.2.2"
+},
+{
+"name": "xdg-terminal-exec-0.14.4",
+"pname": "xdg-terminal-exec",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/xd/xdg-terminal-exec/package.nix:43",
+"version": "0.14.4"
+},
+{
+"name": "helix-25.07.1",
+"pname": "helix",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/he/helix/package.nix:146",
+"version": "25.07.1"
+},
+{
+"name": "git-2.56.0",
+"pname": "git",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gi/git/package.nix:665",
+"version": "2.56.0"
+},
+{
+"name": "git-lfs-3.8.1",
+"pname": "git-lfs",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gi/git-lfs/package.nix:107",
+"version": "3.8.1"
+},
+{
+"name": "claude-code-2.1.316",
+"pname": "claude-code",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/cl/claude-code/package.nix:103",
+"version": "2.1.316"
+},
+{
+"name": "btop-1.4.8",
+"pname": "btop",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/bt/btop/package.nix:65",
+"version": "1.4.8"
+},
+{
+"name": "syncthing-2.1.7",
+"pname": "syncthing",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/sy/syncthing/package.nix:121",
+"version": "2.1.7"
+},
+{
+"name": "swayidle-1.9.1",
+"pname": "swayidle",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/sw/swayidle/package.nix:55",
+"version": "1.9.1"
+},
+{
+"name": "cliphist-0.7.0",
+"pname": "cliphist",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/cl/cliphist/package.nix:54",
+"version": "0.7.0"
+}
+]
+},
+"kernel": "7.2.14",
+"release": "26.11",
+"system": [
+{
+"name": "oversteer-0.8.3",
+"pname": "oversteer",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ov/oversteer/package.nix:104",
+"version": "0.8.3"
+},
+{
+"name": "protontricks-1.15.0",
+"pname": "protontricks",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/pr/protontricks/package.nix:102",
+"version": "1.15.0"
+},
+{
+"name": "protonup-qt-2.15.1",
+"pname": "protonup-qt",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/pr/protonup-qt/package.nix:35",
+"version": "2.15.1"
+},
+{
+"name": "jstest-gtk-0.1.1-unstable-2025-04-03",
+"pname": "jstest-gtk",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/js/jstest-gtk/package.nix:34",
+"version": "0.1.1-unstable-2025-04-03"
+},
+{
+"name": "evtest-1.36",
+"pname": "evtest",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ev/evtest/package.nix:29",
+"version": "1.36"
+},
+{
+"name": "lm-sensors-3.6.2",
+"pname": "lm-sensors",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/lm/lm_sensors/package.nix:79",
+"version": "3.6.2"
+},
+{
+"name": "spotify-1.2.95.453.g0eeebbed",
+"pname": "spotify",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/sp/spotify/package.nix:17",
+"version": "1.2.95.453.g0eeebbed"
+},
+{
+"name": "xwayland-satellite-0.8.3",
+"pname": "xwayland-satellite",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/xw/xwayland-satellite/package.nix:70",
+"version": "0.8.3"
+},
+{
+"name": "git-2.56.0",
+"pname": "git",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gi/git/package.nix:665",
+"version": "2.56.0"
+},
+{
+"name": "nixd-2.9.3",
+"pname": "nixd",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/tools/language-servers/nixd/default.nix:175",
+"version": "2.9.3"
+},
+{
+"name": "nixfmt-1.5.0",
+"pname": "nixfmt",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixfmt/generated-package.nix:26",
+"version": "1.5.0"
+},
+{
+"name": "nixfmt-tree-2.6.0",
+"pname": "nixfmt-tree",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixfmt-tree/package.nix:60",
+"version": "2.6.0"
+},
+{
+"name": "cachix-1.12.1",
+"pname": "cachix",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/haskell-modules/hackage-packages.nix:129921",
+"version": "1.12.1"
+},
+{
+"name": "tokei-15.0.0",
+"pname": "tokei",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/to/tokei/package.nix:38",
+"version": "15.0.0"
+},
+{
+"name": "fd-10.5.0",
+"pname": "fd",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/fd/fd/package.nix:52",
+"version": "10.5.0"
+},
+{
+"name": "ripgrep-15.2.0",
+"pname": "ripgrep",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ri/ripgrep/package.nix:66",
+"version": "15.2.0"
+},
+{
+"name": "du-dust-1.2.6",
+"pname": "du-dust",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/du/dust/package.nix:56",
+"version": "1.2.6"
+},
+{
+"name": "jq-1.8.2",
+"pname": "jq",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/jq/jq/package.nix:124",
+"version": "1.8.2"
+},
+{
+"name": "fastfetch-2.70.0",
+"pname": "fastfetch",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/fa/fastfetch-unwrapped/package.nix:158",
+"version": "2.70.0"
+},
+{
+"name": "pfetch-1.11.0",
+"pname": "pfetch",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/pf/pfetch/package.nix:41",
+"version": "1.11.0"
+},
+{
+"name": "bluetui-0.8.2",
+"pname": "bluetui",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/bl/bluetui/package.nix:31",
+"version": "0.8.2"
+},
+{
+"name": "python3-3.14.8",
+"pname": "python3",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/interpreters/python/cpython/default.nix:862",
+"version": "3.14.8"
+},
+{
+"name": "tuxedo-2026.8.1",
+"pname": "tuxedo",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/tu/tuxedo/package.nix:39",
+"version": "2026.8.1"
+},
+{
+"name": "ffmpeg-9.0.2",
+"pname": "ffmpeg",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/libraries/ffmpeg/generic.nix:1107",
+"version": "9.0.2"
+},
+{
+"name": "lz4-1.10.0",
+"pname": "lz4",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/lz/lz4/package.nix:63",
+"version": "1.10.0"
+},
+{
+"name": "libqalculate-5.13.2",
+"pname": "libqalculate",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/li/libqalculate/package.nix:73",
+"version": "5.13.2"
+},
+{
+"name": "nixos-version",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/nixos/modules/installer/tools/tools.nix:54",
+"version": null
+},
+{
+"name": "nixos-rebuild-ng-26.11",
+"pname": "nixos-rebuild-ng",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixos-rebuild-ng/package.nix:119",
+"version": "26.11"
+},
+{
+"name": "nixos-option-26.11",
+"pname": "nixos-option",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixos-option/package.nix:66",
+"version": "26.11"
+},
+{
+"name": "nixos-install",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixos-install/package.nix:37",
+"version": null
+},
+{
+"name": "nixos-generate-config",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/nixos/modules/installer/tools/tools.nix:30",
+"version": null
+},
+{
+"name": "nixos-enter",
+"pname": null,
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ni/nixos-enter/package.nix:30",
+"version": null
+},
+{
+"name": "lvm2-2.03.41",
+"pname": "lvm2",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/os-specific/linux/lvm2/common.nix:238",
+"version": "2.03.41"
+},
+{
+"name": "dosfstools-4.2",
+"pname": "dosfstools",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/do/dosfstools/package.nix:64",
+"version": "4.2"
+},
+{
+"name": "dbus-1.16.2",
+"pname": "dbus",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/db/dbus/package.nix:182",
+"version": "1.16.2"
+},
+{
+"name": "tailscale-1.104.4",
+"pname": "tailscale",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/ta/tailscale/package.nix:326",
+"version": "1.104.4"
+},
+{
+"name": "wireplumber-0.5.19",
+"pname": "wireplumber",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/wi/wireplumber/package.nix:93",
+"version": "0.5.19"
+},
+{
+"name": "gnome-keyring-50.0",
+"pname": "gnome-keyring",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gn/gnome-keyring/package.nix:120",
+"version": "50.0"
+},
+{
+"name": "fuse-3.18.2",
+"pname": "fuse",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/os-specific/linux/fuse/common.nix:90",
+"version": "3.18.2"
+},
+{
+"name": "less-710",
+"pname": "less",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/le/less/package.nix:51",
+"version": "710"
+},
+{
+"name": "fuse-3.18.2",
+"pname": "fuse",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/os-specific/linux/fuse/common.nix:90",
+"version": "3.18.2"
+},
+{
+"name": "firefox-159.0",
+"pname": "firefox",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+"version": "159.0"
+},
+{
+"name": "gnome-keyring-50.0",
+"pname": "gnome-keyring",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gn/gnome-keyring/package.nix:120",
+"version": "50.0"
+},
+{
+"name": "bind-9.20.30",
+"pname": "bind",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/bi/bind/package.nix:159",
+"version": "9.20.30"
+},
+{
+"name": "attr-2.6.0",
+"pname": "attr",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/libraries/attr/default.nix:47",
+"version": "2.6.0"
+},
+{
+"name": "curl-8.22.0",
+"pname": "curl",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/cu/curlMinimal/package.nix:313",
+"version": "8.22.0"
+},
+{
+"name": "patch-2.8",
+"pname": "patch",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/gn/gnupatch/package.nix:39",
+"version": "2.8"
+},
+{
+"name": "less-710",
+"pname": "less",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/le/less/package.nix:51",
+"version": "710"
+},
+{
+"name": "ncurses-6.6",
+"pname": "ncurses",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/development/libraries/ncurses/default.nix:266",
+"version": "6.6"
+},
+{
+"name": "libressl-4.3.2",
+"pname": "libressl",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/top-level/all-packages.nix:2417",
+"version": "4.3.2"
+},
+{
+"name": "strace-7.3",
+"pname": "strace",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/by-name/st/strace/package.nix:60",
+"version": "7.3"
+},
+{
+"name": "nix-2.34.9",
+"pname": "nix",
+"position": "/nix/store/x85g4cmcjva68vjxn3wr5j3mabvx0jk4-source/pkgs/tools/package-management/nix/modular/packaging/everything.nix:236",
+"version": "2.34.9"
+}
+]
+}
