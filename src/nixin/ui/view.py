@@ -21,11 +21,13 @@ Each piece of text carries a semantic `style` that the UI maps to its palette
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..apply.closure import human_size
 from ..discovery.format import _HEADERS, _footer
+from ..outdated import render as outdated_render
 from ..truth.render import nix_text
 
 ELLIPSIS = "…"
@@ -156,6 +158,11 @@ class Hit:
     detail: str  # version (pkg), type (opt, hm), "package version" (program)
     description: str
     record: dict[str, Any] = field(compare=False, hash=False, repr=False)
+    where_name: str = ""  # what `where` takes when it is not `target` (an installed row's pname)
+
+    @property
+    def where_target(self) -> str:
+        return self.where_name or self.target
 
     @property
     def is_option(self) -> bool:
@@ -896,3 +903,358 @@ def where_cue(doc: Doc) -> Span | None:
             if s.get("mode") != "prefix":
                 return Span(f"= {clip(option_value(o), 30)}", "option")
     return None
+
+
+# --- packages: `list` -----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Scope:
+    """One choice of the scope toggle: everything, the system, or one Home Manager user."""
+
+    key: str  # "all" | "system" | "home:<user>"
+    label: str
+
+    @property
+    def user(self) -> str | None:
+        return self.key.removeprefix("home:") if self.key.startswith("home:") else None
+
+
+def package_scopes(users: list[str]) -> list[Scope]:
+    """all, system, then each HM user (the `list` document's `users[]`)."""
+    return [
+        Scope("all", "all"),
+        Scope("system", "system"),
+        *(Scope(f"home:{u}", f"home {u}") for u in users),
+    ]
+
+
+_ATTR = re.compile(r"[A-Za-z_][\w'-]*(?:\.[A-Za-z_][\w'-]*)*")
+
+
+@dataclass(frozen=True)
+class PackageRow:
+    """One `list` row: what is installed, for whom, and the line that lists it."""
+
+    scope: str  # system | home
+    user: str | None
+    name: str  # pname, else the derivation name (writeShellApplication scripts have no pname)
+    drv: str  # the derivation name
+    version: str
+    where: str  # the first `declared` file:line (+N more), "" when a module adds it
+    target: str  # the attribute info/versions/add/rm take: from `declared`, else the name
+
+    @property
+    def tag(self) -> str:
+        return self.user or "system"
+
+    @property
+    def key(self) -> str:
+        return "system" if self.user is None else f"home:{self.user}"
+
+
+def attribute(declared: list[dict[str, Any]]) -> str | None:
+    """The attribute path a `declared` element names (`pkgs.ripgrep` → `ripgrep`,
+    `kdePackages.dolphin` as is); None for a call (`callPackage ./x {}`)."""
+    for d in declared:
+        text = str(d.get("text") or "").removeprefix("pkgs.")
+        if _ATTR.fullmatch(text):
+            return text
+    return None
+
+
+def package_rows(doc: Doc) -> list[PackageRow]:
+    rows = []
+    for p in doc.get("packages") or []:
+        decl = [d for d in p.get("declared") or [] if isinstance(d, dict)]
+        name = str(p.get("pname") or p.get("name") or "?")
+        where = ""
+        if decl:
+            where = f"{decl[0].get('file')}:{decl[0].get('line')}"
+            where += f" +{len(decl) - 1}" if len(decl) > 1 else ""
+        rows.append(
+            PackageRow(
+                scope=str(p.get("scope") or "system"),
+                user=p.get("user"),
+                name=name,
+                drv=str(p.get("name") or name),
+                version=str(p.get("version") or ""),
+                where=where,
+                target=attribute(decl) or name,
+            )
+        )
+    return rows
+
+
+def filter_packages(rows: list[PackageRow], text: str = "", scope: str = "all") -> list[PackageRow]:
+    """`list --filter TEXT` (name or pname contains it, any case) and `--scope`/`--home`,
+    on rows already loaded: the toggles need no second eval."""
+    needle = text.strip().lower()
+    return [
+        r
+        for r in rows
+        if (scope == "all" or r.key == scope)
+        and (not needle or needle in r.name.lower() or needle in r.drv.lower())
+    ]
+
+
+def package_columns(width: int, tagged: bool) -> list[Column]:
+    """name, version, the scope (`tagged`: several scopes shown), and from 80 cells the
+    file:line that lists it. Same padding rules as `hit_columns`."""
+    avail = width - 1
+    tag_w = 9 if tagged else 0
+    if tagged:
+        avail -= tag_w + 2
+    if width < 80:
+        ver_w = max(7, min(12, avail // 4))
+        cols = [
+            Column("name", "NAME", max(8, avail - ver_w - 4)),
+            Column("version", "VERSION", ver_w),
+        ]
+    else:
+        ver_w = max(8, min(16, avail // 6))
+        name_w = max(14, min(32, avail // 3))
+        where_w = max(10, avail - name_w - ver_w - 6)
+        cols = [
+            Column("name", "NAME", name_w),
+            Column("version", "VERSION", ver_w),
+            Column("where", "LISTED IN", where_w),
+        ]
+    if tagged:
+        cols.insert(2, Column("tag", "FOR", tag_w))
+    return cols
+
+
+def package_cells(r: PackageRow, columns: list[Column]) -> list[Span]:
+    values = {"name": r.name, "version": r.version, "tag": r.tag, "where": r.where}
+    style = {"name": "accent", "version": "", "tag": "dim" if r.user is None else "option"}
+    out = []
+    for c in columns:
+        v = values[c.key]
+        if c.key == "where" and len(v) > c.width:  # keep the file name and line
+            v = ELLIPSIS + v[len(v) - c.width + 1 :]
+        out.append(Span(clip(v, c.width), style.get(c.key, "dim")))
+    return out
+
+
+def package_detail(r: PackageRow) -> str:
+    """The line under the table for the highlighted row."""
+    who = "the system" if r.user is None else f"home {r.user}"
+    where = f"listed in {r.where}" if r.where else "added by a module (no list line found)"
+    return f"{r.drv} · {who} · {where}"
+
+
+def list_footer(doc: Doc, shown: int, text: str = "", scope: Scope | None = None) -> str:
+    """`328 packages: 138 system, 190 home brucking · 67 repeats folded · cached`, or what the
+    filter and the scope leave: `3 of 328 packages matching 'fire' (system)`."""
+    total = int(doc.get("count") or 0)
+    rows = doc.get("packages") or []
+    narrowed = bool(text.strip()) or (scope is not None and scope.key != "all")
+    head = f"{shown} of {total} packages" if narrowed else f"{total} packages"
+    if text.strip():
+        head += f" matching {text.strip()!r}"
+    if scope is not None and scope.key != "all":
+        head += f" ({scope.label})"
+    elif not narrowed:
+        per = [f"{sum(r.get('scope') == 'system' for r in rows)} system"]
+        per += [f"{sum(r.get('user') == u for r in rows)} home {u}" for u in doc.get("users") or []]
+        head += ": " + ", ".join(per) if len(per) > 1 else ""
+    parts = [head]
+    if doc.get("folded"):
+        parts.append(f"{doc['folded']} repeats folded")
+    hit = "packages" in ((doc.get("cache") or {}).get("hits") or [])
+    took = (doc.get("timings") or {}).get("packages")
+    parts.append("cached" if hit else f"evaluated in {took} s")
+    return " · ".join(parts)
+
+
+def package_hit(r: PackageRow) -> Hit:
+    """An installed row as a search hit, for the Details view: info/versions/rm take the
+    attribute, `where` the pname (truth matches pname or derivation name)."""
+    rec = {"kind": "pkg", "name": r.target, "version": r.version, "description": ""}
+    where = r.name if r.name != r.target else ""
+    return Hit("pkg", r.name, r.target, r.version, "", rec, where_name=where)
+
+
+# --- updates: `outdated` ------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class UpdateRow:
+    """One `outdated` row: a package that changes, appears or goes away."""
+
+    pname: str
+    old: str  # from (lock) / installed (published); "added" for an added one
+    new: str  # to / published; "removed" for a removed one
+    scope: str
+    user: str | None
+    note: str  # (older), (same order), as kdePackages.x, (added), (removed)
+    style: str  # accent (newer), warn (older or same order), add, del
+
+    @property
+    def tag(self) -> str:
+        return self.user or "system"
+
+
+_DIR = {"down": ("(older)", "warn"), "same": ("(same order)", "warn")}
+
+
+def update_rows(doc: Doc) -> list[UpdateRow]:
+    """Per scope (system first, as `scopes[]` orders them), by pname within: the CLI's tables."""
+    rows: list[UpdateRow] = []
+    order = {(s.get("scope"), s.get("user")): i for i, s in enumerate(doc.get("scopes") or [])}
+    lock = doc.get("mode") != "published"
+    for r in doc.get("changed") or []:
+        note, style = _DIR.get(str(r.get("direction")), ("", "accent"))
+        if lock:
+            old, new = str(r.get("from") or ""), str(r.get("to") or "")
+        else:
+            old, new = str(r.get("installed") or ""), str(r.get("published") or "")
+            attr = str(r.get("attr") or "")
+            if attr and attr.rsplit(".", 1)[-1] != r.get("pname"):
+                note = f"{note}  as {attr}".strip()
+        rows.append(UpdateRow(str(r["pname"]), old, new, r["scope"], r.get("user"), note, style))
+    for r in doc.get("removed") or []:
+        v = str(r.get("version") or "")
+        rows.append(UpdateRow(str(r["pname"]), v, "removed", r["scope"], r.get("user"), "", "del"))
+    for r in doc.get("added") or []:
+        v = str(r.get("version") or "")
+        rows.append(UpdateRow(str(r["pname"]), "added", v, r["scope"], r.get("user"), "", "add"))
+    rows.sort(key=lambda r: (order.get((r.scope, r.user), 99), r.pname.lower()))
+    return rows
+
+
+def update_columns(width: int, tagged: bool) -> list[Column]:
+    """name, from, to, the scope when several are shown, and from 80 cells the note."""
+    avail = width - 1
+    tag_w = 8 if tagged else 0
+    if tagged:
+        avail -= tag_w + 2
+    if width < 80:
+        ver_w = max(7, min(12, (avail - 4) // 4))
+        cols = [
+            Column("name", "PACKAGE", max(8, avail - 2 * ver_w - 6)),
+            Column("old", "FROM", ver_w),
+            Column("new", "TO", ver_w),
+        ]
+    else:
+        ver_w = max(10, min(18, avail // 6))
+        name_w = max(14, min(32, avail // 3))
+        cols = [
+            Column("name", "PACKAGE", name_w),
+            Column("old", "FROM", ver_w),
+            Column("new", "TO", ver_w),
+            Column("note", "", max(8, avail - name_w - 2 * ver_w - 8)),
+        ]
+    if tagged:
+        cols.insert(3, Column("tag", "FOR", tag_w))
+    return cols
+
+
+def update_cells(r: UpdateRow, columns: list[Column]) -> list[Span]:
+    values = {"name": r.pname, "old": r.old, "new": r.new, "tag": r.tag, "note": r.note}
+    style = {
+        "name": "accent" if r.style == "accent" else r.style,
+        "old": "del" if r.style == "del" else "dim",
+        "new": r.style if r.style != "accent" else "",
+        "tag": "dim" if r.user is None else "option",
+        "note": "dim",
+    }
+    if r.style == "add":
+        style["old"] = "add"
+    return [Span(clip(values[c.key], c.width), style[c.key]) for c in columns]
+
+
+def outdated_head(doc: Doc, host: str) -> str:
+    """`19BK: nixpkgs (github:nixos/nixpkgs/nixos-unstable) 3ec6363 (2026-10-23) → 0bb2eed
+    (2026-11-01), 8.9 days newer` (or the --published comparison)."""
+    return outdated_render.header(doc, host)
+
+
+def kernel_line(doc: Doc) -> Span:
+    k = doc.get("kernel") or {}
+    text = outdated_render.kernel(k, str(doc.get("mode") or "lock"))
+    moves = bool(k.get("changed")) or bool(k.get("to") and k.get("to") != k.get("from"))
+    return Span(text, "warn" if moves else "dim")
+
+
+def outdated_summary(doc: Doc) -> str:
+    """`13 of 325 packages would change; kernel 7.2.12 → 7.2.14`."""
+    return outdated_render.summary(doc)
+
+
+def outdated_scopes(doc: Doc) -> list[str]:
+    """`system: 4 of 135 would change (1 removed)`, one per scope."""
+    return [outdated_render.scope_line(doc, s) for s in doc.get("scopes") or []]
+
+
+def outdated_notes(doc: Doc) -> list[str]:
+    """notes[] and, with --published, the names search.nixos.org has no package for."""
+    out = [str(n) for n in doc.get("notes") or []]
+    unpub = doc.get("unpublished") or []
+    if unpub:
+        out.append(f"not on {(doc.get('target') or {}).get('source')}: {_join(unpub, 8)}")
+    return out
+
+
+def update_args(doc: Doc | None) -> list[str] | None:
+    """What `update` takes to bring in what this `outdated` document compared: nothing for
+    the lock's own ref (`nix flake update`), `--to REV` for another target (the commit
+    compared, as `outdated`'s `next:` pins it). None when there is nothing to update."""
+    if not doc or not doc.get("ok") or doc.get("up_to_date"):
+        return None
+    target = doc.get("target") or {}
+    if doc.get("mode") == "lock" and target.get("from") != "lock" and target.get("rev"):
+        return ["--to", str(target["rev"])]
+    return []
+
+
+def _side(side: dict[str, Any] | None) -> str:
+    if not side or not side.get("rev"):
+        return "?"
+    return short(side["rev"]) + (f" ({side['date']})" if side.get("date") else "")
+
+
+def update_confirm_fields(dry: Doc, outdated: Doc | None = None) -> list[Field]:
+    """`update --dry-run` (and the `outdated` it follows) as the confirmation: what runs,
+    where, from which commit to which, what it does not do, what it costs."""
+    out = [
+        Field("runs", str(dry.get("command")), "accent"),
+        Field(str(dry.get("input") or "input"), f"now {_side(dry.get('from'))}", ""),
+    ]
+    target = (outdated or {}).get("target") or {}
+    if outdated and outdated.get("mode") == "lock" and target.get("rev"):
+        out.append(
+            Field(
+                "to",
+                f"{target.get('short_rev')} ({target.get('date')}), as compared: "
+                + outdated_summary(outdated),
+                "add",
+            )
+        )
+    else:
+        out.append(Field("to", f"{dry.get('to_ref')}, as it resolves now", "add"))
+    out += [
+        Field("writes", f"flake.lock in {dry.get('config')}; nothing is built or switched", "dim"),
+        Field("then", "Pending: Plan builds it, Apply… switches (root)", "dim"),
+        Field("takes", "nix fetches the new nixpkgs: about a minute the first time", "dim"),
+    ]
+    return out
+
+
+def update_fields(doc: Doc) -> list[Field]:
+    """What `update` did."""
+    name = str(doc.get("input") or "input")
+    if doc.get("changed"):
+        out = [Field(name, f"{_side(doc.get('from'))} → {_side(doc.get('to'))}", "add")]
+    else:
+        out = [Field(name, f"already at {_side(doc.get('to'))}; flake.lock unchanged", "dim")]
+    out.append(Field("ran", str(doc.get("command")), "dim"))
+    out += [Field("next", str(c), "dim") for c in doc.get("commands") or []]
+    return out
+
+
+def update_summary(doc: Doc) -> str:
+    """One line for the session log: `nixpkgs 3ec6363 → 0bb2eed (flake.lock)`."""
+    fr, to = doc.get("from") or {}, doc.get("to") or {}
+    return f"{doc.get('input')} {short(fr.get('rev'))} → {short(to.get('rev'))} (flake.lock)"

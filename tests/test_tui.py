@@ -165,6 +165,140 @@ def test_farewell():
     assert view.farewell(["+cowsay (x)"], [load("apply_ok")]).endswith("applied: generation 113")
 
 
+# --- view-model: packages (`list`), updates (`outdated`), `update` ------------------------------
+
+
+def test_package_rows_from_list():
+    doc = load("list_19BK")
+    rows = view.package_rows(doc)
+    assert len(rows) == doc["count"] == 78
+    by = {(r.name, r.tag): r for r in rows}
+    rg = by[("ripgrep", "system")]
+    assert (rg.version, rg.target, rg.where) == ("15.2.0", "ripgrep", "configuration.nix:413")
+    harper = by[("harper", "brucking")]
+    assert harper.scope == "home" and harper.key == "home:brucking"
+    csv = by[("csvmusic", "brucking")]  # `(pkgs.callPackage ./csvmusic/package.nix {})`
+    assert csv.target == "csvmusic" and csv.where.startswith("home/")
+    agent = by[("agent-status", "brucking")]  # no pname: the derivation name
+    assert agent.version == "" and agent.target == "a.agent-status"
+    acl = by[("acl", "system")]
+    assert acl.where == "" and "added by a module" in view.package_detail(acl)
+    assert view.attribute([{"text": "pkgs.kdePackages.dolphin"}]) == "kdePackages.dolphin"
+    assert view.attribute([{"text": "(callPackage./x{})"}]) is None
+
+
+def test_package_filter_scope_and_footer():
+    doc = load("list_19BK")
+    rows = view.package_rows(doc)
+    scopes = view.package_scopes(doc["users"])
+    assert [(s.key, s.label) for s in scopes] == [
+        ("all", "all"),
+        ("system", "system"),
+        ("home:brucking", "home brucking"),
+    ]
+    assert scopes[2].user == "brucking" and scopes[1].user is None
+    assert [r.name for r in view.filter_packages(rows, "FIRE")] == ["firefox"]
+    assert {r.name for r in view.filter_packages(rows, "zsh")} == {"zsh"}  # both scopes
+    assert len(view.filter_packages(rows, "zsh")) == 2
+    system = view.filter_packages(rows, "", "system")
+    assert system and all(r.user is None for r in system)
+    home = view.filter_packages(rows, "zsh", "home:brucking")
+    assert [(r.name, r.user) for r in home] == [("zsh", "brucking")]
+    assert view.filter_packages(rows, "0.49") == [r for r in rows if "0.49" in r.drv]
+    assert view.list_footer(doc, len(rows)) == (
+        "78 packages: 26 system, 52 home brucking · 67 repeats folded · evaluated in 3.21 s"
+    )
+    assert view.list_footer(doc, 1, "fire", scopes[1]).startswith(
+        "1 of 78 packages matching 'fire' (system) · "
+    )
+    cached = {**doc, "cache": {"hits": ["packages"]}, "folded": 0}
+    assert view.list_footer(cached, 3, "", scopes[2]) == "3 of 78 packages (home brucking) · cached"
+
+
+def test_package_hit_opens_details_with_the_pname_for_where():
+    rows = {r.name: r for r in view.package_rows(load("list_19BK"))}
+    h = view.package_hit(rows["ripgrep"])
+    assert (h.kind, h.target, h.where_target, h.detail) == ("pkg", "ripgrep", "ripgrep", "15.2.0")
+    assert h.is_package and h.record["name"] == "ripgrep"
+    agent = view.package_hit(rows["agent-status"])
+    assert agent.target == "a.agent-status" and agent.where_target == "agent-status"
+
+
+@pytest.mark.parametrize("width", [40, 50, 59, 60, 80, 120, 200])
+@pytest.mark.parametrize("tagged", [False, True])
+def test_package_and_update_columns_fit(width, tagged):
+    for cols in (view.package_columns(width, tagged), view.update_columns(width, tagged)):
+        used = sum(c.width + 2 for c in cols) + 1
+        assert used <= max(width, 44), (width, cols)
+        keys = [c.key for c in cols]
+        assert ("tag" in keys) == tagged
+        assert ("where" in keys or "note" in keys) == (width >= 80)
+
+
+def test_update_rows_lock_mode():
+    doc = load("outdated_19BK")
+    rows = view.update_rows(doc)
+    assert len(rows) == 14  # 13 changed + fuse 2.9.9 removed
+    assert [r.tag for r in rows] == ["system"] * 5 + ["brucking"] * 9  # system first
+    names = [r.pname for r in rows[:5]]
+    assert names == sorted(names, key=str.lower)
+    ff = next(r for r in rows if r.pname == "firefox")
+    assert (ff.old, ff.new, ff.style, ff.note) == ("158.0.1", "159.0", "accent", "")
+    fuse = next(r for r in rows if r.pname == "fuse")
+    assert (fuse.old, fuse.new, fuse.style) == ("2.9.9", "removed", "del")
+    cells = view.update_cells(fuse, view.update_columns(50, True))
+    assert [c.style for c in cells] == ["del", "del", "del", "dim"]
+    assert view.outdated_head(doc, "19BK") == (
+        "19BK: nixpkgs (github:nixos/nixpkgs/nixos-unstable) 3ec6363 (2026-10-23) → "
+        "0bb2eed (2026-11-01), 8.9 days newer"
+    )
+    assert view.kernel_line(doc) == view.Span("kernel 7.2.12 → 7.2.14", "warn")
+    assert view.outdated_summary(doc) == "13 of 325 packages would change; kernel 7.2.12 → 7.2.14"
+    assert view.outdated_scopes(doc) == [
+        "system: 4 of 135 would change (1 removed)",
+        "home brucking: 9 of 190 would change",
+    ]
+    assert view.update_args(doc) == []  # the lock's own ref: `nix flake update nixpkgs`
+    pinned = {**doc, "target": {**doc["target"], "from": "channel"}}
+    assert view.update_args(pinned) == ["--to", doc["target"]["rev"]]
+    assert view.update_args({**doc, "up_to_date": True}) is None
+    assert view.outdated_summary({**doc, "up_to_date": True}) == (
+        "the lock already has 0bb2eed: nothing would change"
+    )
+
+
+def test_update_rows_published():
+    doc = load("outdated_19BK_published")
+    rows = view.update_rows(doc)
+    assert len(rows) == doc["count"] == 13
+    assert all(r.style in ("accent", "warn") for r in rows)
+    assert view.kernel_line(doc).text == "kernel 7.2.12 → 7.2.13, latest 7.3"
+    assert view.outdated_summary(doc).startswith("13 of 275 packages differ on unstable; kernel")
+    notes = view.outdated_notes(doc)
+    assert notes[0].startswith("search.nixos.org has many attributes per pname")
+    assert notes[-1].startswith("not on search.nixos.org: ")
+    assert view.update_args(doc) == []
+
+
+def test_update_documents():
+    dry = load("update_dry")
+    fields = {f.label: f for f in view.update_confirm_fields(dry, load("outdated_19BK"))}
+    assert fields["runs"].value == "nix flake update nixpkgs --flake /home/master/nixos"
+    assert fields["nixpkgs"].value == "now 3ec6363 (2026-10-23)"
+    assert fields["to"].value.startswith("0bb2eed (2026-11-01), as compared: 13 of 325")
+    assert "nothing is built or switched" in fields["writes"].value
+    alone = {f.label: f.value for f in view.update_confirm_fields(dry)}
+    assert alone["to"] == "github:nixos/nixpkgs/nixos-unstable, as it resolves now"
+    ok = load("update_ok")
+    assert view.update_fields(ok)[0] == view.Field(
+        "nixpkgs", "3ec6363 (2026-10-23) → 0bb2eed (2026-11-01)", "add"
+    )
+    assert view.update_summary(ok) == "nixpkgs 3ec6363 → 0bb2eed (flake.lock)"
+    same = view.update_fields(load("update_same"))
+    assert same[0].value == "already at 0bb2eed (2026-11-01); flake.lock unchanged"
+    assert view.has_pending(load("status_updated")["pending"])
+
+
 # --- the backend shim on the real handlers (no network, no nix: usage and config errors) --------
 
 

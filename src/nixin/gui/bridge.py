@@ -453,7 +453,7 @@ class DetailsVM(VM):
         self.set(whereLoading=True)
         self.gui.fetch(
             "where",
-            *(hit.target, "--kind", "option" if hit.is_option else "package"),
+            *(hit.where_target, "--kind", "option" if hit.is_option else "package"),
             done=lambda doc, h=hit: self._where(h, doc),
             group="where",
             exclusive=True,

@@ -348,7 +348,7 @@ class DetailsScreen(Base):
         kind = "option" if h.is_option else "package"
         self.nixin.fetch(
             "where",
-            h.target,
+            h.where_target,
             "--kind",
             kind,
             done=self._where,
