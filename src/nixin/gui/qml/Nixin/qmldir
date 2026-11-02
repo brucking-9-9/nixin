@@ -1,0 +1,22 @@
+module Nixin
+singleton Theme 1.0 Theme.qml
+Main 1.0 Main.qml
+TopBar 1.0 TopBar.qml
+NavRail 1.0 NavRail.qml
+SearchPage 1.0 SearchPage.qml
+HitRow 1.0 HitRow.qml
+DetailsPane 1.0 DetailsPane.qml
+PendingPage 1.0 PendingPage.qml
+StatusPage 1.0 StatusPage.qml
+DiffDialog 1.0 DiffDialog.qml
+SetDialog 1.0 SetDialog.qml
+ApplyDialog 1.0 ApplyDialog.qml
+NoticeBar 1.0 NoticeBar.qml
+FieldList 1.0 FieldList.qml
+SectionHead 1.0 SectionHead.qml
+LogView 1.0 LogView.qml
+DiffView 1.0 DiffView.qml
+ClosureTable 1.0 ClosureTable.qml
+Card 1.0 Card.qml
+DangerButton 1.0 DangerButton.qml
+DialogFooter 1.0 DialogFooter.qml

@@ -1,0 +1,138 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+// The window: the top bar, the navigation on the left (Search, Pending, Status), the page,
+// the non-modal notice over the bottom of the page, and the dialogs (diff, set, apply).
+// `backend` is the Python root object (nixin/gui/bridge.py: Gui); everything shown comes
+// from it, and every action is one of its slots.
+ApplicationWindow {
+    id: win
+
+    required property var backend
+
+    objectName: "main"
+    width: 1200
+    height: 780
+    minimumWidth: 900
+    minimumHeight: 600
+    visible: true
+    title: "nixin · " + backend.host
+    color: Theme.bg
+    font.family: Theme.font
+    font.pixelSize: Theme.fontSize
+
+    palette {
+        window: Theme.bg
+        windowText: Theme.fg
+        base: Theme.panel
+        alternateBase: Theme.raised
+        text: Theme.fg
+        button: Theme.panel
+        buttonText: Theme.fg
+        brightText: Theme.fg
+        highlight: Theme.cyan
+        highlightedText: Theme.bg
+        accent: Theme.cyan
+        placeholderText: Theme.dim2
+        toolTipBase: Theme.panel
+        toolTipText: Theme.fg
+        link: Theme.cyan
+        mid: Theme.line
+        dark: Theme.sunken
+        light: Theme.raised
+        midlight: Theme.raised
+        shadow: "#000000"
+    }
+
+    header: TopBar {
+        backend: win.backend
+    }
+
+    RowLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        NavRail {
+            backend: win.backend
+            onSearchRequested: searchPage.focusQuery()
+            Layout.fillHeight: true
+            Layout.preferredWidth: Theme.navW
+        }
+        Rectangle {
+            Layout.fillHeight: true
+            implicitWidth: 1
+            color: Theme.line
+        }
+        StackLayout {
+            id: pages
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: ["search", "pending", "status"].indexOf(win.backend.page)
+
+            SearchPage {
+                id: searchPage
+                backend: win.backend
+            }
+            PendingPage {
+                backend: win.backend
+            }
+            StatusPage {
+                backend: win.backend
+            }
+        }
+    }
+
+    NoticeBar {
+        notice: win.backend.notice
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.navW + 1 + Theme.pad
+        anchors.rightMargin: Theme.pad
+        anchors.bottomMargin: Theme.pad
+    }
+
+    DiffDialog {
+        writer: win.backend.writer
+    }
+    SetDialog {
+        writer: win.backend.writer
+    }
+    ApplyDialog {
+        apply: win.backend.apply
+        host: win.backend.host
+    }
+
+    function showPage(name: string) {
+        win.backend.go(name);
+        if (name === "search")
+            searchPage.focusQuery();
+    }
+
+    Shortcut {
+        sequence: "/"
+        onActivated: win.showPage("search")
+    }
+    Shortcut {
+        sequence: "Ctrl+1"
+        onActivated: win.showPage("search")
+    }
+    Shortcut {
+        sequence: "Ctrl+2"
+        onActivated: win.showPage("pending")
+    }
+    Shortcut {
+        sequence: "Ctrl+3"
+        onActivated: win.showPage("status")
+    }
+    Shortcut {
+        sequence: "Ctrl+Q"
+        context: Qt.ApplicationShortcut
+        onActivated: win.close()
+    }
+
+    onClosing: close => close.accepted = win.backend.mayQuit()
+
+    Component.onCompleted: searchPage.focusQuery()
+}
