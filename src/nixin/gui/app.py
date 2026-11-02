@@ -42,7 +42,6 @@ def application() -> QGuiApplication:
     if app is None:
         app = QGuiApplication([sys.argv[0] if sys.argv else "nixin-gui"])
     QGuiApplication.setApplicationName("nixin")
-    QGuiApplication.setApplicationDisplayName("nixin")
     QGuiApplication.setDesktopFileName(APP_ID)
     return app  # type: ignore[return-value]
 
