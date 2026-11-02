@@ -243,6 +243,15 @@ def test_stderr_router_sends_a_streaming_run_to_its_log(qapp, qtbot):
     assert real == ["passes through\n", "after\n"]
 
 
+def test_a_search_from_elsewhere_shows_its_query(ui):
+    u = ui()
+    u.gui.go("status")  # the query field has no focus there
+    settle(u)
+    u.gui.search.search(" cowsay ")
+    settle(u)
+    assert prop(u, "query", "text") == "cowsay"
+
+
 def test_a_newer_search_supersedes_an_older_one(ui):
     first = {**load("search_pkg_firefox")}
     second = load("search_pkg_cowsay")

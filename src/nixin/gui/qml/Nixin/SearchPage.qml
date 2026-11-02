@@ -18,6 +18,16 @@ Item {
         query.selectAll();
     }
 
+    // A search started elsewhere (a script, a test) shows its query; never while typing,
+    // where the stripped query would eat a trailing space.
+    Connections {
+        target: page.vm
+        function onChanged() {
+            if (!query.activeFocus && query.text !== page.vm.query)
+                query.text = page.vm.query;
+        }
+    }
+
     Timer {
         id: debounce
         interval: 350
