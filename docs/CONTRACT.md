@@ -539,10 +539,12 @@ every screen renders the documents above, got by calling the verb handlers in-pr
 given. It writes only through `add`/`rm`/`set`/`unset` (after showing their `--dry-run`
 diff) and switches only through `apply` (after `apply --dry-run` and a confirmation).
 
-Under `--json`, or without a terminal, it is a `usage` error (exit 2). When the person
-quits, human mode prints one line about the session (`nixin tui: wrote 1: +cowsay (…) ·
-not applied yet`) and exits 0. While it runs it sets `GIT_TERMINAL_PROMPT=0` (unless
-already set) so a git fetch cannot prompt on the terminal it owns.
+Under `--json`, or when stdin or stderr is not a terminal (Textual draws on stderr, so
+`nixin tui 2>file` would show nothing), it is a `usage` error (exit 2). When the person
+quits, it prints one line about the session on stdout (`nixin tui: wrote 1: +cowsay (…) ·
+not applied yet (nixin plan, nixin apply)`, `nixin tui: applied: generation 113`) and
+exits 0. While it runs it sets `GIT_TERMINAL_PROMPT=0` (unless already set) so a git
+fetch cannot prompt on the terminal it owns.
 
 Costs: whatever the verbs it calls cost (see each verb). `plan` and `apply` run in human
 mode under the TUI so that nix's build output and nixos-rebuild's log stream into its log
