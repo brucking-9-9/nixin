@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from nixin import __version__, truth, writer
+from nixin import __version__, apply, truth, writer
 from nixin.cli import VERBS, main
 from nixin.discovery import VERBS as DISCOVERY_VERBS
 
@@ -25,7 +25,7 @@ def test_no_verb_is_usage(capsys):
 def test_every_verb_speaks_json(verb, after, capsys):
     flags = ["--json", "--host", "testhost"]
     argv = [verb, *flags] if after else [*flags, verb]
-    configured = verb in truth.VERBS or verb in writer.VERBS
+    configured = verb in truth.VERBS or verb in writer.VERBS or verb in apply.VERBS
     if configured:
         argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests
     rc = main(argv)

@@ -22,6 +22,7 @@ import pytest
 from conftest import fixture
 
 from nixin import writer
+from nixin.apply import proc as apply_proc
 from nixin.cli import VERBS, main
 from nixin.configrepo import ConfigRepo
 from nixin.discovery import local
@@ -59,6 +60,17 @@ ERROR_CODES = {
     "file-conflict",
     "invalid-state",
     "needs-sudo",
+    "build-failed",
+    "nothing-to-apply",
+    "host-not-local",
+    "authoritative-missing",
+    "authoritative-dirty",
+    "authoritative-diverged",
+    "switch-failed",
+    "verify-failed",
+    "git-failed",
+    "diverged",
+    "busy",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 
@@ -407,6 +419,13 @@ def world(tmp_path, monkeypatch, transport, cache_dir):
     )
     monkeypatch.setattr("nixin.truth.local_hostname", lambda: "mbp13")
     monkeypatch.delenv("NIXIN_CONFIG", raising=False)
+    monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(tmp_path / "no-authoritative"))  # status
+    # apply's git/nix/sudo seam: the fixture copy is no git checkout
+    monkeypatch.setattr(
+        apply_proc,
+        "RUN",
+        lambda argv, **kw: apply_proc.Proc(argv, 128, "", "fatal: not a git repository"),
+    )
 
     has = lambda body, s: s.lower() in json.dumps(body).lower()
     transport.add("GET", r"/_cat/aliases", fixture_file="es/aliases.json")
@@ -421,7 +440,17 @@ def world(tmp_path, monkeypatch, transport, cache_dir):
 def nixin(capsys, world: World, *argv: str, host: str = "mbp13") -> dict:
     """`nixin --json --host H ARGV --config <fixture copy>` through main(), envelope checked."""
     full = ["--json", "--host", host, *argv]
-    if first_verb(full) in ("status", "where", "add", "rm", "set", "unset"):
+    if first_verb(full) in (
+        "status",
+        "where",
+        "add",
+        "rm",
+        "set",
+        "unset",
+        "plan",
+        "apply",
+        "sync",
+    ):
         full += ["--config", str(world.root)]
     rc = main(full)
     out, err = capsys.readouterr()
@@ -610,10 +639,12 @@ SWEEP = [
     ["set", X11],  # usage
     ["unset", X11],  # not-found
     ["add", "--home", "bob", "cowsay"],  # unknown-user
-    # apply layer stubs
+    # apply (the fixture copy is no git checkout: not-a-workspace)
     ["plan"],
     ["apply"],
-    ["sync"],
+    ["apply", "--dry-run"],
+    ["sync", "--push"],
+    ["plan", "extra"],  # usage
     # no verb / unknown verb
     [],
     ["frobnicate"],
@@ -632,7 +663,8 @@ def test_envelope_holds_everywhere(world, capsys, argv):
         (["where", "x", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["add", "x", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["add", "x", "--config", "/etc/nixos"], "not-a-workspace"),
-        (["plan"], "not-implemented"),
+        (["plan", "--config", "/etc/nixos"], "not-a-workspace"),
+        (["apply", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["frobnicate"], "usage"),
     ],
 )
@@ -670,7 +702,9 @@ def test_no_error_code_escapes_the_contract():
     src = "\n".join(p.read_text() for p in (ROOT / "src" / "nixin").rglob("*.py"))
     raised = set(
         re.findall(
-            r'(?:NixinError|WriterError|DiscoveryError)\(\s*"([a-z][a-z0-9-]*)"', src, re.MULTILINE
+            r'(?:NixinError|WriterError|DiscoveryError|ApplyError)\(\s*"([a-z][a-z0-9-]*)"',
+            src,
+            re.MULTILINE,
         )
     )
     raised |= set(re.findall(r'"code": "([a-z][a-z0-9-]*)"', src))
