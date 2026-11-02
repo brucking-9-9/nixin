@@ -1,0 +1,237 @@
+/* Layout of the nixin TUI. Colours come from theme.py (standard variables only).
+   Breakpoints (App.HORIZONTAL_BREAKPOINTS): Screen.-narrow below 80 cells (a phone over
+   ssh is ~50), Screen.-wide from 80. No large filled areas: surface = background. */
+
+Screen {
+    background: $background;
+    layout: vertical;
+}
+
+TopBar {
+    padding: 0 1;
+}
+
+Footer {
+    background: $background;
+}
+
+/* --- search */
+
+#query {
+    margin: 0 1;
+    border: none;
+    background: $background;
+}
+#query:focus {
+    background: $boost;
+}
+
+#kinds {
+    margin: 0 1;
+}
+
+#results {
+    height: 1fr;
+    margin: 0 1;
+    background: $background;
+    scrollbar-size-vertical: 1;
+}
+
+DataTable > .datatable--header {
+    background: $background;
+    color: $text-muted;
+    text-style: bold;
+}
+
+#preview {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+    border-top: hkey $panel;
+}
+
+#source {
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+Spinner {
+    padding: 0 1;
+}
+
+NoticeBox {
+    margin: 0 1;
+    padding: 0 1;
+    border-left: thick $error;
+}
+NoticeBox.-info {
+    border-left: thick $accent;
+}
+NoticeBox.-action {
+    border-left: thick $secondary;
+}
+
+/* --- details, pending, apply, status */
+
+#details-title {
+    height: auto;
+    padding: 0 1;
+    text-style: bold;
+}
+
+#body {
+    height: 1fr;
+    padding: 0 1;
+    scrollbar-size-vertical: 1;
+}
+
+#panes {
+    height: auto;
+}
+Screen.-wide #panes {
+    layout: horizontal;
+}
+Screen.-narrow #panes {
+    layout: vertical;
+}
+
+.pane {
+    height: auto;
+}
+Screen.-wide .pane {
+    width: 1fr;
+}
+Screen.-wide #left {
+    padding-right: 2;
+}
+Screen.-narrow .pane {
+    width: 100%;
+}
+
+#body Spinner, #body NoticeBox {
+    padding: 0;
+    margin: 0;
+}
+#body NoticeBox {
+    padding-left: 1;
+}
+
+#actions {
+    height: auto;
+    padding: 0 1;
+}
+#actions Button {
+    margin-right: 1;
+    min-width: 6;
+}
+
+#closure {
+    height: auto;
+    max-height: 16;
+    background: $background;
+}
+
+LogView {
+    background: $background;
+    color: $text-muted;
+    border-left: tall $panel;
+    padding-left: 1;
+}
+Screen.-narrow LogView {
+    max-height: 8;
+}
+
+#commands {
+    height: auto;
+    max-height: 8;
+    background: $background;
+    color: $secondary;
+    border-left: thick $secondary;
+}
+
+#sudo-help {
+    margin-top: 1;
+}
+
+#sections {
+    height: auto;
+}
+Screen.-wide #sections {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    grid-rows: auto;
+    grid-gutter: 0 2;
+}
+.section {
+    height: auto;
+}
+
+/* --- dialogs */
+
+ModalScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+.dialog {
+    width: 96;
+    max-width: 96%;
+    height: auto;
+    max-height: 92%;
+    padding: 0 1;
+    border: round $accent;
+    background: $background;
+}
+.notice-dialog {
+    border: round $error;
+}
+.apply-dialog {
+    border: round $error;
+}
+
+.dialog-title {
+    width: 100%;
+    color: $accent;
+    text-style: bold;
+}
+
+.dialog VerticalScroll {
+    height: auto;
+    max-height: 70vh;
+    scrollbar-size-vertical: 1;
+}
+Screen.-narrow .dialog VerticalScroll {
+    max-height: 60vh;
+}
+
+.dialog Input {
+    border: none;
+    background: $boost;
+    margin: 0 0 1 0;
+}
+
+.dialog OptionList {
+    height: auto;
+    max-height: 8;
+    background: $background;
+    border: none;
+}
+
+.buttons {
+    height: auto;
+    margin-top: 1;
+}
+.buttons Button {
+    margin-right: 1;
+}
+
+.dim {
+    color: $text-muted;
+}
+
+.key-row {
+    height: 1;
+}

@@ -6,6 +6,7 @@
   buildPythonApplication,
   setuptools,
   requests,
+  textual,
   pytestCheckHook,
   nixfmt,
   git,
@@ -21,7 +22,10 @@ buildPythonApplication {
   src = lib.cleanSource ./.;
 
   build-system = [ setuptools ];
-  dependencies = [ requests ];
+  dependencies = [
+    requests
+    textual
+  ];
 
   # nixfmt also in the check: the writer's render test formats for real;
   # git: the apply tests run real git on temp repos (nix, sudo and nixos-rebuild are faked)

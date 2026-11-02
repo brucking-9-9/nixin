@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, apply, discovery, truth, writer
+from . import __version__, apply, discovery, truth, tui, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -41,6 +41,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "plan": ("apply", "build the pending config and show the closure diff"),
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
+    "tui": ("tui", "interactive terminal UI over the same documents"),
 }
 
 
@@ -84,6 +85,7 @@ def _parser() -> argparse.ArgumentParser:
     truth.register(sub)
     writer.register(sub)
     apply.register(sub)
+    tui.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb
         sp.add_argument(
             "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
