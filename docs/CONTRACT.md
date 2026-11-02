@@ -30,7 +30,8 @@ nixin --version | --help | VERB --help
   (`socket.gethostname()`), even when `--config` points at a config that has no such
   host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
   still echoes it in the envelope.
-- `--config DIR` (truth, writer and apply verbs) is the config flake: `--config`, else
+- `--config DIR` (truth, writer and apply verbs; before or after the verb, the verb's own
+  wins; discovery ignores it) is the config flake: `--config`, else
   `$NIXIN_CONFIG`, else `/etc/nixos`. Truth only reads it. The writer and apply refuse
   `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
