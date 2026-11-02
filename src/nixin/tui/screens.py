@@ -490,15 +490,10 @@ class PendingScreen(Base):
 
     def on_mount(self) -> None:
         self.query_one("#closure", DataTable).display = False
-        self.render_session()
-        self.query_one("#plan", Fields).show(
-            [], "b: build the workspace and diff it against the running system", "dim"
-        )
-        if self.nixin.plan_doc is not None:
-            self.show_plan(self.nixin.plan_doc)
 
-    def on_screen_resume(self) -> None:
+    def on_screen_resume(self) -> None:  # also on the first push
         self.render_session()
+        self.render_plan()
         self.action_refresh(force=False)
 
     def render_session(self) -> None:
@@ -529,7 +524,7 @@ class PendingScreen(Base):
 
     def action_plan(self) -> None:
         log = self.query_one("#log", LogView)
-        log.clear()
+        log.reset()
         self.query_one("#notice", NoticeBox).show(None)
         self.nixin.fetch(
             "plan",
@@ -544,10 +539,30 @@ class PendingScreen(Base):
 
     def show_plan(self, doc: dict) -> None:
         self.nixin.plan_doc = doc
-        notice = view.notice(doc)
-        self.query_one("#notice", NoticeBox).show(notice)
+        self.render_plan()
+        # the result is the bottom of this screen: bring it into view (a phone shows ~15 rows)
+        body = self.query_one("#body", VerticalScroll)
+        self.set_timer(0.05, lambda: body.scroll_end(animate=False))
+
+    def render_plan(self) -> None:
+        """The app's last plan, or the hint when there is none (a write or an apply since
+        made it stale)."""
+        doc = self.nixin.plan_doc
         table = self.query_one("#closure", DataTable)
         head = self.query_one("#closure-head", Line)
+        if doc is None:
+            if self.nixin.busy != "planning":
+                self.query_one("#log", LogView).reset()
+                self.query_one("#log", LogView).display = False
+            self.query_one("#notice", NoticeBox).show(None)
+            self.query_one("#plan", Fields).show(
+                [], "b: build the workspace and diff it against the running system", "dim"
+            )
+            head.show("")
+            table.display = False
+            return
+        notice = view.notice(doc)
+        self.query_one("#notice", NoticeBox).show(notice)
         if notice is not None:
             self.query_one("#plan", Fields).show([])
             head.show("")
@@ -566,9 +581,6 @@ class PendingScreen(Base):
                 *(cell(self.app, x, r.style) for x in (r.sign, r.name, r.version, r.size))
             )
         table.display = bool(rows)
-        # the result is the bottom of this screen: bring it into view (a phone shows ~15 rows)
-        body = self.query_one("#body", VerticalScroll)
-        self.set_timer(0.05, lambda: body.scroll_end(animate=False))
 
     def action_apply(self) -> None:
         self.nixin.start_apply()
@@ -644,7 +656,7 @@ class ApplyScreen(Base):
 
     def run_apply(self) -> None:
         args = ["-m", self.message] if self.message else []
-        self.query_one("#log", LogView).clear()
+        self.query_one("#log", LogView).reset()
         self.nixin.fetch(
             "apply",
             *args,

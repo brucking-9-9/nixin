@@ -384,6 +384,9 @@ def test_apply_with_message_and_result():
     async def script(app, pilot, fake):
         await pilot.press("escape", "p")
         await settle(app, pilot)
+        await pilot.press("b")  # a plan first: the apply must make it stale
+        await settle(app, pilot, 0.1)
+        assert app.screen.query_one("#closure", DataTable).display
         await pilot.press("a")
         await settle(app, pilot)
         await pilot.press(*"test: cowsay", "enter")
@@ -393,11 +396,19 @@ def test_apply_with_message_and_result():
         assert app.screen.query_one("#log", LogView).lines_seen[-1] == (
             "reloading user units for master..."
         )
-        await pilot.press("escape", "q")
+        await pilot.press("escape")
+        await settle(app, pilot)
+        pending = app.screen
+        assert isinstance(pending, PendingScreen)  # the old plan is gone, the hint is back
+        assert not pending.query_one("#closure", DataTable).display
+        assert pending.query_one("#plan", Fields).note.startswith("b: build the workspace")
+        assert "applied generation 113" in pending.query_one("#session", Fields).text
+        await pilot.press("q")
 
     app, fake = drive(script, routes)
     # back on Pending, status is loaded again: the apply made it stale
     assert fake.verbs()[-2:] == [["apply", "-m", "test: cowsay"], ["status"]]
+    assert ["plan"] in fake.verbs() and app.plan_doc is None
     assert app.return_value == "nixin tui: applied: generation 113"
 
 

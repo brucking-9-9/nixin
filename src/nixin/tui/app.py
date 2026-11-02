@@ -244,6 +244,7 @@ class NixinApp(App[str]):
         if doc.get("ok"):
             self.applied.append(doc)
             self.status_stale = True
+            self.plan_doc = None  # it compared against the system that ran before
 
     # --- navigation ----------------------------------------------------------------------------
 
