@@ -1,0 +1,23 @@
+{
+  "error": {
+    "candidates": [
+      {
+        "file": "hosts/mbp13/default.nix",
+        "line": 203,
+        "option": "environment.systemPackages",
+        "text": "git"
+      },
+      {
+        "file": "configuration.nix",
+        "line": 406,
+        "option": "environment.systemPackages",
+        "text": "git"
+      }
+    ],
+    "code": "ambiguous",
+    "message": "git is declared in 2 places for mbp13; repeat with --where FILE:LINE"
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "rm"
+}

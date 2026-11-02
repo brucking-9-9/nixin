@@ -1,0 +1,64 @@
+{
+  "authoritative_head": "a1f0c3e9b8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3",
+  "backends": {
+    "pull": "sudo",
+    "switch": "sudo"
+  },
+  "cached": true,
+  "commit_message": "nixin: mbp13: +cowsay",
+  "committed": "a1f0c3e9b8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3",
+  "diff": {
+    "added": [
+      {
+        "name": "cowsay",
+        "size": 52429,
+        "version": "3.8.4"
+      }
+    ],
+    "changed": [],
+    "removed": [],
+    "size_delta": 52429
+  },
+  "generation": 113,
+  "history": {
+    "commit": "a1f0c3e9b8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3",
+    "generation": 113,
+    "host": "mbp13",
+    "message": "nixin: mbp13: +cowsay",
+    "mode": "switch",
+    "out": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "ts": "2026-11-01T20:15:02Z"
+  },
+  "host": "mbp13",
+  "mode": "switch",
+  "ok": true,
+  "out": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+  "previous": {
+    "generation": 112,
+    "profile": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "profile_generation": 112,
+    "store_path": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363"
+  },
+  "privileged_commands": [
+    "sudo -n git -C /etc/nixos pull --ff-only /home/master/nixos main",
+    "sudo -n nixos-rebuild switch --flake /etc/nixos#mbp13"
+  ],
+  "running": {
+    "generation": 113,
+    "profile": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "profile_generation": 113,
+    "store_path": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363"
+  },
+  "switch_log": "building the system configuration...\nactivating the configuration...\nsetting up /etc...\nreloading user units for master...\nrestarting sysinit-reactivation.target",
+  "switched": true,
+  "timings": {
+    "build": 0.9,
+    "commit": 0.1,
+    "prepare": 0.2,
+    "pull": 0.05,
+    "switch": 29.4,
+    "total": 30.6
+  },
+  "verb": "apply",
+  "warnings": []
+}

@@ -1,0 +1,43 @@
+{
+  "authoritative": {
+    "branch": "main",
+    "dirty": [],
+    "exists": true,
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "path": "/etc/nixos",
+    "relation": "same"
+  },
+  "cache_key": "commit 7da2b4cdd8b2",
+  "cached": true,
+  "diff": {
+    "added": [],
+    "changed": [],
+    "removed": [],
+    "size_delta": 0
+  },
+  "drv": "/nix/store/l5qdzim9bvc1852f8s9i4bc5hg9limkv-nixos-system-mbp13-26.11.20261023.3ec6363.drv",
+  "duration_s": 0.59,
+  "host": "mbp13",
+  "ok": true,
+  "out": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+  "pending_commits": [],
+  "running": {
+    "generation": 112,
+    "profile": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "profile_generation": 112,
+    "store_path": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363"
+  },
+  "timings": {},
+  "up_to_date": true,
+  "verb": "plan",
+  "warnings": [],
+  "workspace": {
+    "branch": "main",
+    "dirty": [
+      "installer/history.jsonl"
+    ],
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "path": "/home/master/nixos",
+    "untracked": []
+  }
+}

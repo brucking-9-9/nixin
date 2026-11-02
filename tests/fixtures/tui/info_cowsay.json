@@ -1,0 +1,70 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 1,
+  "host": "mbp13",
+  "kind": "all",
+  "name": "cowsay",
+  "ok": true,
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Program which generates ASCII pictures of a cow with a message",
+      "homepage": "https://cowsay.diamonds",
+      "kind": "pkg",
+      "license": [
+        "GPL-3.0-only"
+      ],
+      "main_program": "cowsay",
+      "matched_by": "attr",
+      "name": "cowsay",
+      "outputs": [
+        "man",
+        "out"
+      ],
+      "platforms": [
+        "arc-linux",
+        "powerpc-netbsd",
+        "rx-none",
+        "powerpc64le-linux"
+      ],
+      "pname": "cowsay",
+      "position": "pkgs/by-name/co/cowsay/package.nix:58",
+      "programs": [
+        "cowthink",
+        "cowsay"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "3.8.4"
+    }
+  ],
+  "rev": null,
+  "source": "all",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 0,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 01, 2026 at 11:12 UTC"
+    },
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 1,
+      "error": null,
+      "kinds": [
+        "pkg",
+        "opt"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "info"
+}

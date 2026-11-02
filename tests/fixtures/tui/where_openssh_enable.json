@@ -1,0 +1,58 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages"
+    ],
+    "misses": [
+      "prefix-nixos-bb00653e32"
+    ]
+  },
+  "host": "mbp13",
+  "kind": "option",
+  "name": "services.openssh.enable",
+  "ok": true,
+  "scopes": [
+    {
+      "excluded": {},
+      "mode": "exact",
+      "options": [
+        {
+          "declarations": [
+            {
+              "column": 7,
+              "file": "nixos/modules/services/networking/ssh/sshd.nix",
+              "line": 247,
+              "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+              "source": "nixpkgs"
+            }
+          ],
+          "definitions": [
+            {
+              "file": "hosts/mbp13/default.nix",
+              "line": 248,
+              "line_heuristic": true,
+              "raw": "/nix/store/g27bkid6r0mxq87d5wvy8wdlbkgj02v4-source/hosts/mbp13",
+              "source": "config",
+              "text": "enable = true;",
+              "value": true
+            }
+          ],
+          "description": "Whether to enable the OpenSSH secure shell daemon, which allows secure remote logins. ",
+          "highestPrio": 100,
+          "isDefined": true,
+          "name": "services.openssh.enable",
+          "option": "services.openssh.enable",
+          "type": "boolean",
+          "value": true,
+          "value_found": true
+        }
+      ],
+      "scope": "nixos",
+      "under_prefix": 1,
+      "user": null
+    }
+  ],
+  "verb": "where"
+}

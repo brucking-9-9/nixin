@@ -1,0 +1,68 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 1,
+  "host": "mbp13",
+  "kind": "all",
+  "name": "firefox",
+  "ok": true,
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox",
+      "matched_by": "attr",
+      "name": "firefox",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "x86_64-freebsd",
+        "m68k-linux",
+        "armv6l-linux",
+        "loongarch64-linux"
+      ],
+      "pname": "firefox",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [
+        "firefox"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "159.0"
+    }
+  ],
+  "rev": null,
+  "source": "all",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 0,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 01, 2026 at 11:12 UTC"
+    },
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 1,
+      "error": null,
+      "kinds": [
+        "pkg",
+        "opt"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "info"
+}

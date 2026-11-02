@@ -1,0 +1,156 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages"
+    ],
+    "misses": [
+      "prefix-nixos-874ee491da",
+      "prefix-nixos-e5a343d1c9"
+    ]
+  },
+  "declared": [
+    {
+      "file": "hosts/mbp13/default.nix",
+      "items": [
+        "<derivation git-2.56.0>"
+      ],
+      "lines": [
+        {
+          "file": "hosts/mbp13/default.nix",
+          "line": 203,
+          "score": 3,
+          "text": "git"
+        },
+        {
+          "file": "hosts/mbp13/default.nix",
+          "line": 50,
+          "score": 1,
+          "text": "./dots.nix # 19BK shell/editor/git dotfiles, system-wide"
+        },
+        {
+          "file": "hosts/mbp13/default.nix",
+          "line": 225,
+          "score": 1,
+          "text": "gs = \"git status\";"
+        },
+        {
+          "file": "hosts/mbp13/default.nix",
+          "line": 9,
+          "score": 0,
+          "text": "#   sudo git -C /etc/nixos pull --ff-only /home/master/nixos <branch>"
+        }
+      ],
+      "option": "environment.systemPackages",
+      "raw": "/nix/store/g27bkid6r0mxq87d5wvy8wdlbkgj02v4-source/hosts/mbp13",
+      "scope": "system",
+      "source": "config",
+      "user": null
+    },
+    {
+      "file": "nixos/modules/programs/git.nix",
+      "items": [
+        "<derivation git-2.56.0>"
+      ],
+      "option": "environment.systemPackages",
+      "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/programs/git.nix",
+      "scope": "system",
+      "source": "nixpkgs",
+      "user": null
+    }
+  ],
+  "host": "mbp13",
+  "installed": [
+    {
+      "name": "git-2.56.0",
+      "pname": "git",
+      "scope": "system",
+      "user": null,
+      "version": "2.56.0"
+    },
+    {
+      "name": "git-2.56.0",
+      "pname": "git",
+      "scope": "system",
+      "user": null,
+      "version": "2.56.0"
+    }
+  ],
+  "kind": "package",
+  "mentions": [
+    {
+      "file": "configuration.nix",
+      "line": 406,
+      "score": 3,
+      "text": "git"
+    },
+    {
+      "file": "home/modules/terminal/ai/claude_code.nix",
+      "line": 313,
+      "score": 3,
+      "text": "pkgs.git"
+    },
+    {
+      "file": "hosts/mbp13/default.nix",
+      "line": 203,
+      "score": 3,
+      "text": "git"
+    },
+    {
+      "file": "home/modules/git.nix",
+      "line": 4,
+      "score": 2,
+      "text": "programs.git = {"
+    },
+    {
+      "file": "hosts/mbp13/dots.nix",
+      "line": 99,
+      "score": 2,
+      "text": "programs.git = {"
+    },
+    {
+      "file": "home/modules/default.nix",
+      "line": 11,
+      "score": 1,
+      "text": "./git.nix"
+    }
+  ],
+  "name": "git",
+  "ok": true,
+  "programs": [
+    {
+      "declarations": [
+        {
+          "column": 7,
+          "file": "nixos/modules/programs/git.nix",
+          "line": 15,
+          "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/programs/git.nix",
+          "source": "nixpkgs"
+        }
+      ],
+      "definitions": [
+        {
+          "file": "hosts/mbp13/dots.nix",
+          "line": 100,
+          "line_heuristic": true,
+          "raw": "/nix/store/g27bkid6r0mxq87d5wvy8wdlbkgj02v4-source/hosts/mbp13/dots.nix",
+          "source": "config",
+          "text": "enable = true;",
+          "value": true
+        }
+      ],
+      "description": "Whether to enable git, a distributed version control system.",
+      "highestPrio": 100,
+      "isDefined": true,
+      "name": "programs.git.enable",
+      "option": "programs.git.enable",
+      "scope": "system",
+      "type": "boolean",
+      "user": null,
+      "value": true,
+      "value_found": true
+    }
+  ],
+  "verb": "where"
+}

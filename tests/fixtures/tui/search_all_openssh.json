@@ -1,0 +1,319 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 12,
+  "host": "mbp13",
+  "kind": "all",
+  "limit": 4,
+  "ok": true,
+  "query": "openssh",
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Implementation of the SSH protocol",
+      "homepage": "https://www.openssh.com/",
+      "kind": "pkg",
+      "license": [
+        "BSD-2-Clause"
+      ],
+      "main_program": "ssh",
+      "name": "openssh",
+      "outputs": [
+        "out",
+        "dev",
+        "man"
+      ],
+      "platforms": [
+        "armv6l-linux",
+        "loongarch64-linux",
+        "microblaze-linux",
+        "powerpc64-linux"
+      ],
+      "pname": "openssh",
+      "position": "pkgs/tools/networking/openssh/common.nix:281",
+      "programs": [
+        "scp",
+        "sshd",
+        "ssh-keyscan",
+        "ssh-keygen",
+        "ssh-add",
+        "ssh-copy-id",
+        "ssh-agent",
+        "ssh",
+        "sftp"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "10.6p1"
+    },
+    {
+      "channel": "unstable",
+      "description": "Implementation of the SSH protocol with high performance networking patches",
+      "homepage": "https://www.openssh.com/",
+      "kind": "pkg",
+      "license": [
+        "BSD-2-Clause"
+      ],
+      "main_program": "ssh",
+      "name": "openssh_hpn",
+      "outputs": [
+        "man",
+        "dev",
+        "out"
+      ],
+      "platforms": [
+        "aarch64-linux",
+        "armv5tel-linux",
+        "riscv64-netbsd",
+        "x86_64-windows"
+      ],
+      "pname": "openssh-with-hpn",
+      "position": "pkgs/tools/networking/openssh/common.nix:281",
+      "programs": [
+        "scp",
+        "sshd",
+        "ssh",
+        "sftp",
+        "ssh-agent",
+        "ssh-add",
+        "ssh-copy-id",
+        "ssh-keygen",
+        "ssh-keyscan"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "10.5p1"
+    },
+    {
+      "channel": "unstable",
+      "description": "Implementation of the SSH protocol",
+      "homepage": "https://www.openssh.com/",
+      "kind": "pkg",
+      "license": [
+        "BSD-2-Clause"
+      ],
+      "main_program": "ssh",
+      "name": "opensshTest",
+      "outputs": [
+        "man",
+        "dev",
+        "out"
+      ],
+      "platforms": [
+        "s390-linux",
+        "x86_64-freebsd",
+        "microblazeel-linux",
+        "mipsel-linux"
+      ],
+      "pname": "openssh-test",
+      "position": "pkgs/tools/networking/openssh/common.nix:281",
+      "programs": [
+        "scp",
+        "ssh-keyscan",
+        "ssh-agent",
+        "sshd",
+        "ssh-copy-id",
+        "ssh-add",
+        "ssh-keygen",
+        "sftp",
+        "ssh"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "10.6p1"
+    },
+    {
+      "channel": "unstable",
+      "description": "A passphrase dialog for OpenSSH and GTK",
+      "homepage": "https://www.openssh.org",
+      "kind": "pkg",
+      "license": [
+        "BSD-2-Clause"
+      ],
+      "main_program": null,
+      "name": "openssh-askpass",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [],
+      "pname": "openssh-askpass",
+      "position": "pkgs/by-name/op/openssh-askpass/package.nix:27",
+      "programs": [],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "10.6p1"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/1c89083e451e891152365b799595cf7790a43325/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "programs.ssh.package",
+      "description": "OpenSSH package to use for sshd.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.openssh.package",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/1c89083e451e891152365b799595cf7790a43325/nixos/modules/programs/ssh.nix"
+      ],
+      "declarations": [
+        "nixos/modules/programs/ssh.nix"
+      ],
+      "default": "pkgs.openssh",
+      "description": "The openssh package to use.",
+      "example": null,
+      "kind": "opt",
+      "name": "programs.ssh.package",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/1c89083e451e891152365b799595cf7790a43325/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable the OpenSSH secure shell daemon, which allows secure remote logins.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.openssh.enable",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/1c89083e451e891152365b799595cf7790a43325/nixos/modules/virtualisation/libvirtd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/virtualisation/libvirtd.nix"
+      ],
+      "default": "true",
+      "description": "Whether to configure OpenSSH to use the SSH Proxy.",
+      "example": null,
+      "kind": "opt",
+      "name": "virtualisation.libvirtd.sshProxy",
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/ssh.nix"
+      ],
+      "declarations": [
+        "modules/programs/ssh.nix"
+      ],
+      "default": "null",
+      "description": "The openssh package to use. By default, the client provided by your system is used.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.ssh.package",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "null or package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/ssh.nix"
+      ],
+      "declarations": [
+        "modules/programs/ssh.nix"
+      ],
+      "default": "{ }",
+      "description": "OpenSSH client configuration blocks written to\n{file}`~/.ssh/config`.\n\nAttribute names are interpreted as `Host` patterns unless they\nstart with `Host ` or `Match `, in which case they are written\nliterally as block headers. If the order of rules matter then\nuse the DAG functions to express the dependencies as shown in\nthe example. Use {option}`programs.ssh.settings.<name>.header`\nwhen the block should have a short stable name for DAG ordering,\nand use `lib.hm.dag.entriesBefore` or\n`lib.hm.dag.entriesAfter` to order generated groups of blocks.\n\nSee\n{manpage}`ssh_config(5)`\nfor more information.",
+      "example": "# Tagged hosts must appear before Match blocks that select those tags.\nlib.hm.dag.entriesBefore \"corp-host\" [ \"corp-match\" ] [\n  {\n    header = \"Host build.corp\";\n    HostName = \"build.corp.example.org\";\n    User = \"builder\";\n    Tag = \"corp\";\n  }\n\n  {\n    header = \"Host git.corp\";\n    HostName = \"git.corp.example.org\";\n    User = \"git\";\n    Tag = \"corp\";\n  }\n]\n// {\n  # Bare attribute names become Host patterns.\n  \"*.internal.example.org\" = {\n    User = \"internal\";\n  };\n\n  # Literal Host headers can use the full OpenSSH syntax.\n  \"Host *.example.org\" = lib.hm.dag.entryBefore [ \"github.com\" ] {\n    IdentityFile = \"~/.ssh/example\";\n    LocalForward = [\n      {\n        bind.port = 8080;\n        host.address = \"10.0.0.13\";\n        host.port = 80;\n      }\n      \"9000 10.0.0.2:90\"\n    ];\n    DynamicForward = \"127.0.0.1:1080\";\n  };\n\n  # Literal Match headers can be ordered by their attribute name.\n  \"Match host *.vpn.example.org\" = lib.hm.dag.entryAfter [ \"github.com\" ] {\n    ProxyJump = \"vpn\";\n  };\n\n  \"github.com\" = {\n    HostName = \"github.com\";\n    User = \"git\";\n    IdentityFile = \"~/.ssh/github\";\n  };\n\n  # Keep long or dynamic SSH headers out of DAG references.\n  corp-match = lib.hm.dag.entryAfter [ \"github.com\" ] {\n    header = \"Match tagged corp exec \\\"test -f ~/.corp\\\"\";\n    ProxyJump = \"bastion\";\n    RemoteForward = {\n      bind.port = 8081;\n      host.address = \"10.0.0.14\";\n      host.port = 80;\n    };\n  };\n}\n# Generated groups can also be placed after named blocks.\n// lib.hm.dag.entriesAfter \"corp-fallback\" [ \"corp-match\" ] [\n  {\n    header = \"Host *.corp\";\n    User = \"corp\";\n  }\n]\n",
+      "kind": "hm",
+      "name": "programs.ssh.settings",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "DAG of open submodule of attribute set of anything"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/services/colima.nix"
+      ],
+      "declarations": [
+        "modules/services/colima.nix"
+      ],
+      "default": "pkgs.openssh",
+      "description": "The openssh package to use. Used by colima to manage the vm.",
+      "example": null,
+      "kind": "hm",
+      "name": "services.colima.sshPackage",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/services/restic.nix"
+      ],
+      "declarations": [
+        "modules/services/restic.nix"
+      ],
+      "default": "pkgs.openssh",
+      "description": "The openssh package to use.",
+      "example": null,
+      "kind": "hm",
+      "name": "services.restic.backups.<name>.ssh-package",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "package"
+    }
+  ],
+  "rev": null,
+  "source": "all",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 4,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 01, 2026 at 11:12 UTC"
+    },
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 8,
+      "error": null,
+      "kinds": [
+        "pkg",
+        "opt",
+        "program"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "search"
+}

@@ -1,0 +1,89 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 2,
+  "host": "mbp13",
+  "kind": "pkg",
+  "limit": 8,
+  "ok": true,
+  "query": "cowsay",
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Program which generates ASCII pictures of a cow with a message",
+      "homepage": "https://cowsay.diamonds",
+      "kind": "pkg",
+      "license": [
+        "GPL-3.0-only"
+      ],
+      "main_program": "cowsay",
+      "name": "cowsay",
+      "outputs": [
+        "man",
+        "out"
+      ],
+      "platforms": [
+        "arc-linux",
+        "powerpc-netbsd",
+        "rx-none",
+        "powerpc64le-linux"
+      ],
+      "pname": "cowsay",
+      "position": "pkgs/by-name/co/cowsay/package.nix:58",
+      "programs": [
+        "cowthink",
+        "cowsay"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "3.8.4"
+    },
+    {
+      "channel": "unstable",
+      "description": "Cowsay reborn, written in Go",
+      "homepage": "https://github.com/Code-Hex/Neo-cowsay",
+      "kind": "pkg",
+      "license": [
+        "GPL-3.0-only"
+      ],
+      "main_program": "cowsay",
+      "name": "neo-cowsay",
+      "outputs": [
+        "man",
+        "out"
+      ],
+      "platforms": [
+        "arc-linux",
+        "powerpc-netbsd",
+        "rx-none",
+        "powerpc64le-linux"
+      ],
+      "pname": "neo-cowsay",
+      "position": "pkgs/by-name/ne/neo-cowsay/package.nix:23",
+      "programs": [
+        "cowthink",
+        "cowsay"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "2.0.4"
+    }
+  ],
+  "rev": "1c89083e451e891152365b799595cf7790a43325",
+  "source": "search.nixos.org",
+  "sources": {
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 8,
+      "error": null,
+      "kinds": [
+        "pkg"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "search"
+}

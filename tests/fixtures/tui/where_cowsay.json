@@ -1,0 +1,19 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages"
+    ],
+    "misses": []
+  },
+  "declared": [],
+  "host": "mbp13",
+  "installed": [],
+  "kind": "package",
+  "mentions": [],
+  "name": "cowsay",
+  "ok": true,
+  "programs": [],
+  "verb": "where"
+}

@@ -1,0 +1,136 @@
+{
+  "cached": true,
+  "channel": "unstable",
+  "count": 6,
+  "host": "mbp13",
+  "kind": "hm",
+  "limit": 6,
+  "ok": true,
+  "query": "kitty",
+  "results": [
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": "{ }",
+      "description": "Define action aliases.",
+      "example": "{\n  launch_tab = \"launch --cwd=current --type=tab\";\n  launch_window = \"launch --cwd=current --type=os-window\";\n}",
+      "kind": "hm",
+      "name": "programs.kitty.actionAliases",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "attribute set of string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": "null",
+      "description": "Configure Kitty automatic color themes. This creates\n{file}`$XDG_CONFIG_HOME/kitty/light-theme.auto.conf`,\n{file}`$XDG_CONFIG_HOME/kitty/dark-theme.auto.conf`, and\n{file}`$XDG_CONFIG_HOME/kitty/no-preference-theme.auto.conf`.\nKitty applies these based on the OS color scheme, and they override\nother color and background image settings.",
+      "example": "{\n  dark = \"TokyoNight\";\n  light = \"GitHub\";\n  noPreference = \"OneDark\";\n}",
+      "kind": "hm",
+      "name": "programs.kitty.autoThemeFiles",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "null or (submodule)"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": null,
+      "description": "Theme name for dark color scheme.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.kitty.autoThemeFiles.dark",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": null,
+      "description": "Theme name for light color scheme.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.kitty.autoThemeFiles.light",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": null,
+      "description": "Theme name for no-preference color scheme.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.kitty.autoThemeFiles.noPreference",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/kitty.nix"
+      ],
+      "declarations": [
+        "modules/programs/kitty.nix"
+      ],
+      "default": "null",
+      "description": "Command-line options to use when launched by Mac OS GUI",
+      "example": "[\n  \"--single-instance\"\n  \"--directory=/tmp/my-dir\"\n  \"--listen-on=unix:/tmp/my-socket\"\n]",
+      "kind": "hm",
+      "name": "programs.kitty.darwinLaunchOptions",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "null or (list of string)"
+    }
+  ],
+  "rev": null,
+  "source": "home-manager-options",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 6,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 01, 2026 at 11:12 UTC"
+    }
+  },
+  "verb": "search"
+}

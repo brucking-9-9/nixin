@@ -1,0 +1,55 @@
+{
+  "authoritative": {
+    "branch": "main",
+    "dirty": [],
+    "exists": true,
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "path": "/etc/nixos",
+    "relation": "same"
+  },
+  "cache_key": "source 1x3s0pq2yq0j5kq8a9w6zk4m4v5g8n2r",
+  "cached": false,
+  "diff": {
+    "added": [
+      {
+        "name": "cowsay",
+        "size": 52429,
+        "version": "3.8.4"
+      }
+    ],
+    "changed": [],
+    "removed": [],
+    "size_delta": 52429
+  },
+  "drv": "/nix/store/m7v2c3k1q9z8x6w5v4u3t2s1r0p9o8n7-nixos-system-mbp13-26.11.20261023.3ec6363.drv",
+  "duration_s": 84.6,
+  "host": "mbp13",
+  "ok": true,
+  "out": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+  "pending_commits": [],
+  "running": {
+    "generation": 112,
+    "profile": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "profile_generation": 112,
+    "store_path": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363"
+  },
+  "timings": {
+    "build_s": 51.2,
+    "eval_s": 33.1
+  },
+  "up_to_date": false,
+  "verb": "plan",
+  "warnings": [],
+  "workspace": {
+    "branch": "main",
+    "dirty": [
+      "hosts/mbp13/default.nix",
+      "installer/history.jsonl",
+      "installer/mbp13.nix",
+      "installer/state.json"
+    ],
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "path": "/home/master/nixos",
+    "untracked": []
+  }
+}

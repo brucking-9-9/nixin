@@ -1,0 +1,18 @@
+{
+  "error": {
+    "code": "needs-sudo",
+    "commands": [
+      "sudo git -C /etc/nixos pull --ff-only /home/master/nixos main",
+      "sudo nixos-rebuild switch --flake /etc/nixos#mbp13"
+    ],
+    "committed": "a1f0c3e9b8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3",
+    "message": "root is needed and sudo -n cannot get it without a password (sudo: a password is required). Run:\n  sudo git -C /etc/nixos pull --ff-only /home/master/nixos main\n  sudo nixos-rebuild switch --flake /etc/nixos#mbp13\n(or `sudo -v` once, then nixin apply again)",
+    "out": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "privileged_commands": [
+      "sudo -n git -C /etc/nixos pull --ff-only /home/master/nixos main"
+    ]
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "apply"
+}

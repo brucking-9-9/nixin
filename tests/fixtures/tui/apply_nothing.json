@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "nothing-to-apply",
+    "message": "the workspace HEAD 7da2b4c is already in /etc/nixos and /run/current-system is its build (generation 112)"
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "apply"
+}

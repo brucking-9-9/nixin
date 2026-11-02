@@ -1,0 +1,258 @@
+{
+  "cached": false,
+  "channel": "unstable",
+  "count": 8,
+  "host": "mbp13",
+  "kind": "pkg",
+  "limit": 8,
+  "ok": true,
+  "query": "firefox",
+  "results": [
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox",
+      "name": "firefox",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "x86_64-freebsd",
+        "m68k-linux",
+        "armv6l-linux",
+        "loongarch64-linux"
+      ],
+      "pname": "firefox",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [
+        "firefox"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "159.0"
+    },
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox",
+      "name": "firefox-unwrapped",
+      "outputs": [
+        "symbols",
+        "debug",
+        "out"
+      ],
+      "platforms": [
+        "mipsel-netbsd",
+        "x86_64-netbsd",
+        "x86_64-redox",
+        "mips64-linux"
+      ],
+      "pname": "firefox-unwrapped",
+      "position": "pkgs/applications/networking/browsers/firefox/packages/firefox.nix:20",
+      "programs": [
+        "firefox"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "159.0"
+    },
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox",
+      "name": "firefox-esr-153-unwrapped",
+      "outputs": [
+        "out",
+        "symbols",
+        "debug"
+      ],
+      "platforms": [
+        "powerpc64-linux",
+        "loongarch64-linux",
+        "microblaze-linux",
+        "i686-openbsd"
+      ],
+      "pname": "firefox-unwrapped",
+      "position": "pkgs/applications/networking/browsers/firefox/packages/firefox-esr-153.nix:20",
+      "programs": [
+        "firefox"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "153.6.0esr"
+    },
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox-esr",
+      "name": "firefox-esr",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "riscv64-netbsd",
+        "sh4-linux",
+        "x86_64-netbsd",
+        "mips-linux"
+      ],
+      "pname": "firefox",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [
+        "firefox-esr"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "153.6.0esr"
+    },
+    {
+      "channel": "unstable",
+      "description": "Mozilla Firefox, free web browser (binary package)",
+      "homepage": "https://www.mozilla.org/firefox/",
+      "kind": "pkg",
+      "license": [
+        "firefox"
+      ],
+      "main_program": "firefox",
+      "name": "firefox-bin",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "aarch64-darwin",
+        "x86_64-linux",
+        "aarch64-linux",
+        "i686-linux"
+      ],
+      "pname": "firefox-bin",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "159.0"
+    },
+    {
+      "channel": "unstable",
+      "description": "Tool to install, manage and use Progressive Web Apps (PWAs) in Mozilla Firefox (native component)",
+      "homepage": "https://pwasforfirefox.filips.si/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefoxpwa",
+      "name": "firefoxpwa",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "mips64-linux",
+        "loongarch64-linux",
+        "armv5tel-linux",
+        "riscv32-linux"
+      ],
+      "pname": "firefoxpwa",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [
+        "firefoxpwa-connector",
+        "firefoxpwa"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "2.20.1"
+    },
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox",
+      "name": "firefox-mobile",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "powerpc-netbsd",
+        "mips64el-linux",
+        "riscv64-linux",
+        "x86_64-freebsd"
+      ],
+      "pname": "firefox",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "159.0"
+    },
+    {
+      "channel": "unstable",
+      "description": "Web browser built from Firefox source tree",
+      "homepage": "http://www.mozilla.com/en-US/firefox/",
+      "kind": "pkg",
+      "license": [
+        "MPL-2.0"
+      ],
+      "main_program": "firefox-esr",
+      "name": "firefox-esr-153",
+      "outputs": [
+        "out"
+      ],
+      "platforms": [
+        "m68k-linux",
+        "mipsel-linux",
+        "microblazeel-linux",
+        "mips-linux"
+      ],
+      "pname": "firefox",
+      "position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+      "programs": [],
+      "rev": "1c89083e451e891152365b799595cf7790a43325",
+      "source": "search.nixos.org",
+      "unfree": null,
+      "version": "153.6.0esr"
+    }
+  ],
+  "rev": "1c89083e451e891152365b799595cf7790a43325",
+  "source": "search.nixos.org",
+  "sources": {
+    "search.nixos.org": {
+      "cached": false,
+      "channel": "unstable",
+      "count": 8,
+      "error": null,
+      "kinds": [
+        "pkg"
+      ],
+      "rev": "1c89083e451e891152365b799595cf7790a43325"
+    }
+  },
+  "verb": "search"
+}

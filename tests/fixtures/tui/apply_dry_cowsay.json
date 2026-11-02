@@ -1,0 +1,126 @@
+{
+  "authoritative": {
+    "path": "/etc/nixos",
+    "relation": "same"
+  },
+  "cached": true,
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/master/nixos",
+        "add",
+        "-u"
+      ],
+      "command": "git -C /home/master/nixos add -u",
+      "privileged": false,
+      "step": "commit"
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/master/nixos",
+        "commit",
+        "-m",
+        "nixin: mbp13: +cowsay"
+      ],
+      "command": "git -C /home/master/nixos commit -m 'nixin: mbp13: +cowsay'",
+      "privileged": false,
+      "step": "commit"
+    },
+    {
+      "argv": [
+        "sudo",
+        "-n",
+        "git",
+        "-C",
+        "/etc/nixos",
+        "pull",
+        "--ff-only",
+        "/home/master/nixos",
+        "main"
+      ],
+      "backend": "sudo",
+      "by_hand": "sudo git -C /etc/nixos pull --ff-only /home/master/nixos main",
+      "command": "sudo -n git -C /etc/nixos pull --ff-only /home/master/nixos main",
+      "privileged": true,
+      "step": "pull"
+    },
+    {
+      "argv": [
+        "sudo",
+        "-n",
+        "nixos-rebuild",
+        "switch",
+        "--flake",
+        "/etc/nixos#mbp13"
+      ],
+      "backend": "sudo",
+      "by_hand": "sudo nixos-rebuild switch --flake /etc/nixos#mbp13",
+      "command": "sudo -n nixos-rebuild switch --flake /etc/nixos#mbp13",
+      "privileged": true,
+      "step": "switch"
+    }
+  ],
+  "commit": {
+    "files": [
+      "hosts/mbp13/default.nix",
+      "installer/history.jsonl",
+      "installer/mbp13.nix",
+      "installer/state.json"
+    ],
+    "message": "nixin: mbp13: +cowsay\n\nnixos mbp13: + cowsay"
+  },
+  "diff": {
+    "added": [
+      {
+        "name": "cowsay",
+        "size": 52429,
+        "version": "3.8.4"
+      }
+    ],
+    "changed": [],
+    "removed": [],
+    "size_delta": 52429
+  },
+  "dry_run": true,
+  "duration_s": 1.3,
+  "host": "mbp13",
+  "ok": true,
+  "out": "/nix/store/qsrps64fz4w7a7y4hq2p8c2qj9w0b1xk-nixos-system-mbp13-26.11.20261023.3ec6363",
+  "pending_commits": [],
+  "privilege": {
+    "pull": {
+      "backend": "sudo",
+      "ready": false,
+      "why": "sudo: a password is required"
+    },
+    "switch": {
+      "backend": "sudo",
+      "ready": false,
+      "why": "sudo: a password is required"
+    }
+  },
+  "running": {
+    "generation": 112,
+    "profile": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "profile_generation": 112,
+    "store_path": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363"
+  },
+  "verb": "apply",
+  "warnings": [],
+  "workspace": {
+    "branch": "main",
+    "dirty": [
+      "hosts/mbp13/default.nix",
+      "installer/history.jsonl",
+      "installer/mbp13.nix",
+      "installer/state.json"
+    ],
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "path": "/home/master/nixos",
+    "untracked": []
+  }
+}

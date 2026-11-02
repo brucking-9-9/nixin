@@ -1,0 +1,104 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [],
+    "misses": [
+      "toplevel",
+      "packages"
+    ]
+  },
+  "config": {
+    "dirty": true,
+    "fingerprint": "40453c0db10954140e9db13fbb4b8b56c257a30a36948518363857b36aebb571",
+    "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+    "host_is_local": true,
+    "hosts": [
+      "19BK",
+      "mbp13"
+    ],
+    "last_modified": 1793587602,
+    "path": "/home/master/nixos",
+    "source": "/nix/store/g27bkid6r0mxq87d5wvy8wdlbkgj02v4-source",
+    "source_hash": "g27bkid6r0mxq87d5wvy8wdlbkgj02v4"
+  },
+  "eval": {
+    "ok": true,
+    "seconds": 32.65,
+    "toplevel": "/nix/store/l5qdzim9bvc1852f8s9i4bc5hg9limkv-nixos-system-mbp13-26.11.20261023.3ec6363.drv"
+  },
+  "hm_users": [],
+  "host": "mbp13",
+  "lock": {
+    "date": "2026-10-23",
+    "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "input": "nixpkgs",
+    "last_modified": 1792773339,
+    "nar_hash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+    "node": "nixpkgs_2",
+    "owner": "nixos",
+    "ref": "nixos-unstable",
+    "repo": "nixpkgs",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "type": "github"
+  },
+  "ok": true,
+  "options": {},
+  "packages": {
+    "home": {},
+    "system": 423
+  },
+  "pending": {
+    "authoritative": {
+      "head": "7da2b4cdd8b2ddde932eecf4c500b563273c7684",
+      "path": "/etc/nixos"
+    },
+    "built": null,
+    "commits": [],
+    "dirty": [
+      "hosts/mbp13/default.nix",
+      "installer/history.jsonl",
+      "installer/mbp13.nix",
+      "installer/state.json"
+    ],
+    "running_matches": true,
+    "untracked": [],
+    "workspace": "/home/master/nixos"
+  },
+  "programs": {
+    "home": {},
+    "system": [
+      "bash",
+      "dconf",
+      "firefox",
+      "fuse",
+      "gamemode",
+      "gamescope",
+      "git",
+      "hyprland",
+      "hyprlock",
+      "kde-pim",
+      "less",
+      "nano",
+      "niri",
+      "starship",
+      "steam",
+      "xwayland",
+      "zoxide",
+      "zsh"
+    ]
+  },
+  "running": {
+    "hostname": "mbp13",
+    "matches_lock": true,
+    "nixpkgs_rev": "3ec6363",
+    "system": "/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363",
+    "version": "26.11.20261023.3ec6363"
+  },
+  "timings": {
+    "packages": 7.1,
+    "toplevel": 68.2,
+    "total": 76.9
+  },
+  "verb": "status"
+}
