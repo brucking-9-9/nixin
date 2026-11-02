@@ -647,38 +647,45 @@ def has_pending(p: dict[str, Any] | None) -> bool:
 
 
 def dry_run_fields(doc: Doc) -> list[Field]:
-    """`apply --dry-run`: what would be committed, the commands in order, whether root is
-    ready, and whether it still has to build."""
+    """`apply --dry-run`, most important first (a phone shows a dozen lines): what would be
+    committed, the closure diff, what root will run, whether sudo is ready, the build, then
+    the unprivileged commands."""
     out: list[Field] = []
     commit = doc.get("commit")
     if commit:
-        out.append(Field("commit", ", ".join(commit.get("files") or []), "accent"))
+        files = commit.get("files") or []
+        out.append(Field("commit", f"{len(files)} files: " + ", ".join(files), "accent"))
     pc = doc.get("pending_commits")
     if pc:
         out.append(Field("commits", f"{len(pc)} to bring in", ""))
+    if doc.get("diff") is not None:
+        out.append(Field("closure", closure_head(doc.get("diff")), ""))
+    cmds = doc.get("commands") or []
+    for c in cmds:
+        if c.get("privileged"):
+            out.append(
+                Field(f"{c.get('step')} (root)", str(c.get("by_hand") or c.get("command")), "warn")
+            )
+    ready = []
+    for step, pv in (doc.get("privilege") or {}).items():
+        ok = bool(pv.get("ready"))
+        why = str(pv.get("why") or ("ready" if ok else "needs a password"))
+        backend = str(pv.get("backend"))
+        ready.append((step, ok, why if why.startswith(backend) else f"{backend}: {why}"))
+    if ready and len({(ok, text) for _, ok, text in ready}) == 1:
+        _, ok, text = ready[0]
+        out.append(Field("root", text, "ok" if ok else "warn"))
+    else:
+        out += [Field(f"{step} via", text, "ok" if ok else "warn") for step, ok, text in ready]
     if doc.get("out"):
         out.append(Field("build", f"cached: {store_name(doc['out'])}", "dim"))
     else:
         out.append(
             Field("build", "not built yet: apply builds first (minutes; a kernel: longer)", "warn")
         )
-    for c in doc.get("commands") or []:
-        label = f"{c.get('step')}{' (root)' if c.get('privileged') else ''}"
-        out.append(
-            Field(
-                label,
-                str(c.get("by_hand") or c.get("command")),
-                "warn" if c.get("privileged") else "dim",
-            )
-        )
-    for step, pv in (doc.get("privilege") or {}).items():
-        ok = pv.get("ready")
-        why = str(pv.get("why") or ("ready" if ok else "needs a password"))
-        backend = str(pv.get("backend"))
-        text = why if why.startswith(backend) else f"{backend}: {why}"
-        out.append(Field(f"{step} via", text, "ok" if ok else "warn"))
-    if doc.get("diff") is not None:
-        out.append(Field("closure", closure_head(doc.get("diff")), "dim"))
+    for c in cmds:
+        if not c.get("privileged"):
+            out.append(Field(str(c.get("step")), str(c.get("command")), "dim"))
     for w in doc.get("warnings") or []:
         out.append(Field("warning", str(w), "warn"))
     return out

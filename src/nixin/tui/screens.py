@@ -73,11 +73,13 @@ class SearchScreen(Base):
         Binding("k", "next_kind", "Kind"),
         Binding("c", "channel", "Channel"),
         Binding("escape", "escape", "Back", show=False),
+        Binding("down", "results", "Results", show=False),
     ]
 
     def __init__(self) -> None:
         super().__init__()
         self.kind = "pkg"
+        self._jump = False  # Enter in the query: move to the results when they arrive
         self.doc: dict | None = None
         self.hits: list[view.Hit] = []
         self._debounce: Timer | None = None
@@ -111,8 +113,10 @@ class SearchScreen(Base):
     def _submitted(self, event: Input.Submitted) -> None:
         if self._debounce is not None:
             self._debounce.stop()
+        self._jump = True
         self.search()
-        if self.hits:
+        if self.hits and self.doc is not None and self._last == self._key():
+            self._jump = False
             self.query_one("#results", DataTable).focus()
 
     @on(Tabs.TabActivated, "#kinds")
@@ -135,15 +139,24 @@ class SearchScreen(Base):
         self.query_one("#query", Input).focus()
 
     def action_escape(self) -> None:
+        """From the query to the results (so p, s, q work), and back."""
         q = self.query_one("#query", Input)
-        if q.has_focus and self.hits:
+        if q.has_focus:
             self.query_one("#results", DataTable).focus()
-        elif not q.has_focus:
+        else:
             q.focus()
 
-    def search(self, force: bool = False) -> None:
+    def action_results(self) -> None:
+        if self.query_one("#query", Input).has_focus and self.hits:
+            self.query_one("#results", DataTable).focus()
+
+    def _key(self) -> tuple:
         query = self.query_one("#query", Input).value.strip()
-        key = (query, self.kind, self.nixin.channel)
+        return (query, self.kind, self.nixin.channel)
+
+    def search(self, force: bool = False) -> None:
+        key = self._key()
+        query = key[0]
         if not query:
             self._last = None
             self.show(None)
@@ -168,6 +181,9 @@ class SearchScreen(Base):
         self.query_one("#notice", NoticeBox).show(notice)
         self.hits = view.hits(doc) if doc and doc.get("ok") else []
         self.render_table()
+        if self._jump and self.hits:
+            self.query_one("#results", DataTable).focus()
+        self._jump = False
         src = self.query_one("#source", Line)
         src.show(" · ".join(view.source_lines(doc)) if doc and doc.get("ok") else "", "dim")
 
@@ -461,7 +477,7 @@ class PendingScreen(Base):
             yield Fields(id="pending", label_width=10)
             yield Title("this session")
             yield Fields(id="session", label_width=10)
-            yield Title("plan")
+            yield Title("plan", id="plan-title")
             yield Spinner(id="plan-spin")
             yield LogView(id="log")
             yield NoticeBox(id="notice")
@@ -553,6 +569,9 @@ class PendingScreen(Base):
                 *(cell(self.app, x, r.style) for x in (r.sign, r.name, r.version, r.size))
             )
         table.display = bool(rows)
+        # the result is the bottom of this screen: bring it into view (a phone shows ~15 rows)
+        body = self.query_one("#body", VerticalScroll)
+        self.set_timer(0.05, lambda: body.scroll_end(animate=False))
 
     def action_apply(self) -> None:
         self.nixin.start_apply()

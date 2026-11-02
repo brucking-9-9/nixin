@@ -152,7 +152,7 @@ class ApplyModal(Modal):
                 f"apply to {self.dry.get('host')}: commit, pull, switch", classes="dialog-title"
             )
             with VerticalScroll():
-                yield Fields(id="dry", label_width=12)
+                yield Fields(id="dry", label_width=13)
             gen = view.generated_message(self.dry)
             yield Static("commit message (empty: generated)", classes="dim")
             yield Input(placeholder=gen or "nixin: …", id="message", compact=True)
