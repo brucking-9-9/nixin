@@ -318,9 +318,15 @@ several places is `ambiguous`; repeat with `--where FILE:LINE` (from `candidates
 nixin set OPTION NIX-EXPR... [--home USER] [--where FILE:LINE] [--config DIR] [--dry-run] [--no-eval]
 ```
 
-Sets OPTION to a Nix expression (the remaining arguments joined with spaces, checked
-with `nix-instantiate --parse`). If a module already defines OPTION, its value is
-rewritten in place (wrappers like `lib.mkForce`/`lib.mkIf c` kept). Otherwise the
+Sets OPTION to a Nix expression (the remaining arguments joined with spaces), written
+exactly as given. The value is checked for syntax only (`nix-instantiate --parse` of
+`with { }; VALUE`), so it may name the module's arguments: `pkgs.linuxPackages_7_2`,
+`lib.mkForce true`, `config.networking.hostName`. Whether those names exist where the
+value lands is the parse of the edited file before the write (`invalid-nix` with `file`:
+a hand-written `{ ... }:` module has no `lib`; the generated module binds `config`, `lib`
+and `pkgs`). Whether the value suits the option (type, conflicts) is the eval check after
+the write: `checks.eval`, repeated in `warnings`. If a module already defines OPTION, its
+value is rewritten in place (wrappers like `lib.mkForce`/`lib.mkIf c` kept). Otherwise the
 definition goes into the generated module as an attribute path
 (`services.openssh.settings.X11Forwarding = true;`).
 
@@ -345,7 +351,7 @@ Removes OPTION's definition: from state.json, or in place from a hand-written mo
 | `changes[]` | `file` (repo-relative), `kind` (`created`, `modified`, `deleted`), `diff` (unified). Empty when nothing changed |
 | `imports_added[]` | `{file, import}` |
 | `imports_removed[]` | `{file, line, restored}` (`restored`: a one-line list put back exactly) |
-| `checks` | `parse[]` = `{file, ok, error}` per written `.nix` file; `eval` = null (dry run, `--no-eval`, nothing changed) or the eval proof. For packages: `ok`, `attr`, `command` (to rerun it by hand), `packages` (count), `present{attr: name}`, `absent[]`, and `missing[]`/`still_installed{}` when it did not work; for options: `ok`, `attr`, `value` or `defined: false`, `note`. When the eval itself fails: `ok: false`, `code`, `message`, `attr` |
+| `checks` | `parse[]` = `{file, ok, error}` per written `.nix` file; `eval` = null (dry run, `--no-eval`, nothing changed) or the eval proof. For packages: `ok`, `attr`, `command` (to rerun it by hand), `packages` (count), `present{attr: name}`, `absent[]`, and `missing[]`/`still_installed{}` when it did not work; for options: `ok`, `attr`, `value` or `defined: false`, `note`; in `value`, functions, derivations, package sets (anything with `callPackage`) and parts past depth 5 or 60 items are the strings `<function>`, `<derivation NAME>`, `<package set>`, `<…>`. When the eval itself fails: `ok: false`, `code`, `message`, `attr` |
 | `warnings[]` | strings, always present: a conditional list, a kept wrapper, a hand-edited generated file, an eval failure, … |
 
 `checks.eval.ok: false` does not make the verb fail. The text change stands, `ok` stays
@@ -354,8 +360,9 @@ true, exit 0, and the failure is repeated in `warnings` (open question 1 in
 
 Errors (an error writes nothing): `usage`, `config-not-found`, `not-a-workspace`,
 `unknown-host`, `unknown-user` (the message names the hosts where USER exists),
-`unknown-package` (`add`), `invalid-nix` (bad value, bad name, or a file that would not
-parse after the edit; then `file`), `not-found` (`rm`/`unset`: with `hints[]`, e.g.
+`unknown-package` (`add`), `invalid-nix` (a value that is not well-formed Nix, a bad
+name, or a file that would not parse after the edit, e.g. a variable it does not bind;
+then `file`), `not-found` (`rm`/`unset`: with `hints[]`, e.g.
 `programs.kitty.enable is set at …`, or `candidates[]` when `--where` matched nothing),
 `ambiguous` (with `candidates[]` = `{file, line, option, text}`),
 `import-site-missing` (with the exact `line` to add, and `file`), `file-conflict` (an
@@ -573,7 +580,7 @@ view; the document is the same apart from `message`.
 | `not-a-workspace` | writer, apply | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
 | `unknown-user` | writer | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
-| `invalid-nix` | writer | the value or name does not parse, or an edited file would not parse |
+| `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |
 | `ambiguous` | writer | several declarations match; `candidates[]`, repeat with `--where` |
 | `import-site-missing` | writer | no module or no `imports = [ … ];` to import the generated file from; `line` to add |
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
