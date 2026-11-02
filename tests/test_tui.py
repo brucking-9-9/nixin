@@ -325,6 +325,84 @@ def test_details_add_with_diff_preview(size):
     ]
 
 
+def test_home_manager_user_toggle():
+    status = {**load("status_clean"), "hm_users": ["brucking"]}
+    hm_where = {
+        "ok": True,
+        "kind": "option",
+        "name": "programs.kitty.enable",
+        "cache": {},
+        "scopes": [
+            {
+                "scope": "home",
+                "user": "brucking",
+                "mode": "exact",
+                "under_prefix": 1,
+                "excluded": {},
+                "options": [
+                    {
+                        "name": "programs.kitty.enable",
+                        "option": "programs.kitty.enable",
+                        "type": "boolean",
+                        "value": True,
+                        "value_found": True,
+                        "declarations": [],
+                        "definitions": [],
+                    }
+                ],
+            }
+        ],
+    }
+    routes = {**COWSAY, "status": status}
+
+    async def script(app, pilot, fake):
+        await open_details(app, pilot)  # a package: home is off until toggled
+        home = app.screen.query_one("#home")
+        assert str(home.label) == "home: off (h)"
+        await pilot.press("h")  # no users known yet: status is loaded for them
+        await settle(app, pilot)
+        assert str(home.label) == "home: brucking (h)"
+        await pilot.press("a")
+        await settle(app, pilot)
+        await pilot.press("escape", "h")  # cancel; back to off
+        assert str(home.label) == "home: off (h)"
+
+    _, fake = drive(script, routes)
+    assert ["status"] in fake.verbs()
+    assert ["add", "cowsay", "--home", "brucking", "--dry-run"] in fake.verbs()
+
+    hm_routes = {
+        "search": "search_hm_kitty",
+        "info": {"ok": False, "error": {"code": "not-found", "message": "no"}},
+        "where": hm_where,
+        "set --dry-run": "add_cowsay_dry",
+    }
+
+    async def hm(app, pilot, fake):
+        await pilot.press(*"kitty", "enter")
+        await settle(app, pilot)
+        assert app.screen.hits[0].target == "programs.kitty.actionAliases"
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert str(app.screen.query_one("#home").label) == "home: brucking"  # from where
+        await pilot.press("e")
+        await pilot.pause()
+        assert app.screen.query_one("#value").value == "true"  # where's value
+        await pilot.press("backspace", *"false", "enter")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+
+    _, fake = drive(script=hm, routes=hm_routes)
+    assert fake.verbs()[-1] == [
+        "set",
+        "programs.kitty.actionAliases",
+        "false",
+        "--home",
+        "brucking",
+        "--dry-run",
+    ]
+
+
 def test_cancel_in_the_diff_modal_writes_nothing():
     async def script(app, pilot, fake):
         await open_details(app, pilot)
