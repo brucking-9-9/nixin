@@ -34,6 +34,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "versions": ("discovery", "version history of a package (which nixpkgs rev shipped what)"),
     "status": ("truth", "this host: lock rev, generation, counts, pending (unapplied) changes"),
     "where": ("truth", "where a package / option is declared in the config, with its value"),
+    "list": ("truth", "the installed packages (system, Home Manager), where each is listed"),
     "add": ("writer", "add a package (system, or --home for Home Manager)"),
     "rm": ("writer", "remove a package, wherever it is declared"),
     "set": ("writer", "set an option to a Nix value"),
