@@ -312,5 +312,10 @@ def _terms_query(names: list[str]) -> dict[str, Any]:
             }
         },
         "size": es.MAX_SIZE,
-        "_source": ["package_attr_name", "package_pname", "package_pversion"],
+        "_source": [
+            "package_attr_name",
+            "package_pname",
+            "package_pversion",
+            "package_position",
+        ],
     }

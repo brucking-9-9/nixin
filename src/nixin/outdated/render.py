@@ -43,7 +43,7 @@ def _scope_rows(doc: dict[str, Any], scope: str, user: str | None) -> list[tuple
     else:
         for r in filter(mine, doc["changed"]):
             note = [_dir_note(r)] if _dir_note(r) else []
-            if r.get("attr") and r["attr"] != r["pname"]:
+            if r.get("attr") and r["attr"].rsplit(".", 1)[-1] != r["pname"]:  # not kdePackages.x
                 note.append(f"as {r['attr']}")
             rows.append((r["pname"], r["installed"], r["published"], "  ".join(note)))
     rows.sort(key=lambda r: r[0].lower())

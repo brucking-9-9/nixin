@@ -157,22 +157,55 @@ def pnames(doc: dict[str, Any], home: str | None = None) -> list[str]:
     return sorted(out)
 
 
-def pick(pname: str, hits: list[dict[str, Any]]) -> dict[str, Any] | None:
+_STORE_FILE = re.compile(r"^/nix/store/[^/]+/(.+?)(?::\d+)?$")
+_REL_FILE = re.compile(r"^(.+?)(?::\d+)?$")
+
+
+def position_file(position: str | None) -> str | None:
+    """`/nix/store/…-source/pkgs/kde/gear/ark/default.nix:7` (meta.position) or
+    `pkgs/kde/gear/ark/default.nix:7` (search.nixos.org) -> the nixpkgs-relative file."""
+    if not position:
+        return None
+    m = _STORE_FILE.match(position) or _REL_FILE.match(position)
+    return m.group(1) if m else None
+
+
+def _major(version: str | None) -> str | None:
+    comps = _components(version or "")
+    return comps[0] if comps else None
+
+
+def pick(
+    pname: str,
+    hits: list[dict[str, Any]],
+    installed: str | None = None,
+    files: set[str] | None = None,
+) -> dict[str, Any] | None:
     """The channel's package for an installed pname, from the hits that share it.
 
     A pname is shared by many attributes (python3: python3, python314, python316 at
-    3.16.0a1, mopidyPackages.python; git: git and emacsPackages.git at 20140128), so the
-    newest version is the wrong answer. The attribute named like the pname wins; else
-    the shortest top-level attribute (gcc-wrapper -> gcc), else the shortest of all,
-    the order search.nixos.org ranks by.
+    3.16.0a1; git: git and emacsPackages.git at 20140128; ark: kdePackages.ark and an
+    unrelated top-level ark at 0.1.252; qtbase: qt5.qtbase and qt6.qtbase), so the
+    newest version is the wrong answer. In order: the attribute defined in the same
+    nixpkgs file as the installed one (`files`, from meta.position), the same major
+    version as `installed`, the attribute named like the pname, a top-level attribute,
+    the shortest name (the order search.nixos.org ranks by).
     """
     mine = [h for h in hits if h.get("package_pname") == pname and h.get("package_pversion")]
     if not mine:
         return None
+    major = _major(installed)
 
-    def rank(h: dict[str, Any]) -> tuple[int, int, int, str]:
+    def rank(h: dict[str, Any]) -> tuple[bool, bool, bool, bool, int, str]:
         attr = h.get("package_attr_name") or ""
-        return (attr != pname, "." in attr, len(attr), attr)
+        return (
+            bool(files) and position_file(h.get("package_position")) not in files,
+            major is not None and _major(h.get("package_pversion")) != major,
+            attr != pname,
+            "." in attr,
+            len(attr),
+            attr,
+        )
 
     return min(mine, key=rank)
 
@@ -193,20 +226,26 @@ def published(
     total = 0
     per_scope: list[dict[str, Any]] = []
     for scope in scopes(lock, home):
-        inv = inventory(p for p in packages(lock, scope) if p.get("pname"))
+        mine = [p for p in packages(lock, scope) if p.get("pname")]
+        inv = inventory(mine)
+        files: dict[str, set[str]] = {}
+        for p in mine:
+            f = position_file(p.get("position"))
+            if f:
+                files.setdefault(p["pname"], set()).add(f)
         total += len(inv)
         n = 0
         for pname in sorted(inv):
+            installed = sorted(inv[pname], key=version_key)
+            old = installed[-1]
             cands = by_pname.get(pname, [])
-            hit = pick(pname, cands)
+            hit = pick(pname, cands, old, files.get(pname))
             if hit is None:
                 unpublished.add(pname)
                 continue
             new = hit["package_pversion"]
-            installed = sorted(inv[pname], key=version_key)
             if new in installed:
                 continue
-            old = installed[-1]
             changed.append(
                 {
                     "pname": pname,
