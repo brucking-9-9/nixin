@@ -42,6 +42,9 @@ on merge it moves here.
     screenshots in `docs/tui/`, `docs/gui/`. Live on mbp13: both UIs read-only against
     `~/nixos`; the update round trip on a throwaway clone in both UIs. Nothing switched,
     no sudo, `~/nixos` untouched.
+  - Gates at 9c4f1cf: `nix build` 577 passed, 25 skipped (live), then `nixin gui:
+    self-test ok`; `nix develop -c pytest` the same; `ruff check`, `ruff format
+    --check`, `nix fmt -- --check` clean; qmllint clean (a test).
   - Half-done: nothing. Not run: Plan/Apply after an update (a new nixpkgs means a long
     build, and apply's dry run asks sudo).
   - Found live: at nixos-unstable 0bb2eed mbp13's config no longer evaluates (`gtk+-2.24.33`
