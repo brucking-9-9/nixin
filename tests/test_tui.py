@@ -13,11 +13,11 @@ from textual.widgets import DataTable, TextArea
 from tui_fake import COWSAY, FakeBackend, load, screen_text
 
 from nixin.cli import main
-from nixin.tui import backend, view
 from nixin.tui.app import NixinApp
 from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
+from nixin.ui import backend, view
 
 PHONE = (50, 25)
 DESKTOP = (120, 40)

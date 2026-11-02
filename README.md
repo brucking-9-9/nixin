@@ -38,6 +38,7 @@ status where                truth       what this config gives a host (evaluates
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
+gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
 
 With `--json` every invocation prints exactly one document on stdout, nothing on
@@ -83,7 +84,7 @@ nixin-tui --config ~/nixos          # = nixin --config ~/nixos tui; --host H, --
 
 A Textual UI that shows the same documents the CLI prints with `--json`: it calls the verb
 handlers in-process, in worker threads, and renders their documents
-(`src/nixin/tui/view.py` turns them into display rows). Search (kind filter, channel,
+(`src/nixin/ui/view.py`, shared with the GUI, turns them into display rows). Search (kind filter, channel,
 typing debounced, the CLI's `source channel@rev` footer) → Details (info, versions, and
 `where` for this host: installed? declared where?) → Add / Remove / Set / Unset, each
 previewed as the writer's `--dry-run` diff before anything is written, with a Home
@@ -99,11 +100,45 @@ phone over ssh (50×25: panes stacked, the description column dropped) as well a
 columns. Colours: `src/nixin/tui/theme.py`. Screenshots of both sizes: `docs/tui/`
 (`scripts/tui-screenshots.py` makes them, from the test fixtures or `--live`).
 
+## GUI
+
+```
+nixin-gui --config ~/nixos          # = nixin --config ~/nixos gui; --host H, --channel stable
+nixin-gui --self-test               # load the window, draw one frame, exit (checks the Qt setup)
+```
+
+A Qt 6 window (PySide6 + QML, Wayland or X11) over the same documents, through the same
+data path and view-model as the TUI (`src/nixin/ui/`: the verb handlers in-process, and
+the documents turned into display rows). The Python side (`src/nixin/gui/bridge.py`)
+exposes them as Qt objects and list models; verbs run on a thread pool, with a busy
+indicator in the top bar saying what runs, for how long, and what to expect.
+
+The left rail has **Search** (the query, typing debounced; the kind filter; the channel;
+the results; the CLI's source footer) with the selected row's **details** beside it (info,
+versions from NixHub, `where` on this host: installed? set where? the value), and Add /
+Remove / Set… / Unset for the system or a Home Manager user. Every write opens the
+writer's `--dry-run` diff in a dialog first (the user can be changed there), then Write.
+**Pending** shows `status.pending`, this session's writes and applies, and Plan (nix's
+build output streamed, then the closure diff); Apply… opens the apply dialog (`apply
+--dry-run`: what is committed, what root runs, sudo readiness; a commit message; the
+switch log streamed; the new generation; without a sudo ticket the exact root commands,
+with Copy and Retry). **Status** shows the lock, HEAD, the running system, pending,
+counts and caches. Error documents appear as a notice over the page (`code` + message,
+the candidates to pick for an ambiguous write, commands to copy).
+
+Keys: `/` search, `Ctrl+1/2/3` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
+in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).
+The palette is the quickshell one (`src/nixin/gui/qml/Nixin/Theme.qml`: background
+`#120B10`, cyan accent, pink for errors and destructive actions, purple for options), and
+the controls are a Qt Quick Controls style of their own (`qml/NixinStyle/`). The Wayland
+app id is `nixin`. Screenshots: `docs/gui/` (`scripts/gui-screenshots.py`, offscreen,
+from the test fixtures or `--live`).
+
 ## Develop
 
 ```
-nix develop                     # python + requests + textual, pytest, ruff, nixfmt
-pytest                          # offline: fixtures and fakes, no nix, no network
+nix develop                     # python + requests + textual + pyside6, pytest(-qt), qmllint, ruff, nixfmt
+pytest                          # offline: fixtures and fakes, no nix, no network; the GUI offscreen
 nix build                       # the same tests in the sandbox (checkPhase)
 ruff check && ruff format --check
 nix fmt -- --check              # or `nix fmt` to format; no path = every tracked *.nix
@@ -124,7 +159,9 @@ mbp13 (`docs/HANDOFF-integrate.md`: fixes and open questions); the apply layer t
 switched mbp13 for real from its workspace (add → plan → apply → rm → apply, and
 `configurationLimit 2` to free `/boot`): `docs/HANDOFF-apply.md`. The TUI ran the same
 round trip on mbp13 from a 50×25 terminal (generations 113 and 114):
-`docs/HANDOFF-tui.md`. See `docs/HANDOFF-*.md` for each layer.
+`docs/HANDOFF-tui.md`. The GUI ran on mbp13 against the real config (search, details,
+`where`, the add preview) and on its Wayland session: `docs/HANDOFF-gui.md`. See
+`docs/HANDOFF-*.md` for each layer.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com

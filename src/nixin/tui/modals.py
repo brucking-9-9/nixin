@@ -12,7 +12,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, OptionList, Static
 from textual.widgets.option_list import Option
 
-from . import view
+from ..ui import view
 from .widgets import Fields, NoticeBox, Spans, Title
 
 

@@ -1,5 +1,8 @@
 # HANDOFF: TUI (branch `tui`)
 
+> Since the GUI branch, `backend.py` and `view.py` live in `src/nixin/ui/` (shared by the TUI
+> and the GUI); the paths below are as they were when this was written.
+
 Written 2026-11-01 (late evening) on mbp13, headless, as `master`. The branch was cut from
 `apply` @ 1f47173 (all four backend layers). Nothing is pushed. This session switched mbp13
 twice, both from the TUI (generations 113 and 114). It was the only session running.

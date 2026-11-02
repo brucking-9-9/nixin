@@ -1,12 +1,12 @@
-"""Documents → display rows: the view-model of the TUI, and the one the GUI mirrors.
+"""Documents → display rows: the view-model the TUI and the GUI share.
 
-Pure functions over the --json documents (docs/CONTRACT.md). No Textual here, no I/O:
+Pure functions over the --json documents (docs/CONTRACT.md). No toolkit here, no I/O:
 every function takes a document (or a piece of one) and returns plain data: strings,
 `Field`s, `Span`s, `Hit`s. Wording follows the CLI's human output, reusing its helpers
 where they exist (discovery's source footer, truth's `nix_text`, apply's `human_size`).
 
 Each piece of text carries a semantic `style` that the UI maps to its palette
-(theme.STYLES for the TUI):
+(nixin.tui.theme.STYLES for the TUI, Theme.qml's `style()` for the GUI):
 
     ""        normal text
     "dim"     secondary text: paths, counts, hints
@@ -866,10 +866,10 @@ def status_sections(doc: Doc, running: dict[str, Any] | None = None) -> list[Sec
 # --- the session ----------------------------------------------------------------------------
 
 
-def farewell(writes: list[str], applied: list[Doc]) -> str:
-    """The line `nixin tui` prints after the app closes."""
+def farewell(writes: list[str], applied: list[Doc], prog: str = "nixin tui") -> str:
+    """The line `nixin tui` (or `nixin gui`, as `prog`) prints after the app closes."""
     if not writes and not applied:
-        return "nixin tui: nothing changed"
+        return f"{prog}: nothing changed"
     parts = []
     if writes:
         parts.append(f"wrote {len(writes)}: " + "; ".join(writes))
@@ -877,7 +877,7 @@ def farewell(writes: list[str], applied: list[Doc]) -> str:
         parts.append(f"applied: generation {applied[-1].get('generation')}")
     elif writes:
         parts.append("not applied yet (nixin plan, nixin apply)")
-    return "nixin tui: " + " · ".join(parts)
+    return f"{prog}: " + " · ".join(parts)
 
 
 def where_cue(doc: Doc) -> Span | None:

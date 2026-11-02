@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from nixin.tui.backend import Backend, Call
+from nixin.ui.backend import Backend, Call
 
 FIXTURES = Path(__file__).parent / "fixtures" / "tui"
 
