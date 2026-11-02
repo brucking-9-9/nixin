@@ -550,6 +550,34 @@ Costs: whatever the verbs it calls cost (see each verb). `plan` and `apply` run 
 mode under the TUI so that nix's build output and nixos-rebuild's log stream into its log
 view; the document is the same apart from `message`.
 
+### `gui`
+
+```
+nixin [--host H] [--config DIR] gui [--channel C] [--self-test]
+nixin-gui [--host H] [--config DIR] [--channel C] [--self-test]
+```
+
+The desktop UI (Qt 6, PySide6 + QML). Like `tui`, a consumer of this contract: it calls
+the same verb handlers in-process, on a thread pool, and renders their documents through
+the same view-model (`nixin.ui.view`). It writes only through `add`/`rm`/`set`/`unset`
+(after showing their `--dry-run` diff in a dialog) and switches only through `apply`
+(after `apply --dry-run` and a confirmation).
+
+Under `--json` it is a `usage` error, and so it is without a display (none of
+`WAYLAND_DISPLAY`, `DISPLAY`, `QT_QPA_PLATFORM` set). `--self-test` loads the window,
+draws one frame and exits 0 with `nixin gui: self-test ok (…)`; it calls no verb, so it
+runs anywhere Qt does (the package's install check runs it with
+`QT_QPA_PLATFORM=offscreen` in the build sandbox). A QML load error is `internal`
+(message `QML: …`). When the window closes it prints one line about the session, as
+`tui` does (`nixin gui: wrote 1: +cowsay (…) · not applied yet (nixin plan, nixin
+apply)`), and exits 0; if a verb is still running it waits for it first. It sets
+`GIT_TERMINAL_PROMPT=0` (unless already set).
+
+Costs: whatever the verbs it calls cost. It loads nothing on start (no `status`): search
+and its details (`info`, `versions`, `where`) when asked, `status` when Pending or
+Status is opened or the Home Manager users are needed. `plan` and `apply` run in human
+mode, as under `tui`, so their logs stream into the window.
+
 ## Error codes
 
 | code | from | when |

@@ -22,16 +22,26 @@
       # then `pkgs.nixin`, built against the consumer's own nixpkgs.
       overlays.default = final: prev: { nixin = final.python3Packages.callPackage ./package.nix { }; };
 
-      devShells = forAll (pkgs: {
-        default = pkgs.mkShell {
-          inputsFrom = [ self.packages.${pkgs.stdenv.hostPlatform.system}.nixin ];
-          packages = with pkgs; [
-            python3Packages.pytest
-            ruff
-            nixfmt
-          ];
-        };
-      });
+      devShells = forAll (
+        pkgs:
+        let
+          nixin = self.packages.${pkgs.stdenv.hostPlatform.system}.nixin;
+        in
+        {
+          default = pkgs.mkShell {
+            inputsFrom = [ nixin ];
+            packages = with pkgs; [
+              python3Packages.pytest
+              python3Packages.pytest-qt
+              qt6.qtdeclarative # qmllint
+              ruff
+              nixfmt
+            ];
+            # Qt's plugins and QML modules for pytest and for the GUI run from the tree
+            env = nixin.qtEnv;
+          };
+        }
+      );
 
       # `nix fmt` passes no paths, and bare nixfmt then reads stdin. Without a path
       # argument (only flags, e.g. `nix fmt -- --check`) this formats the tracked *.nix files.

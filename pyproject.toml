@@ -10,11 +10,12 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
-dependencies = ["requests", "textual"]
+dependencies = ["requests", "textual", "pyside6"]
 
 [project.scripts]
 nixin = "nixin.cli:main"
 nixin-tui = "nixin.tui:main"
+nixin-gui = "nixin.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -22,6 +23,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "nixin.truth" = ["*.nix"]
 "nixin.tui" = ["*.tcss"]
+"nixin.gui" = ["qml/*/*.qml", "qml/*/qmldir"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
