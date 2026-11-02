@@ -443,6 +443,7 @@ def nixin(capsys, world: World, *argv: str, host: str = "mbp13") -> dict:
     if first_verb(full) in (
         "status",
         "where",
+        "list",
         "add",
         "rm",
         "set",
@@ -508,6 +509,52 @@ def test_install_flow(world, capsys):
     doc = nixin(capsys, world, "rm", "cowsay")
     assert doc["checks"]["eval"]["absent"] == ["cowsay"]
     assert snapshot(world.root) == before  # add then rm leaves the tree as it was
+
+
+def test_list_flow(world, capsys):
+    """`list` on the fixture tree: what each host has, and the lines that list it (the
+    writer's scanner), a nixin-generated module included."""
+    doc = nixin(capsys, world, "list")
+    assert [(p["scope"], p["pname"]) for p in doc["packages"]] == [
+        ("system", "btop"),
+        ("system", "firefox"),
+        ("system", "git"),
+        ("system", "kitty"),
+    ]
+    assert doc["count"] == 4 and doc["users"] == [] and doc["warnings"] == []
+    by = {
+        p["pname"]: [(d["file"], d["line"], d["text"]) for d in p["declared"]]
+        for p in doc["packages"]
+    }
+    assert by["kitty"] == [("hosts/mbp13/default.nix", 16, "kitty")]
+    assert by["btop"] == [  # `rm btop` is ambiguous for the same reason
+        ("hosts/mbp13/default.nix", 17, "btop"),
+        ("hosts/mbp13/desktop.nix", 4, "pkgs.btop"),
+    ]
+
+    nixin(capsys, world, "add", "cowsay")
+    doc = nixin(capsys, world, "list", "--filter", "COW")
+    ((row,),) = [doc["packages"]]
+    assert (row["name"], row["scope"]) == ("cowsay-1.0", "system")
+    assert [(d["file"], d["text"]) for d in row["declared"]] == [
+        ("installer/mbp13.nix", "pkgs.cowsay")
+    ]
+    nixin(capsys, world, "rm", "cowsay")
+
+    doc = nixin(capsys, world, "list", host="19BK")
+    assert [(p["scope"], p["user"], p["pname"]) for p in doc["packages"]] == [
+        ("home", "alice", "fd"),
+        ("system", None, "git"),
+        ("system", None, "jq"),
+        ("system", None, "ripgrep"),
+        ("home", "alice", "ripgrep"),
+    ]
+    doc = nixin(capsys, world, "list", "--home", "alice", "--programs", host="19BK")
+    assert [p["declared"][0]["file"] for p in doc["packages"]] == ["home/modules/packages.nix"] * 2
+    assert doc["programs"] == [
+        {"scope": "home", "user": "alice", "name": "kitty", "option": "programs.kitty.enable"}
+    ]
+    assert nixin(capsys, world, "list", "--home", "alice")["error"]["code"] == "unknown-user"
 
 
 def test_option_flow(world, capsys):
@@ -627,6 +674,11 @@ SWEEP = [
     ["where", "kitty", "git"],  # usage: one NAME
     ["status", "extra"],  # usage
     ["where", "x", "--kind", "pkg"],  # usage (truth says package|option)
+    ["list"],
+    ["list", "--programs", "--filter", "git"],
+    ["list", "--home", "bob"],  # unknown-user
+    ["list", "extra"],  # usage
+    ["list", "--scope", "nope"],  # usage (choices)
     # writer
     ["add", "cowsay", "--dry-run"],
     ["add", "no-such-pkg"],  # unknown-package
@@ -661,6 +713,7 @@ def test_envelope_holds_everywhere(world, capsys, argv):
     [
         (["status", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["where", "x", "--config", "/nonexistent/nixin"], "config-not-found"),
+        (["list", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["add", "x", "--config", "/nonexistent/nixin"], "config-not-found"),
         (["add", "x", "--config", "/etc/nixos"], "not-a-workspace"),
         (["plan", "--config", "/etc/nixos"], "not-a-workspace"),
