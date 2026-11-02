@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from nixin.cli import main
 
 ENVELOPE = {
@@ -139,9 +137,8 @@ def test_search_offline_is_network(transport, cache_dir, capsys):
 
 
 def test_search_needs_a_query(capsys):
-    with pytest.raises(SystemExit) as e:
-        main(["--json", "search"])
-    assert e.value.code == 2
+    rc, doc = run_json(capsys, "search")
+    assert rc == 2 and doc["error"]["code"] == "usage" and doc["verb"] == "search"
 
 
 def test_info_pkg(es_transport, cache_dir, capsys):
