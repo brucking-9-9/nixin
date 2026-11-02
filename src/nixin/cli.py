@@ -58,6 +58,11 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("args", nargs="*")
     truth.register(sub)
     writer.register(sub)
+    for sp in sub.choices.values():  # the global flags also work after the verb
+        sp.add_argument(
+            "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
+        )
+        sp.add_argument("--host", default=argparse.SUPPRESS, help="as `nixin --host`")
     return p
 
 

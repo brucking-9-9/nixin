@@ -20,9 +20,11 @@ def test_no_verb_is_usage(capsys):
     assert main([]) == 2
 
 
+@pytest.mark.parametrize("after", [False, True], ids=["flags-before-verb", "flags-after-verb"])
 @pytest.mark.parametrize("verb", STUB_VERBS)
-def test_every_verb_speaks_json(verb, capsys):
-    argv = ["--json", "--host", "testhost", verb]
+def test_every_verb_speaks_json(verb, after, capsys):
+    flags = ["--json", "--host", "testhost"]
+    argv = [verb, *flags] if after else [*flags, verb]
     configured = verb in truth.VERBS or verb in writer.VERBS
     if configured:
         argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests
