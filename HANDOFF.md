@@ -6,3 +6,4 @@ on merge it moves here.
 
 - [discovery](docs/HANDOFF-discovery.md) — merged; verified live on 19BK and mbp13.
 - [truth](docs/HANDOFF-truth.md) — merged; verified end to end on mbp13.
+- [writer](docs/HANDOFF-writer.md) — merged; acceptance list verified on mbp13 against a clone of the config.

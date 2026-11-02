@@ -22,7 +22,11 @@ buildPythonApplication {
   build-system = [ setuptools ];
   dependencies = [ requests ];
 
-  nativeCheckInputs = [ pytestCheckHook ];
+  # nixfmt also in the check: the writer's render test formats for real
+  nativeCheckInputs = [
+    pytestCheckHook
+    nixfmt
+  ];
 
   # The writer formats the files it generates. nix and git are deliberately
   # NOT wrapped in: nixin must drive the host's own nix (same version as its
