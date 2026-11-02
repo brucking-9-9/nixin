@@ -20,3 +20,6 @@ on merge it moves here.
   shared `nixin.ui` data path and view-model (moved out of `tui/`); offscreen tests and
   screenshots, live read-only on mbp13 and its Wayland session; the real apply round trip
   was not run (another session had `~/nixos` mid-change).
+- [outdated](docs/HANDOFF-outdated.md) — branch `outdated-verb`: `nixin outdated`, what a
+  nixpkgs lock update would change for a host (two package-list evals, by pname, kernel),
+  and `--published` against a search.nixos.org channel; run live on mbp13 for both hosts.

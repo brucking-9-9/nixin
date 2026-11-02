@@ -133,6 +133,19 @@ does not.
   `where`; the writer must not edit based on it.
 - `in_config` counts files of the config tree only (inline definitions not counted).
 
+## Note: `outdated` builds on truth (branch `outdated-verb`, 2026-11-02)
+
+`nixin outdated` (`src/nixin/outdated/`, `docs/HANDOFF-outdated.md`) uses three truth
+pieces and changes none of them: `TruthCache` (names `outdated-lock` and `outdated-target`;
+the target's salt holds the target commit, so the key is (fingerprint, host, target rev)),
+`configrepo.parse_lock` (the nixpkgs node, `nixpkgs_2` here), and `ConfigRepo.nix` as the
+test seam. Its eval helper `outdated/outdated.nix` copies `pkgInfo` from
+`truth/packages.nix` and adds `meta.position`, the kernel version and `system.nixos.release`.
+If `packages.nix` changes how a package is read, change both. One eval gives the
+packages and the kernel together (~2 s), so outdated does not read truth's `packages`
+cache. Unifying them (packages.nix grows `position`/`kernel`, outdated reuses that entry
+for the lock side) would save one ~2 s eval on a cold run.
+
 ## How to test
 
 ```
