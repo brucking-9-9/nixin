@@ -46,7 +46,7 @@ Done; nothing half-done.
 - New error codes: `boot-space`, `unknown-generation`, `workspace-dirty` (CONTRACT
   table, `tests/test_integration.py`'s list).
 
-Gates at the last code commit (docs came after): `nix build` 599 passed, 25 skipped
+Gates at 3659daf (the last commit before this note): `nix build` 599 passed, 25 skipped
 (live) in the sandbox; `nix develop -c pytest` the same; `ruff check`, `ruff format
 --check`, `nix fmt -- --check` clean.
 
