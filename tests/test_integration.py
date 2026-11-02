@@ -567,7 +567,7 @@ def test_flow_without_json_is_human_text(world, capsys):
         assert out.strip() and err == "", argv
         with pytest.raises(json.JSONDecodeError):
             json.loads(out)
-    assert main(["rm", "cowsay", *cfg]) == 1
+    assert main(["--host", "mbp13", "rm", "cowsay", *cfg]) == 1
     out, err = capsys.readouterr()
     assert out == "" and err.startswith("nixin rm: cowsay is not declared")
 
