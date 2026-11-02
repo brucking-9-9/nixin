@@ -6,9 +6,12 @@
 
 Default: the cowsay flow on the recorded documents in tests/fixtures/tui (offline,
 reproducible): search, details, the add preview, plan, the apply confirmation,
-`needs-sudo`, status. --live drives the real verb handlers instead (network for
-discovery, nix against --config): search, details with `where`, and the `add --dry-run`
-preview; it writes nothing (the diff modal is cancelled). OUTDIR defaults to docs/tui.
+`needs-sudo`, status; then the Packages page on 19BK's documents: installed, a filter,
+updates (lock, --published), the update confirmation. --live drives the real verb
+handlers instead (network for discovery, nix against --config): search, details with
+`where`, the `add --dry-run` preview, and the Packages page (`list`, `outdated`); it
+writes nothing (the diff modal is cancelled, `update` is never run). OUTDIR defaults to
+docs/tui.
 Files are named <size>-<step>.svg (live-<size>-<step>.svg with --live).
 """
 
@@ -85,6 +88,28 @@ async def fixtures(size: str, outdir: Path) -> None:
         shot(app, outdir / f"{size}-7-status.svg", "status")
 
 
+async def packages(size: str, outdir: Path) -> None:
+    from tui_fake import PACKAGES, FakeBackend
+
+    app = NixinApp(FakeBackend(dict(PACKAGES), host="19BK"))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "i")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-8-packages.svg", "packages: installed")
+        await pilot.press("f", *"git", "enter")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-9-packages-filter.svg", "packages: filter")
+        await pilot.press("t")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-10-updates.svg", "packages: updates (lock)")
+        await pilot.press("m")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-11-updates-published.svg", "packages: updates (--published)")
+        await pilot.press("m", "u")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-12-update-confirm.svg", "update nixpkgs")
+
+
 async def live(size: str, outdir: Path, host: str, config: str, query: str, pkg: str) -> None:
     app = NixinApp(Backend(host=host, config=config))
     async with app.run_test(size=SIZES[size]) as pilot:
@@ -104,6 +129,12 @@ async def live(size: str, outdir: Path, host: str, config: str, query: str, pkg:
         shot(app, outdir / f"live-{size}-3-add-preview.svg", f"add {pkg} --dry-run")
         await pilot.press("escape")  # cancel: nothing is written
         await settle(app, pilot)
+        await pilot.press("escape", "escape", "i")  # Packages: list, then outdated (reads only)
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-4-packages.svg", "packages: installed")
+        await pilot.press("t")
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-5-updates.svg", "packages: updates")
 
 
 def main() -> int:
@@ -122,6 +153,7 @@ def main() -> int:
             asyncio.run(live(size, out, a.host, a.config, a.query, a.package))
         else:
             asyncio.run(fixtures(size, out))
+            asyncio.run(packages(size, out))
     return 0
 
 

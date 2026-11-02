@@ -10,7 +10,7 @@ import json
 
 import pytest
 from textual.widgets import DataTable, TextArea
-from tui_fake import COWSAY, FakeBackend, load, screen_text
+from tui_fake import COWSAY, PACKAGES, FakeBackend, load, screen_text
 
 from nixin.cli import main
 from nixin.tui.app import NixinApp
@@ -731,18 +731,6 @@ def test_escape_goes_back_and_q_quits():
 
 
 # --- the Packages screen: installed (`list`), updates (`outdated`), `update` ---------------------
-
-PACKAGES = {
-    "list": "list_19BK",
-    "outdated": "outdated_19BK",
-    "outdated --published": "outdated_19BK_published",
-    "update --dry-run": "update_dry",
-    "update": "update_ok",
-    "status": "status_updated",
-    "info": "info_cowsay",
-    "versions": "versions_cowsay",
-    "where": "where_cowsay",
-}
 
 
 async def open_packages(app, pilot, *keys: str):

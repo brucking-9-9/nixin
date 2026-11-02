@@ -34,6 +34,19 @@ COWSAY = {
     "sync": "sync",
 }
 
+# the Packages screen, on 19BK's documents (recorded on mbp13 against ~/nixos, trimmed)
+PACKAGES = {
+    "list": "list_19BK",
+    "outdated": "outdated_19BK",
+    "outdated --published": "outdated_19BK_published",
+    "update --dry-run": "update_dry",
+    "update": "update_ok",
+    "status": "status_updated",
+    "info": "info_cowsay",
+    "versions": "versions_cowsay",
+    "where": "where_cowsay",
+}
+
 
 def load(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / f"{name}.json").read_text())
