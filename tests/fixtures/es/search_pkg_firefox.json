@@ -1,0 +1,126 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "firefox",
+     "package_description": "Web browser built from Firefox source tree",
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-freebsd",
+      "aarch64-linux"
+     ],
+     "package_pname": "firefox",
+     "package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "159.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "firefox-unwrapped",
+     "package_description": "Web browser built from Firefox source tree",
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "symbols",
+      "debug",
+      "out"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-freebsd",
+      "aarch64-linux"
+     ],
+     "package_pname": "firefox-unwrapped",
+     "package_position": "pkgs/applications/networking/browsers/firefox/packages/firefox.nix:20",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "159.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "firefox-esr-153-unwrapped",
+     "package_description": "Web browser built from Firefox source tree",
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "out",
+      "symbols",
+      "debug"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-freebsd",
+      "aarch64-linux"
+     ],
+     "package_pname": "firefox-unwrapped",
+     "package_position": "pkgs/applications/networking/browsers/firefox/packages/firefox-esr-153.nix:20",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "153.6.0esr"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "firefox-esr",
+     "package_description": "Web browser built from Firefox source tree",
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox-esr",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-freebsd",
+      "aarch64-linux"
+     ],
+     "package_pname": "firefox",
+     "package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+     "package_programs": [
+      "firefox-esr"
+     ],
+     "package_pversion": "153.6.0esr"
+    }
+   }
+  ],
+  "total": {
+   "relation": "eq",
+   "value": 63
+  }
+ }
+}

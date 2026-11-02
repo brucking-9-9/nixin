@@ -1,0 +1,18 @@
+[
+ {
+  "alias": "latest-48-nixos-25.11",
+  "index": "nixos-48-25.11-b6018f87da91d19d0ab4cf979885689b469cdd41"
+ },
+ {
+  "alias": "latest-52-nixos-unstable",
+  "index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325"
+ },
+ {
+  "alias": "latest-51-nixos-unstable",
+  "index": "nixos-51-unstable-e7439b6b14ad3cc35d05608ebca9bce01a25f5f8"
+ },
+ {
+  "alias": "latest-52-nixos-26.05",
+  "index": "nixos-52-26.05-fa1373130d5a21c040a47c5dbe1913d59ed91808"
+ }
+]

@@ -1,0 +1,92 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "ripgrep",
+     "package_description": "Utility that combines the usability of The Silver Searcher with the raw speed of grep",
+     "package_homepage": [
+      "https://github.com/BurntSushi/ripgrep"
+     ],
+     "package_license_set": [
+      "Unlicense",
+      "MIT"
+     ],
+     "package_mainProgram": "rg",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-linux",
+      "aarch64-netbsd"
+     ],
+     "package_pname": "ripgrep",
+     "package_position": "pkgs/by-name/ri/ripgrep/package.nix:66",
+     "package_programs": [
+      "rg"
+     ],
+     "package_pversion": "15.2.0"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "rgx",
+     "package_description": "Terminal regex tester with real-time matching and multi-engine support",
+     "package_homepage": [
+      "https://github.com/brevity1swos/rgx"
+     ],
+     "package_license_set": [
+      "Apache-2.0",
+      "MIT"
+     ],
+     "package_mainProgram": "rgx",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "aarch64-darwin",
+      "aarch64-linux",
+      "aarch64-netbsd"
+     ],
+     "package_pname": "rgx",
+     "package_position": "pkgs/by-name/rg/rgx/package.nix:37",
+     "package_programs": [
+      "rgx"
+     ],
+     "package_pversion": "0.14.3"
+    }
+   },
+   {
+    "_index": "nixos-52-unstable-1c89083e451e891152365b799595cf7790a43325",
+    "_source": {
+     "package_attr_name": "rgxg",
+     "package_description": "C library and a command-line tool to generate (extended) regular expressions",
+     "package_homepage": [
+      "https://rgxg.github.io/"
+     ],
+     "package_license_set": [
+      "Zlib"
+     ],
+     "package_mainProgram": "rgxg",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [],
+     "package_pname": "rgxg",
+     "package_position": "pkgs/by-name/rg/rgxg/package.nix:17",
+     "package_programs": [
+      "rgxg"
+     ],
+     "package_pversion": "0.1.2"
+    }
+   }
+  ],
+  "total": {
+   "relation": "eq",
+   "value": 811
+  }
+ }
+}
