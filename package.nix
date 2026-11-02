@@ -73,13 +73,12 @@ buildPythonApplication {
     makeWrapperArgs+=(--prefix PATH : ${lib.makeBinPath [ nixfmt ]} "''${qtWrapperArgs[@]}")
   '';
 
-  # The installed GUI starts headless and quits after its first frame.
-  doInstallCheck = true;
-  installCheckPhase = ''
-    runHook preInstallCheck
+  # After the tests: the installed GUI starts headless and quits after its first frame.
+  # (Python packages run pytest as their installCheckPhase, against $out; a hook, not a
+  # phase of its own, or the tests would not run.)
+  postCheck = ''
     HOME=$TMPDIR XDG_RUNTIME_DIR=$TMPDIR QT_QPA_PLATFORM=offscreen \
       $out/bin/nixin-gui --config $TMPDIR/no-config --self-test
-    runHook postInstallCheck
   '';
 
   passthru = { inherit qtEnv; };
