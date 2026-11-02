@@ -3,6 +3,90 @@
 Started on 19BK, continued on mbp13 on 2026-11-01 (headless, as `master`). Everything below
 "verified" was run on mbp13 against the workspace config `~/nixos` (read only) unless marked.
 
+## `list` (branch `list-verb`, mbp13, 2026-11-02)
+
+The gap: `status` gave counts only and `where NAME` one package at a time, so there was
+no way to *see* what a host installs. `nixin list [--home USER] [--scope
+system|home|all] [--filter TEXT] [--programs] [--json]` shows it. Contract:
+`docs/CONTRACT.md`, "`list`".
+
+- **Code.** `truth/listing.py` (rows, scope resolution, the filter, folding,
+  `declared[]`, programs), `list_`/`_list` in `truth/__init__.py` (registered like
+  `status`/`where`, same `unknown-host`/`--refresh`/`--config` handling),
+  `render.listing` in `truth/render.py`. In `cli.py`, only the `VERBS` entry.
+- **Data.** The rows are `packages.collect()`, the eval and cache entry `status` and
+  `where` already use (`truth/<host>-<key>-packages.json`, fingerprint-keyed). Verified
+  live: `status` run after `list` hit `packages` and evaluated only `toplevel`. A
+  second `list` runs no eval. `--refresh` evaluates again. No new cache file.
+- **Folding.** The evaluated lists repeat packages: mbp13 has 425 entries and 340
+  distinct ones (the same `git`/`tmux`/KDE packages added by several modules). `list`
+  shows one row per (scope, name, pname, version) and reports the dropped repeats as
+  `folded`, so `status.packages` = `count + folded` for the listed scopes. The same
+  package in system and home is two rows.
+- **`declared[]` (best effort, documented as such).** No eval: the writer's scanner
+  (`writer._scope(…, use_eval=False)`, `Workspace.module_defs`, `NixFile.list_items`)
+  walks the host's and each user's module closure from `flake.nix`, generated
+  `installer/*.nix` included (`package_decls` skips those, so the loop is in
+  `listing.declared`). Each list element gets candidate names (`pkgs.x`/`x` → `x`,
+  `a.b` → `b` and `a-b`, camelCase → kebab, `_` → `-`, `callPackage ./dir/package.nix`
+  → `dir`, `write*Bin "name"` → `name`). Each package row is matched on pname, name, or
+  name minus the version. The scan takes 0.04–0.08 s on `~/nixos`. Live hit rate:
+  mbp13 73 of 340 rows, 19BK 90 of 328 (brucking 65 of 190). The rest come from modules
+  (NixOS defaults, `programs.x.enable`, KDE), or from elements the name rule misses:
+  let-bound helpers whose derivation name differs (`picker` → `kiosk-picker`),
+  `mode "music" [ … ]` calls, renamed pnames (`dust` → `du-dust`, `pandoc` →
+  `pandoc-cli`), aliases (`networkmanagerapplet`). Truth imports the writer lazily
+  inside `listing.declared`, because the writer imports `truth.scan` at module level.
+- **Human output.** `scope  name  version  (user)  file:line`, sorted by name, a footer
+  (count per scope, folded repeats, cached or the eval's seconds). `NIXIN_WIDTH` is
+  honoured with the same rule as discovery's tables (`render.width()`, a copy, so that
+  truth does not import discovery and with it `requests`). On a narrow terminal the
+  name column gives way (down to 16), then the location is cut from the left and dropped
+  below 12 columns, then the footer goes onto separate lines.
+- **`--programs`.** Shown, because it is already in the status data (`packages.nix`
+  collects `programs.<x>.enable` per scope). Same scope and filter rules. HM programs
+  come from values only (as in `status`), so `home-manager`, `man`, `ssh` appear.
+
+Verified live, read only, against `~/nixos` at `81f19b7` (one uncommitted file,
+`installer/history.jsonl`, from another session; no stash entries), dev shell python
+on the worktree's `src`:
+
+| run | wall | peak RSS | result |
+|---|---|---|---|
+| `--json --host mbp13 list`, nixin cache cold | 2.54 s | 339 MiB | 340 rows, 85 folded, 73 with `declared` |
+| same, warm | 0.36 s | 42 MiB | `cache.hits = [packages]` |
+| `--host mbp13 list` (human), warm | 0.36 s | 42 MiB | |
+| `--json --host 19BK list --home brucking`, cold | 3.21 s | 452 MiB | 190 rows, 2 folded, 65 with `declared` |
+| same, warm | 0.41 s | 42 MiB | |
+| `--json --host 19BK list --refresh` | 3.07 s | 452 MiB | 328 rows (138 system + 190 brucking), 67 folded |
+| `--json --host 19BK status` right after | 21.8 s | 1.36 GiB | `hits [packages]`, `misses [toplevel]` |
+
+The box was quiet (load 1.0–1.7). nix's own eval cache was as other sessions left it.
+Also checked by hand: `--filter KITTY`, `--programs`, `NIXIN_WIDTH` 120/80/50.
+Scratch: `/tmp/nixin-list-bench/` (`bench.sh`, `*.out`, `*.time`).
+
+Tests: `tests/test_truth.py` (`test_list_*`, the FakeNix fixtures: contract, scopes,
+`--home`, filter, programs, cache hit and `--refresh`, every error, `declared` from a
+small module tree with an `imports`ed conditional list, folding, element names and
+matching, human output at 120/40 columns). `tests/test_integration.py`: `list` in the
+envelope sweep and `test_error_codes`, plus `test_list_flow` on `writer-config` (the
+hand-written lists, `btop` listed in two files, `cowsay` found in the generated
+`installer/mbp13.nix` after `add`, 19BK's HM user `alice`, `unknown-user` on mbp13).
+
+Not done / next:
+
+- `declared[]` could take the evaluated attribution where it is already cached: the
+  `environment.systemPackages` / `home.packages` prefix query `where PACKAGE` runs
+  gives each config file's derivations exactly (`definitionValues`). With it, `list
+  --exact` (one prefix eval per scope, a few seconds cold) would place every
+  config-listed package, including the let-bound helpers the name rule misses. The
+  line would still come from the scanner.
+- A `via` field for packages with an empty `declared[]` that an enabled
+  `programs.<pname>` explains (19BK brucking: `kitty`, `btop`, `bat`, `git`, …). The
+  data is already in the document.
+- The TUI and GUI do not show `list` yet (a Packages page: the rows, the filter, and
+  Remove on a row with a `declared` entry).
+
 ## Done and verified
 
 - **Build and checks.** `nix build` passes (34 tests in the sandbox, 2 live skipped). The
@@ -146,6 +230,12 @@ nix build                             # runs pytest in the sandbox (nix unavaila
 PYTHONPATH=src python -m nixin.cli --json status --config ~/nixos
 PYTHONPATH=src python -m nixin.cli --host 19BK status --full --config ~/nixos
 PYTHONPATH=src python -m nixin.cli --host 19BK where programs.kitty.enable --config ~/nixos
+
+# list (cli.py imports every layer now, so keep the dev shell's PYTHONPATH for requests):
+nix develop -c pytest -q -k list tests/test_truth.py tests/test_integration.py
+nix develop -c sh -c 'PYTHONPATH=src:$PYTHONPATH python3 -m nixin.cli --host mbp13 list --config ~/nixos'
+nix develop -c sh -c 'PYTHONPATH=src:$PYTHONPATH python3 -m nixin.cli --host 19BK list --home brucking --config ~/nixos'
+nix develop -c sh -c 'PYTHONPATH=src:$PYTHONPATH NIXIN_WIDTH=50 python3 -m nixin.cli --json --host 19BK list --filter git --programs --config ~/nixos'
 ```
 
 Scratch from the mbp13 session (not in the repo): `/tmp/nixin-mbp13/`, with `bench.sh` (the

@@ -6,6 +6,11 @@ on merge it moves here.
 
 - [discovery](docs/HANDOFF-discovery.md) — merged; verified live on 19BK and mbp13.
 - [truth](docs/HANDOFF-truth.md) — merged; verified end to end on mbp13.
+  `list` verb: branch `list-verb`. `nixin list [--home USER] [--scope system|home|all]
+  [--filter TEXT] [--programs]` shows the installed packages (system + every HM user)
+  from `status`'s cached package eval, with a best-effort `declared[]` (file:line) from
+  the writer's scanner. Verified live on mbp13 against `~/nixos` (mbp13, 19BK/brucking);
+  state, numbers, next steps and how to test: the "`list`" section of HANDOFF-truth.md.
 - [writer](docs/HANDOFF-writer.md) — merged; acceptance list verified on mbp13 against a clone of the config.
   Fixes: branch `fix-set-validation` — `set` values are checked by syntax only (`pkgs.…`,
   `lib.mkForce …`, `config.…` were `invalid-nix`), and the option eval check survives package sets.
