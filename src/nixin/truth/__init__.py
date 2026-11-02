@@ -98,7 +98,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     timings["packages"] = pk["seconds"]
     option_docs: dict[str, Any] = {}
     if ns.full:
-        store = opts.ExclusionStore(repo)
+        store = opts.ExclusionStore(repo, host)
         option_docs["nixos"] = opts.summary(repo, host, cache, store=store)
         option_docs["home"] = {
             u: opts.summary(repo, host, cache, hm=u, store=store) for u in pk["hm_users"]

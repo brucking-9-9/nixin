@@ -117,9 +117,13 @@ def evaluate(
 
 
 class ExclusionStore:
-    """The full index's exclusions, persisted per (nixpkgs rev, home-manager rev) as
-    `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>.json` = {"nixos": {name: message},
-    "home": {...}}, seeded with SEED_EXCLUSIONS. Kind "home" covers every HM user.
+    """The full index's exclusions, persisted per (nixpkgs rev, home-manager rev, host) as
+    `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>-<host>.json` = {"nixos": {name:
+    message}, "home": {...}}, seeded with SEED_EXCLUSIONS. Kind "home" covers every HM user
+    of the host. Per host, because whether an option's definitions throw depends on the
+    config: one learned on a host without nvidia must not hide it on a host with nvidia.
+    Files from before the host was part of the key (`exclude-<nixpkgs>-<hm>.json`) are
+    ignored: they mix hosts, and the seed covers what they held.
 
     Not used by prefix queries: `where` asks for values (other failures) and should still
     answer for an excluded option on a host where it does evaluate (nvidia enabled).
@@ -127,15 +131,17 @@ class ExclusionStore:
 
     _lock = threading.Lock()  # the NixOS and HM index may learn at the same time
 
-    def __init__(self, repo: ConfigRepo) -> None:
+    def __init__(self, repo: ConfigRepo, host: str) -> None:
         nixpkgs, hm = repo.lock("nixpkgs"), repo.lock("home-manager")
         self.revs = {
             "nixpkgs": nixpkgs.rev if nixpkgs else None,
             "home-manager": hm.rev if hm else None,
         }
+        self.host = host
         np_rev = (self.revs["nixpkgs"] or "unknown")[:12]
         hm_rev = (self.revs["home-manager"] or "none")[:12]
-        self.path = cache_dir() / f"exclude-{np_rev}-{hm_rev}.json"
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", host)
+        self.path = cache_dir() / f"exclude-{np_rev}-{hm_rev}-{safe}.json"
 
     def _read(self) -> dict[str, dict[str, str]]:
         try:
@@ -158,7 +164,8 @@ class ExclusionStore:
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 tmp = self.path.with_suffix(f".{os.getpid()}.tmp")
-                tmp.write_text(json.dumps({**self.revs, **doc}, indent=1, sort_keys=True))
+                full = {**self.revs, "host": self.host, **doc}
+                tmp.write_text(json.dumps(full, indent=1, sort_keys=True))
                 os.replace(tmp, self.path)
             except OSError:
                 pass
@@ -179,7 +186,7 @@ def index(
     hit = cache.get(name, salt)
     if hit is not None:
         return hit
-    store = store or ExclusionStore(repo)
+    store = store or ExclusionStore(repo, host)
     kind = "nixos" if hm is None else "home"
     known = store.load(kind)
     doc = evaluate(repo, host, hm=hm, values=INDEX_VALUES, exclude=list(known))

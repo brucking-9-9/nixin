@@ -340,11 +340,11 @@ def test_index_seeds_learns_and_persists_exclusions(repo):
     doc = options.index(repo, "19BK", TruthCache(repo, "19BK"))
     assert len(args_seen) == 2 and '"hardware.nvidia.open"' in args_seen[0]  # seeded
     assert len(doc["excluded"]) == len(options.SEED_EXCLUSIONS["nixos"]) + 1
-    store = options.ExclusionStore(repo)
-    assert store.path.name == "exclude-3ec636362e18-c216bf5a1f17.json"
+    store = options.ExclusionStore(repo, "19BK")
+    assert store.path.name == "exclude-3ec636362e18-c216bf5a1f17-19BK.json"
     saved = json.loads(store.path.read_text())
     assert saved["nixos"]["services.new.thing"] == "boom"  # first line only
-    assert saved["nixpkgs"].startswith("3ec6363")
+    assert saved["nixpkgs"].startswith("3ec6363") and saved["host"] == "19BK"
     assert saved["home"] == options.SEED_EXCLUSIONS["home"]
 
     args_seen.clear()  # a new config tree (cache miss) on the same lock: one eval
@@ -354,6 +354,21 @@ def test_index_seeds_learns_and_persists_exclusions(repo):
     hm = options.index(repo, "19BK", TruthCache(repo, "19BK"), hm="brucking")
     assert len(args_seen) == 1 and '"programs.radicle.uri.web-rad.browser"' in args_seen[0]
     assert options.summarize(hm)["excluded"] == len(options.SEED_EXCLUSIONS["home"])
+
+
+def test_exclusions_are_kept_per_host_and_old_files_ignored(repo):
+    """An option learned as poisoned on one host is not skipped on another (nvidia on one
+    machine only); the pre-host files (one per rev pair, mixing hosts) are not read."""
+    a, b = options.ExclusionStore(repo, "19BK"), options.ExclusionStore(repo, "mbp13")
+    assert a.path != b.path and a.path.parent == b.path.parent
+    legacy = a.path.parent / "exclude-3ec636362e18-c216bf5a1f17.json"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps({"nixos": {"from.another.host": "x"}, "home": {}}))
+    a.add("nixos", {"hardware.nvidia.open": "expected a set", "only.on.19BK": "boom"})
+    assert "only.on.19BK" in a.load("nixos")
+    assert "only.on.19BK" not in b.load("nixos") and "from.another.host" not in b.load("nixos")
+    assert b.load("nixos") == options.SEED_EXCLUSIONS["nixos"]
+    assert options.ExclusionStore(repo, "19 BK/x").path.name.endswith("-19_BK_x.json")
 
 
 def test_evaluate_gives_up_without_a_marker(repo):
@@ -441,7 +456,7 @@ def test_status_json_contract(repo, monkeypatch, capsys):
     rc = main(["--json", "--host", "19BK", "status", "--full"])
     full = json.loads(capsys.readouterr().out)["options"]
     assert full["nixos"]["total"] == 0 and full["nixos"]["excluded"] == 8
-    saved = json.loads(options.ExclusionStore(repo).path.read_text())  # first pass writes it
+    saved = json.loads(options.ExclusionStore(repo, "19BK").path.read_text())  # first pass writes it
     assert saved["nixos"] == options.SEED_EXCLUSIONS["nixos"]
     assert set(full["home"]) == {"brucking"}
     n = len(repo.nix.calls)
