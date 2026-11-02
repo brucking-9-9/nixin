@@ -166,6 +166,22 @@ def test_trim_nix_error_keeps_the_final_block():
     assert one == "flake does not provide attribute 'y'"
 
 
+def test_run_nix_never_lets_nix_read_stdin(monkeypatch):
+    seen = {}
+
+    class Done:
+        returncode, stdout, stderr = 0, "{}", ""
+
+    def fake_run(cmd, **kw):
+        seen.update(kw, cmd=cmd)
+        return Done()
+
+    monkeypatch.setattr(configrepo.shutil, "which", lambda exe: f"/bin/{exe}")
+    monkeypatch.setattr(configrepo.subprocess, "run", fake_run)
+    assert configrepo.run_nix(["eval", "--json", "x"]) == "{}"
+    assert seen["stdin"] is configrepo.subprocess.DEVNULL and seen["cmd"][0] == "/bin/nix"
+
+
 def test_parse_lock_follows_root_input_to_the_real_node():
     lock = parse_lock(fixture("flake.lock.json"))
     assert lock.node == "nixpkgs_2" and lock.name == "nixpkgs"
