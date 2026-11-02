@@ -167,8 +167,9 @@ def declared(repo: ConfigRepo, host: str, scopes: list[str | None]):
     for user in scopes:
         try:
             sc = writer._scope(ws, host, user, use_eval=False)
-        except NixinError as e:
-            warnings.append(f"declared: {e.message}")
+        except NixinError as e:  # flake.nix built in a way the text scanner cannot follow
+            label = host if user is None else f"{user}@{host}"
+            warnings.append(f"declared[] left empty for {label}: {e.message}")
             continue
         found = out.setdefault(user, [])
         for m in sc.mods:
