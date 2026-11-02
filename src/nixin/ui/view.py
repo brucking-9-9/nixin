@@ -866,10 +866,10 @@ def status_sections(doc: Doc, running: dict[str, Any] | None = None) -> list[Sec
 # --- the session ----------------------------------------------------------------------------
 
 
-def farewell(writes: list[str], applied: list[Doc]) -> str:
-    """The line `nixin tui` prints after the app closes."""
+def farewell(writes: list[str], applied: list[Doc], prog: str = "nixin tui") -> str:
+    """The line `nixin tui` (or `nixin gui`, as `prog`) prints after the app closes."""
     if not writes and not applied:
-        return "nixin tui: nothing changed"
+        return f"{prog}: nothing changed"
     parts = []
     if writes:
         parts.append(f"wrote {len(writes)}: " + "; ".join(writes))
@@ -877,7 +877,7 @@ def farewell(writes: list[str], applied: list[Doc]) -> str:
         parts.append(f"applied: generation {applied[-1].get('generation')}")
     elif writes:
         parts.append("not applied yet (nixin plan, nixin apply)")
-    return "nixin tui: " + " · ".join(parts)
+    return f"{prog}: " + " · ".join(parts)
 
 
 def where_cue(doc: Doc) -> Span | None:
