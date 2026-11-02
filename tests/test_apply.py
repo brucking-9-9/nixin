@@ -342,6 +342,7 @@ def test_add_plan_apply_rm_apply(m, capsys):
         f"sudo -n nixos-rebuild switch --flake {m.auth}#{HOST}",
     ]
     assert d["backends"] == {"pull": "sudo", "switch": "sudo"}
+    assert "Done. The new configuration is" in d["switch_log"]
     assert [a["name"] for a in d["diff"]["added"]] == ["cowsay"]
     # one history line, not committed yet
     lines = (m.ws / HISTORY).read_text().splitlines()
@@ -363,10 +364,15 @@ def test_add_plan_apply_rm_apply(m, capsys):
     assert d2["error"]["code"] == "nothing-to-apply"
     assert m.toplevel_evals() == evals
 
-    # rm, then apply with -m: the history line goes in with it
+    # rm, plan, then apply with -m: the history line goes in with it, and plan's build
+    # (made while history.jsonl was still untracked) is reused
     m.rm_cowsay()
+    run(capsys, m, "plan")
+    builds, evals = m.count("nix", "build"), m.toplevel_evals()
     d3 = run(capsys, m, "apply", "-m", "test: no cowsay")
     assert d3["ok"], d3
+    assert d3["cached"] is True
+    assert (m.count("nix", "build"), m.toplevel_evals()) == (builds, evals)
     assert git(m.ws, "log", "-1", "--format=%s") == "test: no cowsay"
     files = git(m.ws, "show", "--name-status", "--format=", "HEAD").splitlines()
     assert sorted(files) == sorted(

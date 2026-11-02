@@ -380,13 +380,21 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
 
     committed = None
     t_commit = time.monotonic()
+    # plan's entry for the tree as it is now. The commit is this tree plus, the first
+    # time, installer/history.jsonl, which no module reads: same out path, so that entry
+    # holds for the commit even when the history file changes the source hash.
+    pre = _target(ctx, st, head, dry=True) if to_commit else None
     if to_commit:
         committed = ctx.git.commit(message, add_history)
         head = committed
         ctx.repo = build.repo_at(ctx.path)  # the tree nix sees changed (same content though)
         st = ctx.git.status()
     t_build = time.monotonic()
-    target = _target(ctx, st, head)
+    if pre and pre["out"]:
+        target = pre
+        ctx.cache.put_commit(ctx.host, head, {"out": pre["out"], "drv": pre.get("drv")})
+    else:
+        target = _target(ctx, st, head)
     out = target["out"]
     diff = build.diff(before["store_path"], out)
     progress: dict[str, Any] = {"committed": committed, "out": out}
@@ -443,6 +451,7 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
             **progress,
         )
     t_done = time.monotonic()
+    switch_log = p.tail(20)
     now = system.realpath(system.CURRENT if mode == "switch" else system.PROFILE)
     if now != out:
         what = "/run/current-system" if mode == "switch" else system.PROFILE
@@ -483,6 +492,7 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
         "running": after,
         "privileged_commands": ran,
         "backends": {s.name: bk[s.name].name for s in steps},
+        "switch_log": switch_log,
         "diff": diff,
         "cached": target["cached"],
         "history": line,

@@ -464,6 +464,7 @@ Result:
 | `previous`, `running` | the `running` block (as in `plan`) before and after |
 | `privileged_commands[]` | the root commands exactly as run (`sudo -n git -C /etc/nixos pull --ff-only /home/me/nixos main`, …) |
 | `backends` | `{pull, switch}`: `sudo` or `nixos-switch` |
+| `switch_log` | the last 20 lines nixos-rebuild printed (human mode streams all of it to stderr) |
 | `diff` | the closure diff from the previous system to `out` (as in `plan`) |
 | `cached` | the out path came from plan's cache |
 | `history` | the line appended to `installer/history.jsonl` |
