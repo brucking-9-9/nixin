@@ -36,6 +36,11 @@ VERBS = ("outdated",)
 HELP = "what a nixpkgs lock update would change; --published: newer versions on a channel"
 HELPER = files("nixin.outdated") / "outdated.nix"
 BATCH = 50  # pnames per search.nixos.org query
+PUBLISHED_NOTE = (
+    "search.nixos.org has many attributes per pname; the one defined in the same file as "
+    "the installed package is compared (else the same major version, then the attribute "
+    "named like the pname). `nixin outdated` without --published is exact."
+)
 
 
 def helper_text() -> str:
@@ -125,7 +130,6 @@ def _eval(
 
 def _outdated(ns: argparse.Namespace) -> dict[str, Any]:
     t0 = time.monotonic()
-    repo = ConfigRepo.locate(ns.config)
     if ns.args:
         raise NixinError("usage", f"outdated takes no arguments (got {' '.join(ns.args)!r})")
     if ns.nixpkgs and ns.channel:
@@ -134,6 +138,7 @@ def _outdated(ns: argparse.Namespace) -> dict[str, Any]:
         raise NixinError(
             "usage", "--published compares with a search.nixos.org channel: use --channel"
         )
+    repo = ConfigRepo.locate(ns.config)
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
@@ -224,6 +229,7 @@ def _lock(ns, repo, host, np, cache, timings) -> dict[str, Any]:
         "total": d["total"],
         "scopes": d["scopes"],
         "commands": _commands(repo, host, np, target),
+        "notes": _notes(np, target),
         "_release": lock.get("release"),
     }
 
@@ -235,9 +241,27 @@ def _commands(repo: ConfigRepo, host: str, np: tgt.Nixpkgs, target: tgt.Target) 
     if target.source == "lock":  # the input's own ref: exactly what flake update follows
         bump = f"nix flake update {shlex.quote(np.input)} --flake {cfg}"
     else:  # pins the compared commit; flake.nix (and `original`) keep their ref
-        pin = f"github:{np.locked.owner or 'nixos'}/{np.locked.repo or 'nixpkgs'}/{target.rev}"
-        bump = f"nix flake lock {cfg} --override-input {shlex.quote(np.input)} {pin}"
+        bump = f"nix flake lock {cfg} --override-input {shlex.quote(np.input)} {_pin(np, target)}"
     return [bump, f"nixin plan {nixin}", f"nixin apply {nixin}"]
+
+
+def _pin(np: tgt.Nixpkgs, target: tgt.Target) -> str:
+    lk = np.locked
+    if lk.type == "github" and target.rev:
+        return f"github:{lk.owner}/{lk.repo}/{target.rev}"
+    return shlex.quote(target.locked)
+
+
+def _notes(np: tgt.Nixpkgs, target: tgt.Target) -> list[str]:
+    if target.source == "lock":
+        return []
+    note = (
+        f"flake.nix asks for {np.original_ref}: the pin holds {target.short_rev} until the next "
+        f"`nix flake update`, which goes back to that ref. To follow {target.flakeref} for "
+        f'good, set inputs.{np.input}.url = "{target.flakeref}" and run '
+        f"`nix flake update {np.input}`."
+    )
+    return [note]
 
 
 # --- --published --------------------------------------------------------------------
@@ -285,6 +309,7 @@ def _published(ns, repo, host, np, cache, timings) -> dict[str, Any]:
         "added": [],
         "removed": [],
         "unpublished": res["unpublished"],
+        "notes": [PUBLISHED_NOTE],
         "kernel": kern,
         "count": len(res["changed"]),
         "total": res["total"],

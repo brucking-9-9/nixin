@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from typing import Any
 
 ARROW = "→"
@@ -81,11 +82,17 @@ _WHY = {
 
 
 def _next(commands: list[str]) -> list[str]:
-    w = max(len(c) for c in commands)
+    """The commands with a comment each, aligned; a very long one gets its comment above."""
+    w = max((len(c) for c in commands if len(c) <= 64), default=0)
     out = ["next:"]
     for c in commands:
         why = next((v for k, v in _WHY.items() if c.startswith(k)), "")
-        out.append(f"  {c:<{w}}  # {why}" if why else f"  {c}")
+        if not why:
+            out.append(f"  {c}")
+        elif len(c) > 64:
+            out += [f"  # {why}", f"  {c}"]
+        else:
+            out.append(f"  {c:<{w}}  # {why}")
     return out
 
 
@@ -125,6 +132,8 @@ def outdated(doc: dict[str, Any], host: str) -> str:
     if mode == "published" and doc.get("unpublished"):
         summary += f"; {len(doc['unpublished'])} not on {target['source']}"
     lines += ["", summary]
+    if mode == "lock":  # --published's caveat is in the document; the text says "as attr"
+        lines += [textwrap.fill(n, 88) for n in doc.get("notes") or []]
     if doc.get("commands"):
         lines += _next(doc["commands"])
     return "\n".join(lines)
