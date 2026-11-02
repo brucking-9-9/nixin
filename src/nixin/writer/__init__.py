@@ -410,9 +410,10 @@ def _finish(ctx: Ctx, fields: dict[str, Any], summary: str, check=None) -> dict[
                     f"{checks['eval'].get('code', 'eval-failed')}: "
                     f"{checks['eval'].get('message', '')}".strip()
                 )
-    for f in [*ws.warnings, *ctx.warnings]:
-        if f not in fields.setdefault("warnings", []):
-            fields["warnings"].append(f)
+    warnings = fields.setdefault("warnings", [])
+    for w in [*ws.warnings, *ctx.warnings]:
+        if w not in warnings:
+            warnings.append(w)
     doc = {
         "ok": True,
         "config": str(ws.root),

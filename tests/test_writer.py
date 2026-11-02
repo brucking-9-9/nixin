@@ -256,6 +256,7 @@ def test_add_creates_module_and_import_then_rm_reverts(cfg):
     state = json.loads((cfg / "installer/state.json").read_text())
     assert state["nixos"]["mbp13"]["packages"] == ["cowsay"]
     assert all(p["ok"] for p in d["checks"]["parse"])
+    assert d["warnings"] == [] and d["imports_removed"] == []  # always present
 
     rc, d = run(cfg, "add", "cowsay", "git")  # idempotent
     assert rc == 0 and d["changes"] == []
