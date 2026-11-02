@@ -87,9 +87,9 @@ mkMerge/mkIf/mkForce, `mbp13` with `''` strings and `++ lib.optionals`, `bare` w
 imports list; HM user `alice` with a one-line imports list) using fake tools/nix; one live
 test (`NIXIN_LIVE=1`) clones `$NIXIN_CONFIG` (else `~/nixos`) into tmp and runs
 add/rm cowsay with eval on `$NIXIN_LIVE_HOST` (default 19BK; passed for 19BK and mbp13).
-Totals: `pytest` 55 passed, 3 skipped (live); live run 3 passed; `nix build` 54 passed /
-3 skipped in the sandbox (before the last test was added); `ruff check` and `ruff format
---check` clean; `nixfmt --check` on every tracked `.nix` clean.
+Totals: `pytest` 55 passed, 3 skipped (live); live run 3 passed; `nix build` 55 passed /
+3 skipped in the sandbox; `ruff check` and `ruff format --check` clean; `nixfmt --check`
+on every tracked `.nix` clean.
 
 ## Half-done / limits (known, not bugs)
 
