@@ -356,7 +356,9 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
         )
     before = system.running()
     real = [f for f in st.dirty if f != HISTORY]
-    add_history = [HISTORY] if HISTORY in st.untracked else []
+    # (not from st.untracked: git lists an untracked installer/ as the directory)
+    new_history = (ctx.path / HISTORY).is_file() and not ctx.git.tracked(HISTORY)
+    add_history = [HISTORY] if new_history else []
     to_commit = sorted(set(st.dirty) | set(add_history))
     if not real and not rel["pending"]:
         target = _target(ctx, st, head, dry=ns.dry_run)

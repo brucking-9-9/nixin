@@ -95,6 +95,9 @@ class Git:
     def count(self, rev_range: str) -> int:
         return int(self.check("rev-list", "--count", rev_range).strip() or 0)
 
+    def tracked(self, rel: str) -> bool:
+        return self.run("ls-files", "--error-unmatch", "--", rel).ok
+
     def show(self, rev: str, rel: str) -> str | None:
         p = self.run("show", f"{rev}:{rel}")
         return p.out if p.ok else None

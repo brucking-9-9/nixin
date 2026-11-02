@@ -397,6 +397,18 @@ def test_add_plan_apply_rm_apply(m, capsys):
     assert p["up_to_date"] is True and p["cached"] is True
 
 
+def test_history_in_a_new_installer_dir_is_committed_next_time(m, capsys):
+    """A hand edit, no installer/ yet: git shows the new dir, not the history file."""
+    (m.ws / "flake.nix").write_text("{ outputs = _: { edited = true; }; }\n")
+    d = run(capsys, m, "apply")
+    assert d["ok"] and d["commit_message"] == "nixin: update flake.nix"
+    assert Git(m.ws).status().untracked == ["installer/"]
+    (m.ws / "flake.nix").write_text("{ outputs = _: { edited = 2; }; }\n")
+    d = run(capsys, m, "apply")
+    assert d["ok"]
+    assert git(m.ws, "show", "--name-only", "--format=", "HEAD").split() == ["flake.nix", HISTORY]
+
+
 def test_apply_dry_run_runs_nothing(m, capsys):
     m.add_cowsay()
     head = git(m.ws, "rev-parse", "HEAD")
