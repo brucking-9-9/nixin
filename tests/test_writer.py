@@ -453,6 +453,67 @@ def test_render_through_real_nixfmt_is_stable():
     assert "  a.b = true;\n" in text
 
 
+# --- the value check, with the real parser -----------------------------------------------
+
+
+@pytest.fixture
+def real_parse(cfg, tmp_path, monkeypatch):
+    """The real `nix-instantiate --parse`: it resolves names while parsing, which the fake
+    scanner does not, and that is what the value check has to get right. `dummy://` means no
+    store, so this runs in the build sandbox too (nix is a check input)."""
+    if shutil.which("nix-instantiate") is None:
+        pytest.skip("nix-instantiate not on PATH")
+    (tmp_path / "home").mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("NIX_REMOTE", "dummy://")
+    monkeypatch.setattr(writer, "TOOLS", Tools())
+    return cfg
+
+
+@pytest.mark.parametrize(
+    ("option", "argv"),
+    [
+        ("boot.kernelPackages", ["pkgs.linuxPackages_7_2"]),
+        ("x", ["lib.mkForce", "true"]),
+        ("y", ["config.networking.hostName"]),
+    ],
+)
+def test_set_value_may_name_module_arguments(real_parse, option, argv):
+    rc, d = run(real_parse, "set", option, *argv)
+    assert rc == 0, d
+    value = " ".join(argv)
+    assert d["value"] == value
+    assert f"\n  {option} = {value};\n" in (real_parse / "installer/mbp13.nix").read_text()
+    state = json.loads((real_parse / "installer/state.json").read_text())
+    assert state["nixos"]["mbp13"]["options"] == {option: value}
+    assert all(p["ok"] for p in d["checks"]["parse"]), d["checks"]
+
+
+def test_set_malformed_value_is_invalid_nix(real_parse):
+    before = snapshot(real_parse)
+    rc, d = run(real_parse, "set", "z", "pkgs.foo [")
+    assert rc == 1 and d["error"]["code"] == "invalid-nix", d
+    msg = d["error"]["message"]
+    assert "unexpected end of file" in msg and "1| pkgs.foo [" in msg  # the user's text
+    assert "checks.eval" in msg
+    assert snapshot(real_parse) == before
+
+
+def test_set_names_are_checked_in_the_file_they_land_in(real_parse):
+    """The value check lets every free name through; the parse of the edited file then knows
+    the real scope: ssh.nix is `{ ... }:` (no lib), the generated module binds config, lib
+    and pkgs only."""
+    before = snapshot(real_parse)
+    rc, d = run(real_parse, "set", "services.openssh.enable", "lib.mkForce false", host="19BK")
+    assert rc == 1 and d["error"]["code"] == "invalid-nix", d
+    assert d["error"]["file"] == "ssh.nix"
+    assert "undefined variable 'lib'" in d["error"]["message"]
+    rc, d = run(real_parse, "set", "z", "inputs.self.rev")
+    assert rc == 1 and d["error"]["file"] == "installer/mbp13.nix", d
+    assert "undefined variable 'inputs'" in d["error"]["message"]
+    assert snapshot(real_parse) == before
+
+
 # --- live -----------------------------------------------------------------------------
 
 live = pytest.mark.skipif(os.environ.get("NIXIN_LIVE") != "1", reason="set NIXIN_LIVE=1 to run nix")

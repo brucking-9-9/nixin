@@ -10,6 +10,7 @@
   pytestCheckHook,
   nixfmt,
   git,
+  nix,
 }:
 let
   project = (lib.importTOML ./pyproject.toml).project;
@@ -28,11 +29,14 @@ buildPythonApplication {
   ];
 
   # nixfmt also in the check: the writer's render test formats for real;
-  # git: the apply tests run real git on temp repos (nix, sudo and nixos-rebuild are faked)
+  # git: the apply tests run real git on temp repos (sudo and nixos-rebuild are faked);
+  # nix: only `nix-instantiate --parse` with NIX_REMOTE=dummy:// (no store, no eval), for
+  # the writer's value check, which depends on how the real parser resolves names
   nativeCheckInputs = [
     pytestCheckHook
     nixfmt
     git
+    nix
   ];
 
   # The writer formats the files it generates. nix and git are deliberately
