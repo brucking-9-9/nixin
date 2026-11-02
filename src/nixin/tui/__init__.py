@@ -43,8 +43,8 @@ def run(ns: argparse.Namespace) -> dict[str, Any]:
         return _usage(f"tui takes no arguments (got {' '.join(ns.args)!r})")
     if ns.json:
         return _usage("tui is interactive and has no --json form; the other verbs have one")
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        return _usage("tui needs a terminal (stdin and stdout must be a tty)")
+    if not (sys.stdin.isatty() and sys.stderr.isatty()):  # Textual draws on stderr
+        return _usage("tui needs a terminal: stdin and stderr must be a tty (it draws on stderr)")
     from .app import NixinApp
     from .backend import Backend
 
