@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from nixin import __version__
+from nixin import __version__, truth
 from nixin.cli import VERBS, main
 from nixin.discovery import VERBS as DISCOVERY_VERBS
 
@@ -22,8 +22,12 @@ def test_no_verb_is_usage(capsys):
 
 @pytest.mark.parametrize("verb", STUB_VERBS)
 def test_every_verb_speaks_json(verb, capsys):
-    rc = main(["--json", "--host", "testhost", verb])
+    argv = ["--json", "--host", "testhost", verb]
+    if verb in truth.VERBS:
+        argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests
+    rc = main(argv)
     doc = json.loads(capsys.readouterr().out)
     assert doc["verb"] == verb and doc["host"] == "testhost"
-    assert doc["ok"] is False and rc == 1  # stubs: the contract, not the feature yet
-    assert doc["error"]["code"] == "not-implemented"
+    assert doc["ok"] is False and rc == 1
+    expected = "config-not-found" if verb in truth.VERBS else "not-implemented"
+    assert doc["error"]["code"] == expected

@@ -131,6 +131,70 @@ Without `--json` the same data is a compact table (`PACKAGE VERSION
 DESCRIPTION`, `OPTION TYPE DESCRIPTION`, ...; `KIND NAME VERSION/TYPE
 DESCRIPTION` for `all`) with a `# N result(s) · source channel@rev` footer;
 `info` prints a key/value block. `NIXIN_WIDTH` overrides the terminal width.
+## Truth output
+
+`nixin [--json] [--host H] status [--config DIR] [--refresh] [--full]` and
+`nixin [--json] [--host H] where NAME [--kind package|option] [--config DIR] [--refresh]`
+evaluate the config flake (`--config`, else `$NIXIN_CONFIG`, else `/etc/nixos`) with the
+host's own `nix`. Results are cached under `$XDG_CACHE_HOME/nixin/truth/` keyed by nix's
+flake fingerprint (tree as nix sees it + lock) and the host, so any tracked edit misses;
+`--refresh` skips reads. Errors: `config-not-found`, `unknown-host`, `eval-failed` (the
+last `error:` block of nix's stderr, traces and warnings stripped), `not-found`,
+`nix-missing`, `eval-timeout`.
+
+`status` is quick by default (`--quick` is accepted and means the same): it evaluates
+`system.build.toplevel` and the package lists, 25–70 s cold depending on the host and its
+load, well under a second from the cache. `--full` also builds the option index of the
+NixOS tree and of each Home Manager user (one eval per tree, ~30 s / 1.6 GiB for NixOS,
+~20 s for HM on 19BK; under load on mbp13 much slower); later quick runs show those counts
+from the cache for as long as the tree is unchanged. Some nixpkgs/HM options raise an error
+nix cannot catch when their service is off; the index skips them. Which ones is a property
+of the module set, so the list is kept per (nixpkgs rev, home-manager rev) in
+`$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>.json`, seeded with the ones known on
+nixpkgs 3ec6363; a new one costs one extra eval once and is added. Delete the file to
+re-learn. `where` does not use the list (it asks per prefix and still answers for an
+option that does evaluate on that host).
+
+`status` fields (`ok: true`):
+
+| field | meaning |
+|---|---|
+| `config` | `path`, `head` (git HEAD), `dirty`, `source` (`/nix/store/…-source` nix evaluates), `source_hash`, `fingerprint`, `last_modified`, `hosts`, `host_is_local` |
+| `lock` | the root flake's nixpkgs node (`nodes.root.inputs.nixpkgs`, here `nixpkgs_2`): `node`, `rev`, `ref`, `date`, `last_modified`, `flakeref`, `nar_hash` |
+| `running` | `/run/current-system`: `system`, `version` (nixos-version), `nixpkgs_rev`, `hostname`, `matches_lock` |
+| `eval` | `ok`, `toplevel` (drvPath of `system.build.toplevel`; evaluating it runs the assertions), `seconds` — a host that does not evaluate makes the whole verb fail with `eval-failed` |
+| `hm_users` | Home Manager users of the host (`[]` without HM) |
+| `packages` | counts: `system` (`environment.systemPackages`), `home.<user>` (`home.packages`) |
+| `programs` | names with `programs.<x>.enable = true`: `system`, `home.<user>` |
+| `options` | per scope (`nixos`, `home.<user>`): `total`, `defined` (set by more than the option's own default — `isDefined` alone is true for every option that has a default), `in_config` (defined in a file of the config tree), `excluded` (options whose definitions cannot be evaluated), `definitions_error`, `seconds`; without `--full` the cached counts of an earlier `--full`, else `{}` |
+| `cache`, `timings` | cache dir + hits/misses; seconds per eval |
+
+`where NAME` with a dot (or `--kind option`) answers for every scope the option exists in
+(`scopes[]`, each `scope` nixos/home + `user`): `mode` is `exact` (the option itself),
+`sub` (a path inside an `attrsOf` option, e.g. `systemd.services.foo.enable`, dug out of
+the parent's value) or `prefix` (a non-leaf path: the options under it that something sets
+beyond their own default; `under_prefix` counts all of them). Each
+option carries `name`, `option`, `type`, `description`, `isDefined`, `highestPrio`,
+`value` (size-capped; `<derivation foo-1.2>`, `<function>`, `<… N more>` placeholders),
+`declarations[]` (`source` = `config` | `nixpkgs` | `home-manager` | other input | `inline`,
+`file` relative to that source — a module imported as a directory is reported as its
+`default.nix` — `line`/`column` from `declarationPositions`) and
+`definitions[]` — the file that sets it (same mapping), `value` that file contributes,
+and for config files a `line` found by a brace-tracking text scan (`line_heuristic:
+true`; `inline` definitions, i.e. attrsets written inside the `nixosSystem` call that
+nixpkgs attributes to its own flake.nix, get `candidates[]` from a repo-wide scan).
+
+`where NAME` without a dot is a package: `installed[]` (`scope`, `user`, `name`, `pname`,
+`version` — attribute paths are not recoverable from derivations), `programs[]` (the
+`programs.NAME.enable` options that are true, with their definitions as above),
+`declared[]` (files whose definition of `environment.systemPackages`/`home.packages`
+lists the derivation, with candidate `lines`), and `mentions[]` (ranked grep of tracked
+`*.nix` files, lowest confidence; files under another host's directory, i.e. a path
+component naming another host, are left out).
+
+Without `--json`, `status` is one line per fact and `where` one line per declaration /
+definition / mention, values in Nix syntax and capped to a terminal line; the `--json`
+document has everything in full.
 
 ## Develop
 
@@ -149,6 +213,11 @@ Consume from a config flake: add `nixin` as an input and
 Skeleton: the CLI contract and the package build. The layers land in order,
 discovery → truth → writer → apply, each with `--json` and tests, tested on a
 second machine before touching the main one.
+
+Truth: `configrepo.py` and `nixin/truth/` are unit-tested against recorded evals and
+`status`/`where` were run end to end against the real config on mbp13 (both hosts, NixOS
+and Home Manager, the `eval-failed` path); `HANDOFF.md` has the measured eval costs and
+the next steps.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com
