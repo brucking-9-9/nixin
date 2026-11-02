@@ -14,14 +14,14 @@ import re
 from pathlib import Path
 from typing import Any
 
+from ..cache import default_root
 from ..configrepo import ConfigRepo
 
 _SAFE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
 def cache_dir() -> Path:
-    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
-    return Path(base) / "nixin" / "truth"
+    return default_root() / "truth"  # same root as discovery's cache (relative XDG ignored)
 
 
 class TruthCache:

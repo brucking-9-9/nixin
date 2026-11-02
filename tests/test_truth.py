@@ -232,6 +232,16 @@ def test_toplevel_failure_is_a_clean_eval_failed(repo):
 # --- cache ------------------------------------------------------------------------------
 
 
+def test_cache_dir_shares_discoverys_root(tmp_path, monkeypatch):
+    from nixin.truth.cache import cache_dir
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CACHE_HOME", "relative/cache")  # the XDG spec says ignore it
+    assert cache_dir() == tmp_path / ".cache" / "nixin" / "truth"
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    assert cache_dir() == tmp_path / "xdg" / "nixin" / "truth"
+
+
 def test_cache_roundtrip_prune_and_refresh(repo):
     c = TruthCache(repo, "19BK")
     assert c.get("packages") is None and c.misses == ["packages"]
