@@ -35,8 +35,10 @@ class Proc:
         return self.rc == 0
 
     def tail(self, n: int = 20) -> str:
-        """The last n non-empty lines of stderr (stdout when stderr is empty)."""
-        lines = [ln for ln in (self.err or self.out).splitlines() if ln.strip()]
+        """The last n non-empty lines of stderr, then stdout (nixos-rebuild prints the
+        new system's path on stdout, after its log on stderr)."""
+        text = self.err + ("\n" + self.out if self.out else "")
+        lines = [ln for ln in text.splitlines() if ln.strip()]
         return "\n".join(lines[-n:])
 
 

@@ -174,7 +174,7 @@ class Machine:
             return proc.Proc(argv, self.rebuild_rc, "", "error: activation script failed\n")
         out = self.realise(self.out_of(Path(repo), self.rebuild_salt))
         self.set_generation(out, switch=mode == "switch")
-        return proc.Proc(argv, 0, "", f"Done. The new configuration is {out}\n")
+        return proc.Proc(argv, 0, f"{out}\n", "Done. The new configuration is\n")
 
     # --- the runner -------------------------------------------------------------------
 
@@ -342,7 +342,7 @@ def test_add_plan_apply_rm_apply(m, capsys):
         f"sudo -n nixos-rebuild switch --flake {m.auth}#{HOST}",
     ]
     assert d["backends"] == {"pull": "sudo", "switch": "sudo"}
-    assert "Done. The new configuration is" in d["switch_log"]
+    assert d["switch_log"].endswith(f"Done. The new configuration is\n{d['out']}")
     assert [a["name"] for a in d["diff"]["added"]] == ["cowsay"]
     # one history line, not committed yet
     lines = (m.ws / HISTORY).read_text().splitlines()
