@@ -457,15 +457,20 @@ def test_render_through_real_nixfmt_is_stable():
 
 
 @pytest.fixture
-def real_parse(cfg, tmp_path, monkeypatch):
-    """The real `nix-instantiate --parse`: it resolves names while parsing, which the fake
-    scanner does not, and that is what the value check has to get right. `dummy://` means no
-    store, so this runs in the build sandbox too (nix is a check input)."""
+def storeless_nix(tmp_path, monkeypatch):
+    """nix-instantiate with no store (`dummy://`): parse and pure evals work, also in the
+    build sandbox (nix is a check input)."""
     if shutil.which("nix-instantiate") is None:
         pytest.skip("nix-instantiate not on PATH")
     (tmp_path / "home").mkdir()
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("NIX_REMOTE", "dummy://")
+
+
+@pytest.fixture
+def real_parse(cfg, storeless_nix, monkeypatch):
+    """The real `nix-instantiate --parse`: it resolves names while parsing, which the fake
+    scanner does not, and that is what the value check has to get right."""
     monkeypatch.setattr(writer, "TOOLS", Tools())
     return cfg
 
@@ -512,6 +517,33 @@ def test_set_names_are_checked_in_the_file_they_land_in(real_parse):
     assert rc == 1 and d["error"]["file"] == "installer/mbp13.nix", d
     assert "undefined variable 'inputs'" in d["error"]["message"]
     assert snapshot(real_parse) == before
+
+
+def test_option_check_shows_package_sets_and_functions_as_json(storeless_nix):
+    """`nix eval --json` of boot.kernelPackages failed ("cannot convert a function to JSON")."""
+    value = (
+        '{ f = x: x; drv = { type = "derivation"; name = "hello-2.12"; }; n = 1; '
+        'kernel = { callPackage = throw "not forced"; }; p = /no/such/file; '
+        "l = builtins.genList (i: i) 61; deep.a.b.c.d.e = 1; }"
+    )
+    out = subprocess.run(
+        [
+            "nix-instantiate",
+            "--eval",
+            "--strict",
+            "--json",
+            "--expr",
+            f"({writer.SHOW_VALUE}) {value}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    got = json.loads(out)
+    assert got["f"] == "<function>" and got["drv"] == "<derivation hello-2.12>"
+    assert got["kernel"] == "<package set>" and got["p"] == "/no/such/file" and got["n"] == 1
+    assert got["l"][:2] == [0, 1] and got["l"][60:] == ["<… 1 more>"]
+    assert got["deep"]["a"]["b"]["c"]["d"] == "<…>"
 
 
 # --- live -----------------------------------------------------------------------------
