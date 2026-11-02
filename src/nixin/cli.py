@@ -21,7 +21,7 @@ import json
 import socket
 import sys
 
-from . import __version__, truth
+from . import __version__, truth, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -54,6 +54,7 @@ def _parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(verb, help=help_)
         sp.add_argument("args", nargs="*")
     truth.register(sub)
+    writer.register(sub)
     return p
 
 
