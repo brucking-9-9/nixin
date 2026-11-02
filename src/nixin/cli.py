@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, discovery, truth, writer
+from . import __version__, apply, discovery, truth, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -77,6 +77,7 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("args", nargs="*")
     truth.register(sub)
     writer.register(sub)
+    apply.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb
         sp.add_argument(
             "--json", action="store_true", default=argparse.SUPPRESS, help="as `nixin --json`"
