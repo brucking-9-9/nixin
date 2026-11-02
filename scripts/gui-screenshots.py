@@ -53,6 +53,14 @@ class Shooter:
             self.app.processEvents()
             time.sleep(0.02)
 
+    def search(self, query: str) -> None:
+        """As typed: the query in the field, then the search."""
+        field = self.win.find("query")
+        assert field is not None
+        field.setProperty("text", query)
+        self.gui.search.search(query)
+        self.settle()
+
     def shot(self, name: str) -> None:
         self.settle()
         path = self.outdir / f"{self.prefix}{name}.png"
@@ -79,7 +87,7 @@ def fixtures(outdir: Path) -> None:
     gui = Gui(FakeBackend(routes))
     s = Shooter(gui, outdir)
     g = gui
-    g.search.search("cowsay")
+    s.search("cowsay")
     s.shot("1-search")
     g.search.select(0)
     s.shot("2-details")
@@ -101,8 +109,7 @@ def fixtures(outdir: Path) -> None:
     s.shot("7-status")
     g.go("search")
     g.search.setKind("opt")
-    g.search.search("services.openssh.enable")
-    s.settle()
+    s.search("services.openssh.enable")
     names = [h.target for h in g.search.hits]
     g.search.select(names.index("services.openssh.enable"))
     s.settle()
@@ -110,8 +117,7 @@ def fixtures(outdir: Path) -> None:
     s.shot("8-set-option")
     g.writer.cancelSet()
     g.search.setKind("pkg")
-    g.search.search("cowsay")
-    s.settle()
+    s.search("cowsay")
     g.search.select(0)
     s.settle()
     g.details.remove()  # rm's preview answers `ambiguous`: the notice with candidates
@@ -123,7 +129,7 @@ def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str
     gui = Gui(Backend(host=host, config=config))
     s = Shooter(gui, outdir, "live-")
     g = gui
-    g.search.search(query)
+    s.search(query)
     s.shot("1-search")
     rows = [h.target for h in g.search.hits]
     g.search.select(rows.index(pkg) if pkg in rows else 0)
@@ -132,8 +138,7 @@ def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str
     s.shot("3-add-preview")
     g.writer.cancel()  # nothing is written
     g.search.setKind("opt")
-    g.search.search(option)
-    s.settle()
+    s.search(option)
     rows = [h.target for h in g.search.hits]
     g.search.select(rows.index(option) if option in rows else 0)
     s.shot("4-option")
