@@ -1,5 +1,6 @@
-"""Human (non --json) output of plan, apply --dry-run, apply, sync and status's pending
-line. The --json document has everything; this is a short read of it."""
+"""Human (non --json) output of plan, apply --dry-run, apply, sync, rollback and status's
+pending line (history renders itself). The --json document has everything; this is a
+short read of it."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ from typing import Any
 
 from ..truth.render import row, sub
 from .closure import human_size
+from .safety import reboot_text, space_text
 
 SHOWN = 25  # closure rows printed per kind
 
@@ -45,6 +47,35 @@ def diff_lines(diff: dict[str, Any] | None) -> list[str]:
     return lines
 
 
+def boot_lines(b: dict[str, Any] | None) -> list[str]:
+    """`reboot    needs a reboot: kernel 7.2.12 → 7.3.0, initrd` and `/boot     +57.3 MiB
+    of 80.4 MiB free (71 %)`; nothing when neither applies."""
+    if not b:
+        return []
+    lines = []
+    if b["reboot_needed"]:
+        lines.append(row("reboot", f"needs a reboot: {reboot_text(b)}"))
+    elif b["pending_reboot"]:
+        lines.append(row("reboot", "pending already (the running kernel is not the booted one)"))
+    for spec in b["specialisations"]:
+        if spec.get("kernel"):
+            k = spec["kernel"]
+            lines.append(sub("~", f"specialisation {spec['name']}: kernel {k['from']} → {k['to']}"))
+    s = b["boot_space"]
+    if s["needed"] or s["state"] not in ("ok", "unknown"):
+        tag = {"warn": " (tight)", "full": " (does not fit: refused)"}.get(s["state"], "")
+        lines.append(row(s["path"], space_text(s) + tag))
+    if b.get("boot_entry") is False:
+        lines += [row("warning", w) for w in b["warnings"] if "no boot entry" in w]
+    return lines
+
+
+def _warnings(d: dict[str, Any]) -> list[str]:
+    """warnings[] minus the boot ones boot_lines already shows."""
+    shown = set((d.get("boot") or {}).get("warnings") or [])
+    return [row("warning", w) for w in d["warnings"] if w not in shown]
+
+
 def _workspace(w: dict[str, Any]) -> str:
     dirty = f", {len(w['dirty'])} changed: {', '.join(w['dirty'][:4])}" if w["dirty"] else ""
     return f"{w['path']} {w['branch']} @ {_short(w['head'])}{dirty}"
@@ -73,8 +104,9 @@ def plan(d: dict[str, Any], host: str) -> str:
         row("pending", _pending(d["pending_commits"])),
         row("running", f"{_gen(d['running'])} {_store(d['running']['store_path'])}"),
         *diff_lines(d["diff"]),
+        *boot_lines(d["boot"]),
     ]
-    lines += [row("warning", w) for w in d["warnings"]]
+    lines += _warnings(d)
     lines.append("up to date: nothing to apply" if d["up_to_date"] else "next: nixin apply")
     return "\n".join(lines)
 
@@ -92,7 +124,8 @@ def dry_run(d: dict[str, Any], host: str) -> str:
         lines.append(row(step, f"{p['backend']} ({state})"))
     if d["diff"] is not None:
         lines += diff_lines(d["diff"])
-    lines += [row("warning", w) for w in d["warnings"]]
+    lines += boot_lines(d["boot"])
+    lines += _warnings(d)
     return "\n".join(lines)
 
 
@@ -105,6 +138,7 @@ def apply(d: dict[str, Any], host: str) -> str:
     for c in d["privileged_commands"]:
         lines.append(sub("[root]", c))
     lines += diff_lines(d["diff"])
+    lines += boot_lines(d["boot"])
     t = d["timings"]
     lines.append(
         row(
@@ -112,7 +146,53 @@ def apply(d: dict[str, Any], host: str) -> str:
             f"{t['total']} s (build {t['build']} s, pull {t['pull']} s, switch {t['switch']} s)",
         )
     )
-    lines += [row("warning", w) for w in d["warnings"]]
+    lines += _warnings(d)
+    return "\n".join(lines)
+
+
+def _config(c: dict[str, Any], dry: bool) -> str:
+    target = _short(c["commit"])
+    src = {"history": "history.jsonl", "plan-cache": "plan's cache"}.get(c["source"], "?")
+    if c["state"] == "untouched":
+        return "untouched: no commit known to build it (see the warning)"
+    if c["state"] == "in-sync":
+        return f"in sync: the authoritative tree already builds it ({target}, from {src})"
+    n = len(c["reverted"])
+    if dry:
+        what = f"revert {n} commit(s) back to {target}" if n else f"pull {target}"
+        return f"would {what} (from {src}) and pull it into the authoritative tree"
+    made = f"{_short(c['revert_commit'])} reverts {n} commit(s), " if c["revert_commit"] else ""
+    return f"{made}back to {target} (from {src}); authoritative @ {_short(c['authoritative_head'])}"
+
+
+def rollback(d: dict[str, Any], host: str) -> str:
+    head = f"rollback {host}: generation {d['from_generation']} → {d['generation']} "
+    head += _store(d["out"]) if d["switched"] else "(it already ran; config only)"
+    lines = [head, row("config", _config(d["config"], dry=False))]
+    for c in d["privileged_commands"]:
+        lines.append(sub("[root]", c))
+    if d["diff"] is not None:
+        lines += diff_lines(d["diff"])
+    lines += boot_lines(d["boot"])
+    t = d["timings"]
+    lines.append(row("took", f"{t['total']} s (switch {t['switch']} s, pull {t['pull']} s)"))
+    lines += _warnings(d)
+    return "\n".join(lines)
+
+
+def rollback_dry_run(d: dict[str, Any], host: str) -> str:
+    gens = f"generation {d['from_generation']} → {d['generation']}"
+    lines = [f"rollback {host} --dry-run: {gens}; would run, in order (nothing was run)"]
+    for c in d["commands"]:
+        lines.append(sub("[root]" if c["privileged"] else "[user]", c["command"]))
+    lines.append(row("config", _config(d["config"], dry=True)))
+    for step, p in d["privilege"].items():
+        state = "ready" if p["ready"] else f"not ready: {p['why']}"
+        lines.append(row(step, f"{p['backend']} ({state})"))
+    if d["diff"] is not None:
+        lines += diff_lines(d["diff"])
+    lines += boot_lines(d["boot"])
+    lines += _warnings(d)
     return "\n".join(lines)
 
 

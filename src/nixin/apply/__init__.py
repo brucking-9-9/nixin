@@ -15,6 +15,12 @@ and `nixos-rebuild switch`es from there; then it checks that /run/current-system
 out path it built and appends a line to installer/history.jsonl (committed by the next
 apply). `sync` moves commits between the workspace and a git remote (the hub).
 
+plan and apply also read what the new system does to boot (safety.py): a new kernel,
+initrd, module tree or command line needs a reboot (`reboot_needed`), and its new
+kernel/initrd files must fit on /boot (`boot_space`; apply refuses with `boot-space`).
+`history` lists the system generations with the apply history; `rollback` goes back to
+one, the config with it (history.py, rollback.py).
+
 `register(subparsers)` is the only thing cli.py calls (same pattern as truth/writer).
 """
 
@@ -34,11 +40,11 @@ from ..cache import default_root
 from ..configrepo import DEFAULT_CONFIG, ConfigRepo, NixinError, local_hostname
 from ..writer.state import STATE_FILE
 from ..writer.workspace import Workspace
-from . import build, commitmsg, privilege, proc, render, system
+from . import build, commitmsg, privilege, proc, render, safety, system
 from .git import Git, Status
 from .system import HISTORY
 
-VERBS = ("plan", "apply", "sync")
+VERBS = ("plan", "apply", "sync", "history", "rollback")
 ENV_AUTHORITATIVE = "NIXIN_AUTHORITATIVE"
 
 
@@ -56,7 +62,15 @@ class ApplyError(NixinError):
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    handlers = {"plan": plan, "apply": apply, "sync": sync}
+    from . import history, rollback  # they import this package's pieces
+
+    handlers = {
+        "plan": plan,
+        "apply": apply,
+        "sync": sync,
+        "history": history.history,
+        "rollback": rollback.rollback,
+    }
     for verb, handler in handlers.items():
         p = sub.choices.get(verb)
         if p is None:
@@ -78,6 +92,12 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="nixos-rebuild boot: make it the boot default, activate at the next boot",
     )
+    history.add_arguments(sub.choices["history"])
+    rb = sub.choices["rollback"]
+    for a in rb._actions:  # cli.py's generic positional is the generation here
+        if a.dest == "args":
+            a.metavar, a.help = "GEN", "generation (default: the one before the running one)"
+    rb.add_argument("--dry-run", action="store_true", help="print the commands, run none of them")
     sy = sub.choices["sync"]
     sy.add_argument("--pull", action="store_true", help="git pull --ff-only into the workspace")
     sy.add_argument("--push", action="store_true", help="push the workspace branch")
@@ -258,10 +278,11 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
     target = _target(ctx, st, head)
     out = target["out"]
     diff = build.diff(run["store_path"], out) if ctx.local else None
+    boot = safety.compare(run["store_path"], out) if ctx.local else None
     if not ctx.local:
         ctx.warnings.append(
-            f"{ctx.host} is not this machine ({local_hostname()}): no closure diff "
-            "(it would compare against this machine's /run/current-system)"
+            f"{ctx.host} is not this machine ({local_hostname()}): no closure diff or boot "
+            "check (they would compare against this machine's /run/current-system)"
         )
     if st.untracked:
         ctx.warnings.append(
@@ -282,11 +303,29 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
         "running": run,
         "pending_commits": rel["pending"],
         "diff": diff,
-        "warnings": ctx.warnings,
+        "boot": boot,
+        "reboot_needed": boot["reboot_needed"] if boot else None,
+        "warnings": ctx.warnings + (boot["warnings"] if boot else []),
     }
     if ctx.human:
         doc["message"] = render.plan(doc, ctx.host)
     return doc
+
+
+def _boot_check(
+    running: str | None, out: str | None, progress: dict[str, Any] | None = None
+) -> dict | None:
+    """safety.compare for switching to `out`; `boot-space` when its kernels do not fit
+    (the error carries `progress`: how far apply got)."""
+    boot = safety.compare(running, out)
+    if boot and boot["boot_space"]["state"] == "full":
+        raise ApplyError(
+            "boot-space",
+            safety.full_error_message(boot),
+            boot_space=boot["boot_space"],
+            **(progress or {}),
+        )
+    return boot
 
 
 # --- apply --------------------------------------------------------------------------------
@@ -386,6 +425,7 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
     # time, installer/history.jsonl, which no module reads: same out path, so that entry
     # holds for the commit even when the history file changes the source hash.
     pre = _target(ctx, st, head, dry=True) if to_commit else None
+    boot = _boot_check(before["store_path"], pre["out"]) if pre and pre["out"] else None
     if to_commit:
         committed = ctx.git.commit(message, add_history)
         head = committed
@@ -398,30 +438,14 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
     else:
         target = _target(ctx, st, head)
     out = target["out"]
-    diff = build.diff(before["store_path"], out)
     progress: dict[str, Any] = {"committed": committed, "out": out}
+    if boot is None:
+        boot = _boot_check(before["store_path"], out, progress)
+    diff = build.diff(before["store_path"], out)
     ran: list[str] = []
 
     def privileged(step: privilege.Step, remaining: list[privilege.Step]) -> proc.Proc:
-        b = bk[step.name]
-        why = b.blocked()  # sudo is not probed: its own refusal below is the answer
-        if why:
-            raise ApplyError("switch-failed", why, privileged_commands=ran, **progress)
-        ran.append(proc.shown(b.argv(step)))
-        p = b.run(step, stream=ctx.human)
-        if isinstance(b, privilege.Sudo) and (p.missing or privilege.needs_password(p)):
-            cmds = [bk[s.name].display(s) for s in remaining]
-            raise ApplyError(
-                "needs-sudo",
-                "root is needed and sudo -n cannot get it without a password "
-                f"({p.tail(1) or 'no ticket'}). Run:\n  "
-                + "\n  ".join(cmds)
-                + "\n(or `sudo -v` once, then nixin apply again)",
-                commands=cmds,
-                privileged_commands=ran,
-                **progress,
-            )
-        return p
+        return run_privileged(ctx, bk, step, remaining, ran, progress)
 
     t_pull = time.monotonic()
     p = privileged(steps[0], steps)
@@ -496,6 +520,8 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
         "backends": {s.name: bk[s.name].name for s in steps},
         "switch_log": switch_log,
         "diff": diff,
+        "boot": boot,
+        "reboot_needed": boot["reboot_needed"] if boot else None,
         "cached": target["cached"],
         "history": line,
         "timings": {
@@ -506,11 +532,43 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
             "switch": round(t_done - t_switch, 2),
             "total": round(time.monotonic() - t0, 2),
         },
-        "warnings": ctx.warnings,
+        "warnings": ctx.warnings + (boot["warnings"] if boot else []),
     }
     if ctx.human:
         doc["message"] = render.apply(doc, ctx.host)
     return doc
+
+
+def run_privileged(
+    ctx: Ctx,
+    bk: dict[str, privilege.Backend],
+    step: privilege.Step,
+    remaining: list[privilege.Step],
+    ran: list[str],
+    progress: dict[str, Any],
+) -> proc.Proc:
+    """Run one root step through its backend; `needs-sudo` with the commands of every
+    step still to run when sudo -n cannot get root. `ran` grows by the command."""
+    b = bk[step.name]
+    why = b.blocked()  # sudo is not probed: its own refusal below is the answer
+    if why:
+        raise ApplyError("switch-failed", why, privileged_commands=ran, **progress)
+    ran.append(proc.shown(b.argv(step)))
+    p = b.run(step, stream=ctx.human)
+    if isinstance(b, privilege.Sudo) and (p.missing or privilege.needs_password(p)):
+        cmds = [bk[s.name].display(s) for s in remaining]
+        verb = getattr(ctx.ns, "verb", None) or "apply"
+        raise ApplyError(
+            "needs-sudo",
+            "root is needed and sudo -n cannot get it without a password "
+            f"({p.tail(1) or 'no ticket'}). Run:\n  "
+            + "\n  ".join(cmds)
+            + f"\n(or `sudo -v` once, then nixin {verb} again)",
+            commands=cmds,
+            privileged_commands=ran,
+            **progress,
+        )
+    return p
 
 
 def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps, bk, t0):
@@ -548,6 +606,7 @@ def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps,
     for c in commands:
         c["command"] = proc.shown(c["argv"])
     ready = {s.name: bk[s.name].probe() for s in steps}
+    boot = safety.compare(before["store_path"], target["out"]) if target["out"] else None
     doc = {
         "ok": True,
         "dry_run": True,
@@ -563,8 +622,10 @@ def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps,
             k: {"backend": bk[k].name, "ready": v is None, "why": v} for k, v in ready.items()
         },
         "diff": build.diff(before["store_path"], target["out"]) if target["out"] else None,
+        "boot": boot,
+        "reboot_needed": boot["reboot_needed"] if boot else None,
         "duration_s": round(time.monotonic() - t0, 2),
-        "warnings": ctx.warnings,
+        "warnings": ctx.warnings + (boot["warnings"] if boot else []),
     }
     if ctx.human:
         doc["message"] = render.dry_run(doc, ctx.host)
