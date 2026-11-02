@@ -39,7 +39,7 @@ system|home|all] [--filter TEXT] [--programs] [--json]` shows it. Contract:
   inside `listing.declared`, because the writer imports `truth.scan` at module level.
 - **Human output.** `scope  name  version  (user)  file:line`, sorted by name, a footer
   (count per scope, folded repeats, cached or the eval's seconds). `NIXIN_WIDTH` is
-  honoured with the same rule as discovery's tables (`render.width()`, a copy, so that
+  honoured with the same rule as discovery's tables (`render.term_width()`, a copy, so that
   truth does not import discovery and with it `requests`). On a narrow terminal the
   name column gives way (down to 16), then the location is cut from the left and dropped
   below 12 columns, then the footer goes onto separate lines.

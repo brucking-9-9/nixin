@@ -52,7 +52,7 @@ def cap(s: str, n: int = VALUE_CAP) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def width() -> int:
+def term_width() -> int:
     """Columns for the `list` table: $NIXIN_WIDTH (as discovery's tables), else the terminal."""
     w = os.environ.get("NIXIN_WIDTH")
     if w and w.isdigit():
@@ -244,7 +244,7 @@ WHERE_MIN = 12
 def listing(d: dict[str, Any], host: str) -> str:
     """`scope  name  version  (user)  file:line`, one package a line, sorted by name; the
     last column only where the line has room. Then the programs (--programs), a footer."""
-    total = width()
+    total = term_width()
     rows = d["packages"]
     lines = _table(
         total,

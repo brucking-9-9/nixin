@@ -224,7 +224,7 @@ def collect(repo: ConfigRepo, host: str, cache, ns) -> dict[str, Any]:
     scopes = wanted(pk, host, ns.scope, ns.home)
     out, folded = rows(pk, scopes, ns.filter)
     t = time.monotonic()
-    decls, warnings = declared(repo, host, scopes)
+    decls, warnings = declared(repo, host, scopes) if out else ({}, [])
     attach(out, decls)
     doc: dict[str, Any] = {
         "ok": True,
