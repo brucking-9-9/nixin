@@ -34,7 +34,7 @@ search box — it knows what would actually change.
 nixin [--json] [--host H] VERB [ARGS...]
 
 search info versions        discovery   what exists upstream, in which versions
-status where                truth       what this config gives a host (evaluates the flake)
+status where list           truth       what this config gives a host (evaluates the flake)
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
@@ -58,6 +58,9 @@ which touch the network, run nix or write files, and the cache locations.
   `/etc/nixos`) with the host's own `nix`. `status` reports the lock, the running
   generation, package/program counts, and with `--full` the option index. `where NAME`
   traces a package or option to the files that declare and define it, with values.
+  `list` shows the installed packages themselves (system and each Home Manager user;
+  `--home USER`, `--scope`, `--filter TEXT`, `--programs`), sorted by name, each with the
+  line that lists it where a text scan finds one; it shares `status`'s cached eval.
 - **apply** builds the workspace host (`plan`: a git+file flake, i.e. what a commit would
   contain; the out path is cached by content, so `apply` right after does not rebuild)
   and diffs its closure against `/run/current-system`. `apply` commits the workspace,

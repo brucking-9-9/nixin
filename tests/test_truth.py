@@ -536,6 +536,224 @@ def test_human_rendering(repo, monkeypatch, capsys):
     assert "  set in    ssh.nix:4" in out
 
 
+# --- list -------------------------------------------------------------------------------
+
+LIST_FLAKE = """{
+  outputs = { nixpkgs, home-manager, ... }: {
+    nixosConfigurations."19BK" = nixpkgs.lib.nixosSystem {
+      modules = [
+        ./configuration.nix
+        home-manager.nixosModules.home-manager
+        { home-manager.users.brucking = import ./home.nix; }
+      ];
+    };
+  };
+}
+"""
+
+
+def _list(repo, monkeypatch, capsys, *argv: str) -> tuple[int, dict]:
+    from nixin.cli import main
+
+    monkeypatch.setattr(
+        configrepo.ConfigRepo, "locate", classmethod(lambda cls, explicit=None, nix=None: repo)
+    )
+    rc = main(["--json", "--host", "19BK", "list", *argv])
+    return rc, json.loads(capsys.readouterr().out)
+
+
+def _package_evals(repo) -> int:
+    return sum("--apply" in c and "programsFromOptions" in c[-1] for c in repo.nix.calls)
+
+
+def test_list_json_contract(repo, monkeypatch, capsys):
+    rc, doc = _list(repo, monkeypatch, capsys)
+    assert rc == 0 and doc["ok"] and doc["verb"] == "list" and doc["host"] == "19BK"
+    assert (doc["scope"], doc["users"], doc["filter"]) == ("all", ["brucking"], None)
+    assert [(p["scope"], p["user"], p["name"]) for p in doc["packages"]] == [
+        ("home", "brucking", "kitty-0.49.2"),
+        ("system", None, "quiet"),
+        ("system", None, "ripgrep-15.2.0"),
+    ]  # sorted by name across scopes
+    assert doc["packages"][2] == {
+        "scope": "system",
+        "user": None,
+        "name": "ripgrep-15.2.0",
+        "pname": "ripgrep",
+        "version": "15.2.0",
+        "declared": [],
+    }
+    assert doc["count"] == 3 and doc["folded"] == 0 and "programs" not in doc
+    # the test tree's flake.nix is `{ }`: no modules for the scanner, said so, not an error
+    assert doc["warnings"] and all("declared[] left empty" in w for w in doc["warnings"])
+    assert doc["cache"]["misses"] == ["packages"] and _package_evals(repo) == 1
+
+    rc, doc = _list(repo, monkeypatch, capsys, "--home", "brucking")
+    assert [p["name"] for p in doc["packages"]] == ["kitty-0.49.2"] and doc["scope"] == "home"
+    assert doc["cache"]["hits"] == ["packages"] and _package_evals(repo) == 1  # from the cache
+    _, doc = _list(repo, monkeypatch, capsys, "--scope", "system")
+    assert [p["pname"] for p in doc["packages"]] == [None, "ripgrep"] and doc["users"] == []
+    _, doc = _list(repo, monkeypatch, capsys, "--scope", "home")
+    assert [p["pname"] for p in doc["packages"]] == ["kitty"] and doc["users"] == ["brucking"]
+    _, doc = _list(repo, monkeypatch, capsys, "--scope", "all", "--home", "brucking")
+    assert doc["count"] == 3  # --home narrows the HM users, --scope all keeps the system
+    _, doc = _list(repo, monkeypatch, capsys, "--filter", "RIP")
+    assert [p["name"] for p in doc["packages"]] == ["ripgrep-15.2.0"] and doc["count"] == 1
+    _, doc = _list(repo, monkeypatch, capsys, "--filter", "0.49")  # name, not only pname
+    assert [p["pname"] for p in doc["packages"]] == ["kitty"]
+    _, doc = _list(repo, monkeypatch, capsys, "--programs")
+    assert [(p["name"], p["scope"]) for p in doc["programs"]] == [
+        ("bash", "system"),
+        ("git", "home"),
+        ("kitty", "home"),
+        ("zsh", "system"),
+    ]
+    assert doc["programs"][2] == {
+        "scope": "home",
+        "user": "brucking",
+        "name": "kitty",
+        "option": "programs.kitty.enable",
+    }
+    _, doc = _list(repo, monkeypatch, capsys, "--programs", "--scope", "system", "--filter", "z")
+    assert [p["name"] for p in doc["programs"]] == ["zsh"] and doc["packages"] == []
+
+    rc, doc = _list(repo, monkeypatch, capsys, "--refresh")
+    assert rc == 0 and doc["cache"]["enabled"] is False and _package_evals(repo) == 2
+
+
+def test_list_errors(repo, monkeypatch, capsys):
+    rc, doc = _list(repo, monkeypatch, capsys, "--home", "bob")
+    assert rc == 1 and doc["error"]["code"] == "unknown-user"
+    assert "'bob' is not a Home Manager user of 19BK (users: brucking)" in doc["error"]["message"]
+    rc, doc = _list(repo, monkeypatch, capsys, "--home", "brucking", "--scope", "system")
+    assert rc == 2 and doc["error"]["code"] == "usage"
+    rc, doc = _list(repo, monkeypatch, capsys, "kitty")
+    assert rc == 2 and doc["error"]["code"] == "usage" and "--filter" in doc["error"]["message"]
+    rc, doc = _list(repo, monkeypatch, capsys, "--scope", "user")  # argparse's choices
+    assert rc == 2 and doc["error"]["code"] == "usage" and doc["verb"] == "list"
+    rc, doc = _list(repo, monkeypatch, capsys, "--host", "nope")
+    assert rc == 1 and doc["error"]["code"] == "unknown-host"
+
+
+def test_list_declared_from_the_scanner(repo, monkeypatch, capsys):
+    (repo.path / "flake.nix").write_text(LIST_FLAKE)
+    (repo.path / "configuration.nix").write_text(
+        "{ pkgs, lib, ... }:\n{\n  imports = [ ./extra.nix ];\n"
+        "  environment.systemPackages = with pkgs; [\n    ripgrep\n    quiet\n  ];\n}\n"
+    )
+    (repo.path / "extra.nix").write_text(
+        "{ pkgs, lib, ... }:\n{\n  environment.systemPackages = lib.optionals true [ pkgs.ripgrep ];\n}\n"
+    )
+    (repo.path / "home.nix").write_text(
+        "{ pkgs, ... }:\n{\n  home.packages = [ pkgs.kitty ];\n  programs.kitty.enable = true;\n}\n"
+    )
+    _, doc = _list(repo, monkeypatch, capsys)
+    assert doc["warnings"] == []
+    by = {(p["scope"], p["name"]): p["declared"] for p in doc["packages"]}
+    assert by["home", "kitty-0.49.2"] == [{"file": "home.nix", "line": 3, "text": "pkgs.kitty"}]
+    assert by["system", "quiet"] == [{"file": "configuration.nix", "line": 6, "text": "quiet"}]
+    assert by["system", "ripgrep-15.2.0"] == [
+        {"file": "configuration.nix", "line": 5, "text": "ripgrep"},
+        {"file": "extra.nix", "line": 3, "text": "pkgs.ripgrep", "conditional": True},
+    ]
+    _, doc = _list(repo, monkeypatch, capsys, "--scope", "system")
+    assert doc["users"] == [] and doc["packages"][1]["declared"][0]["line"] == 5
+
+
+def test_list_rows_fold_repeats_after_the_filter():
+    from nixin.truth import listing
+
+    git = {"name": "git-2.56.0", "pname": "git", "version": "2.56.0"}
+    lfs = {"name": "git-lfs-3.8.0", "pname": "git-lfs", "version": "3.8.0"}
+    pk = {
+        "hm_users": ["me"],
+        "system": {"packages": [git, lfs, git, lfs, git], "programs": []},
+        "home": {"me": {"packages": [git], "programs": []}},
+    }
+    rows, folded = listing.rows(pk, [None, "me"], None)
+    assert [(r["scope"], r["pname"]) for r in rows] == [
+        ("system", "git"),
+        ("home", "git"),
+        ("system", "git-lfs"),
+    ]
+    assert folded == 3  # the same package in two scopes is two rows, not a repeat
+    rows, folded = listing.rows(pk, [None], "LFS")
+    assert [r["pname"] for r in rows] == ["git-lfs"] and folded == 1
+
+
+def test_list_element_names_and_matching():
+    from nixin.truth import listing
+    from nixin.writer.nixtext import NixFile
+
+    def names(expr: str) -> set[str]:
+        nf = NixFile(expr)
+        return set(listing.element_names(nf, 0, len(nf.toks)))
+
+    assert names("pkgs.ripgrep") == {"ripgrep"}
+    assert names("kdePackages.dolphin") == {"dolphin", "kdePackages-dolphin"}
+    assert names("nerd-fonts.jetbrains-mono") >= {"nerd-fonts-jetbrains-mono"}
+    assert names("nightSchedule") == {"nightSchedule", "night-schedule"}
+    assert names("polkit_gnome") >= {"polkit-gnome"}
+    assert names("(pkgs.callPackage ./casual-preloader/package.nix { })") == {"casual-preloader"}
+    assert names("(pkgs.callPackage ./tools/gdoc.nix { })") == {"gdoc"}
+    assert names("(pkgs.writeShellScriptBin \"hello-x\" ''echo hi'')") == {"hello-x"}
+    assert names('(pkgs.writeShellApplication { name = "mc-start"; text = "x"; })') == {"mc-start"}
+    assert names("(python3.withPackages (ps: [ ps.requests ]))") == set()
+
+    rows = [
+        {"user": None, "name": "night-schedule", "pname": None},
+        {"user": None, "name": "ripgrep-15.2.0", "pname": "ripgrep"},
+        {"user": None, "name": "git-lfs-3.8.0", "pname": "git-lfs"},
+        {"user": "me", "name": "ripgrep-15.2.0", "pname": "ripgrep"},
+    ]
+    decl = listing.Decl("a.nix", 3, "nightSchedule", frozenset({"night-schedule"}))
+    rg = listing.Decl("a.nix", 4, "ripgrep", frozenset({"ripgrep"}))
+    git = listing.Decl("a.nix", 5, "git", frozenset({"git"}))
+    listing.attach(rows, {None: [decl, rg, git]})
+    assert [len(r["declared"]) for r in rows] == [1, 1, 0, 0]  # `git` is not git-lfs; per scope
+    assert rows[1]["declared"] == [{"file": "a.nix", "line": 4, "text": "ripgrep"}]
+
+
+def test_list_human(repo, monkeypatch, capsys):
+    from nixin.cli import main
+
+    monkeypatch.setattr(
+        configrepo.ConfigRepo, "locate", classmethod(lambda cls, explicit=None, nix=None: repo)
+    )
+    (repo.path / "flake.nix").write_text(LIST_FLAKE)
+    (repo.path / "configuration.nix").write_text(
+        "{ pkgs, ... }:\n{\n  environment.systemPackages = [\n    pkgs.ripgrep\n  ];\n}\n"
+    )
+    (repo.path / "home.nix").write_text("{ pkgs, ... }:\n{\n  home.packages = [ pkgs.kitty ];\n}\n")
+    monkeypatch.setenv("NIXIN_WIDTH", "120")
+    assert main(["--host", "19BK", "list", "--programs"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[:3] == [
+        "home    kitty    0.49.2  (brucking)  home.nix:3",
+        "system  quiet",
+        "system  ripgrep  15.2.0              configuration.nix:4",
+    ]
+    assert out[3] == "3 packages on 19BK: 2 system, 1 home brucking  · evaluated in 0.0 s"
+    assert out[4:6] == ["", "programs.<name>.enable = true:"]
+    assert out[6:] == [
+        "system  bash",
+        "home    git    (brucking)",
+        "home    kitty  (brucking)",
+        "system  zsh",
+        "4 programs enabled",
+    ]
+
+    monkeypatch.setenv("NIXIN_WIDTH", "40")  # the location column no longer fits: dropped
+    assert main(["--host", "19BK", "list", "--home", "brucking"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["home  kitty  0.49.2  (brucking)", "1 package on 19BK (home brucking)", "cached"]
+    monkeypatch.setenv("NIXIN_WIDTH", "40")  # room for 15 of 19: cut from the left
+    assert main(["--host", "19BK", "list", "--filter", "rip"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "system  ripgrep  15.2.0  …guration.nix:4"
+    assert out[1:] == ["1 package matching 'rip' on 19BK: 1 system, 0 home brucking", "cached"]
+
+
 # --- live -------------------------------------------------------------------------------
 
 live = pytest.mark.skipif(os.environ.get("NIXIN_LIVE") != "1", reason="set NIXIN_LIVE=1 to run nix")

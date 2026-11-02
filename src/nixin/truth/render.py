@@ -1,10 +1,13 @@
-"""Human (non --json) rendering of `status` and `where`: one fact per line, values in Nix
-syntax, capped to stay on one terminal line. The --json document has everything in full.
+"""Human (non --json) rendering of `status`, `where` and `list`: one fact per line, values
+in Nix syntax, capped to stay on one terminal line. The --json document has everything in
+full.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from typing import Any
 
 from ..configrepo import nix_attr
@@ -47,6 +50,14 @@ def sub(label: str, text: str) -> str:
 
 def cap(s: str, n: int = VALUE_CAP) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def term_width() -> int:
+    """Columns for the `list` table: $NIXIN_WIDTH (as discovery's tables), else the terminal."""
+    w = os.environ.get("NIXIN_WIDTH")
+    if w and w.isdigit():
+        return int(w)
+    return shutil.get_terminal_size((100, 24)).columns
 
 
 def _tag(scope: str, user: str | None) -> str:
@@ -220,3 +231,85 @@ def _prefix(name: str, s: dict[str, Any], tag: str) -> list[str]:
         )
         lines.append(f"  {rel:<{width}} = {cap(value, 44)}  {' '.join(places) or '?'}")
     return lines
+
+
+# --- list ---------------------------------------------------------------------------------
+
+NAME_CAP = 32
+NAME_MIN = 16
+VERSION_CAP = 14
+WHERE_MIN = 12
+
+
+def listing(d: dict[str, Any], host: str) -> str:
+    """`scope  name  version  (user)  file:line`, one package a line, sorted by name; the
+    last column only where the line has room. Then the programs (--programs), a footer."""
+    total = term_width()
+    rows = d["packages"]
+    lines = _table(
+        total,
+        [
+            (r["scope"], r["pname"] or r["name"] or "?", r["version"] or "", r["user"], _first(r))
+            for r in rows
+        ],
+    )
+    per = [f"{sum(r['scope'] == 'system' for r in rows)} system"] if d["scope"] != "home" else []
+    per += [f"{sum(r['user'] == u for r in rows)} home {u}" for u in d["users"]]
+    head = f"{d['count']} package{'s' if d['count'] != 1 else ''}"
+    if d["filter"]:
+        head += f" matching {d['filter']!r}"
+    head += f" on {host}"
+    if len(per) > 1:
+        head += ": " + ", ".join(per)
+    elif per:
+        head += f" ({per[0].split(' ', 1)[1]})"
+    foot = [head]
+    if d["folded"]:
+        foot.append(f"{d['folded']} repeated list entries folded")
+    hits = "packages" in d["cache"]["hits"]
+    foot.append("cached" if hits else f"evaluated in {d['timings']['packages']} s")
+    joined = "  · ".join(foot)
+    out = lines + ([joined] if len(joined) <= total else foot)
+    if "programs" in d:
+        progs = d["programs"]
+        out += ["", "programs.<name>.enable = true:"]
+        out += _table(total, [(p["scope"], p["name"], "", p["user"], "") for p in progs])
+        out.append(f"{len(progs)} program{'s' if len(progs) != 1 else ''} enabled")
+    out += [f"note: {w}" for w in d["warnings"]]
+    return "\n".join(out)
+
+
+def _first(r: dict[str, Any]) -> str:
+    decl = r["declared"]
+    if not decl:
+        return ""
+    more = f" +{len(decl) - 1}" if len(decl) > 1 else ""
+    return f"{decl[0]['file']}:{decl[0]['line']}{more}"
+
+
+def _table(total: int, rows: list[tuple[str, str, str, str | None, str]]) -> list[str]:
+    """Columns sized to their content, name and version capped. On a narrow terminal the
+    name column gives way to the last one (down to NAME_MIN), which is then cut from the
+    left (file name and line stay) and dropped below WHERE_MIN."""
+    if not rows:
+        return []
+    sw = max(len(r[0]) for r in rows)
+    vw = min(max(len(r[2]) for r in rows), VERSION_CAP)
+    uw = max((len(r[3]) + 2 for r in rows if r[3]), default=0)
+    lw = max(len(r[4]) for r in rows)
+    fixed = sw + 2 + (vw + 2 if vw else 0) + (uw + 2 if uw else 0) + (lw + 2 if lw else 0)
+    nw = min(max(len(r[1]) for r in rows), NAME_CAP)
+    nw = max(min(nw, total - fixed), min(nw, NAME_MIN))
+    out = []
+    for scope, name, version, user, last in rows:
+        cells = [scope.ljust(sw), cap(name, nw).ljust(nw)]
+        if vw:
+            cells.append(cap(version, vw).ljust(vw))
+        if uw:
+            cells.append((f"({user})" if user else "").ljust(uw))
+        line = "  ".join(cells)
+        room = total - len(line) - 2
+        if last and room >= WHERE_MIN:
+            line += "  " + (last if len(last) <= room else "…" + last[len(last) - room + 1 :])
+        out.append(line.rstrip())
+    return out

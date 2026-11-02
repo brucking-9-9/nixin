@@ -1,7 +1,7 @@
 """truth — what THIS host actually has, from evaluating the config flake itself.
 
-Verbs: `status` and `where`. `register(subparsers)` is the only thing cli.py calls: it
-adds the truth arguments to the two stub parsers and installs the handlers via
+Verbs: `status`, `where` and `list`. `register(subparsers)` is the only thing cli.py
+calls: it adds the truth arguments to the stub parsers and installs the handlers via
 `set_defaults(run=...)`. A handler takes the argparse namespace and returns the --json
 document (without verb/host, which cli adds); in human mode it also puts the rendered
 text under "message", which cli prints.
@@ -16,16 +16,16 @@ import time
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system
+from . import listing, render, scan
 from . import options as opts
 from . import packages as pkgs
-from . import render, scan
 from .cache import TruthCache
 
-VERBS = ("status", "where")
+VERBS = ("status", "where", "list")
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    for verb, handler in (("status", status), ("where", where)):
+    for verb, handler in (("status", status), ("where", where), ("list", list_)):
         p = sub.choices.get(verb)
         if p is None:
             p = sub.add_parser(verb)
@@ -44,6 +44,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     st.add_argument(
         "--quick", action="store_true", help="the default: option counts only if already cached"
+    )
+    ls = sub.choices["list"]
+    ls.add_argument("--home", metavar="USER", help="only this Home Manager user's packages")
+    ls.add_argument(
+        "--scope", choices=listing.SCOPES, help="system, home (every HM user) or all (default)"
+    )
+    ls.add_argument("--filter", metavar="TEXT", help="name or pname contains TEXT (any case)")
+    ls.add_argument(
+        "--programs", action="store_true", help="also the enabled programs.<x> (as in status)"
     )
 
 
@@ -136,6 +145,33 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     from .. import apply  # the pending block (late import: apply imports truth.render)
 
     apply.annotate_status(doc, repo, host)
+    return doc
+
+
+# --- list ---------------------------------------------------------------------------
+
+
+def list_(ns: argparse.Namespace) -> dict[str, Any]:
+    return _run(ns, _list)
+
+
+def _list(ns: argparse.Namespace) -> dict[str, Any]:
+    repo = ConfigRepo.locate(ns.config)
+    if ns.args:
+        raise NixinError(
+            "usage", f"list takes no arguments (got {' '.join(ns.args)!r}; --filter TEXT?)"
+        )
+    host = ns.host
+    hosts = repo.hosts()
+    if host not in hosts:
+        raise NixinError(
+            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
+        )
+    cache = TruthCache(repo, host, enabled=not ns.refresh)
+    doc = listing.collect(repo, host, cache, ns)
+    doc["cache"] = cache.doc()
+    if not ns.json:
+        doc["message"] = render.listing(doc, host)
     return doc
 
 

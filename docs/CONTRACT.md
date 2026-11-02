@@ -20,7 +20,7 @@ nixin --version | --help | VERB --help
 | verb | layer | does |
 |---|---|---|
 | `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
-| `status`, `where` | truth | what this config gives a host (it evaluates the config flake) |
+| `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
 | `plan`, `apply`, `sync` | apply | build + closure diff; commit, pull into the authoritative tree and switch (root); git sync with the hub |
 
@@ -66,7 +66,7 @@ A UI should branch on `ok` and `error.code`, never on `message`.
 Without `--json`, output is human text: results on stdout. A failed verb prints one
 `nixin VERB: message` line to stderr and nothing to stdout. A usage error prints
 argparse's usage and `nixin VERB: error: …` to stderr. The text format is not a contract.
-`NIXIN_WIDTH` overrides the terminal width for discovery's tables.
+`NIXIN_WIDTH` overrides the terminal width for discovery's tables and for `list`.
 
 ## Exit codes
 
@@ -83,9 +83,9 @@ them; the decision on unifying them is open (`docs/HANDOFF-integrate.md`).
 
 | concept | discovery | truth | writer |
 |---|---|---|---|
-| a package's attribute path | `name` on `pkg` rows; `package` on `program` rows (`name` is the binary there); `attr` on `version` rows | not recoverable from derivations: `installed[].name` is the derivation name (`cowsay-3.8.4`), with `pname`/`version` | `packages[]` and `actions[].name` (`cowsay`, `python3Packages.requests`) |
+| a package's attribute path | `name` on `pkg` rows; `package` on `program` rows (`name` is the binary there); `attr` on `version` rows | not recoverable from derivations: `installed[].name` (`where`) and `packages[].name` (`list`) are the derivation name (`cowsay-3.8.4`), with `pname`/`version` | `packages[]` and `actions[].name` (`cowsay`, `python3Packages.requests`) |
 | what NAME is | `--kind`/`kind`: `pkg`, `opt`, `hm`, `program`, `fn`, `version`; `all` | `--kind`/`kind`: `package`, `option` | implied by the verb |
-| NixOS vs Home Manager | `kind` `opt` vs `hm` | option answers: `scope` = `nixos` \| `home`, plus `user`. Package answers: `scope` = `system` \| `home`, plus `user`; `status` uses `packages.system`, `programs.system` | `scope` = `nixos` \| `home`, plus `user`; select with `--home USER` |
+| NixOS vs Home Manager | `kind` `opt` vs `hm` | option answers: `scope` = `nixos` \| `home`, plus `user`. Package answers: `scope` = `system` \| `home`, plus `user`; `status` uses `packages.system`, `programs.system`; `list` selects with `--home USER` / `--scope system\|home\|all` | `scope` = `nixos` \| `home`, plus `user`; select with `--home USER` |
 | declarations | `declarations[]` = strings (`nixos/modules/…nix`), plus `declaration_urls[]` | `declarations[]` = objects `{source, file, line, column, raw}` | — |
 | values | `default`, `example`: Nix source text (strings) | `value`: JSON, with placeholders `<derivation x>`, `<function>`, `<… N more>` | `value`: the Nix text you passed; `checks.eval.value`: JSON |
 | cache state | `cached` (bool), per source in `sources` | `cache` = `{dir, enabled, hits[], misses[]}` | none, always evaluates |
@@ -277,6 +277,52 @@ Errors: `usage` (no NAME, or more than one), `not-found` (an option NAME that no
 Costs: runs nix: one package-list eval per tree change, then one small eval per prefix
 (an option) or per list option plus each matching `programs.x.enable` (a package). Reads
 the config (and greps it), writes cache files. A few seconds cold, under a second warm.
+
+### `list`
+
+```
+nixin list [--home USER] [--scope system|home|all] [--filter TEXT] [--programs]
+           [--config DIR] [--refresh]
+```
+
+The packages the host installs, one row per package: `environment.systemPackages` and
+each Home Manager user's `home.packages` as evaluated (what `status` counts). The default
+scope is `all`: the system and every HM user of the host. `--scope system` and `--scope
+home` (every HM user) narrow it. `--home USER` keeps that user only, and implies `--scope
+home` unless `--scope all` is given (then the system and that user). `--filter TEXT`
+keeps the rows whose `name` or `pname` contains TEXT, ignoring case. It uses the same
+package-list eval and cache entry as `status` (and `where`): after either of them, or a
+first `list`, the next `list` for an unchanged tree runs no eval. `--refresh` evaluates
+again.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `packages[]` | sorted by `pname` (else `name`), case-insensitive: `scope` (`system` \| `home`), `user` (null for `system`), `name` (derivation name, `ripgrep-15.2.0`), `pname`, `version` (null for derivations without them, e.g. `writeShellApplication` scripts), `declared[]` |
+| `declared[]` | **best effort.** The list elements in the config's modules that probably are this package: `file` (repo-relative), `line`, `text` (the element, whitespace dropped: `pkgs.ripgrep`), `conditional: true` under `mkIf`/`optionals`. Found by the writer's text scanner, no eval: the modules of the host (and of the user) reachable from `flake.nix` through `imports` path literals, generated `installer/*.nix` included, and the elements of every list assigned to `environment.systemPackages` / `home.packages` there. An element matches a package by name: `ripgrep` / `pkgs.ripgrep` → pname `ripgrep`, `kdePackages.dolphin` → `dolphin`, a camelCase let binding `nightSchedule` → `night-schedule`, `polkit_gnome` → `polkit-gnome`, `callPackage ./x/package.nix {}` → `x`, `writeShellScriptBin "x" …` → `x`. Empty for what a module adds (`programs.x.enable`, services, NixOS defaults), and for an element whose derivation name differs from its attribute (`dust` is `du-dust`) or that is a function call (`mode "music" [ … ]`). Several entries when several lines list it. For the evaluated answer per file use `where NAME` (`declared[]` there comes from the module system) |
+| `count` | `len(packages)` |
+| `folded` | list entries dropped because they repeat a row (same scope, name, pname and version: a package listed by two modules is installed once). `status.packages` counts list entries, so for the listed scopes it is `count + folded` without a filter |
+| `scope`, `users[]`, `filter` | what was listed: the scope as resolved, the HM users included, the filter (null without one) |
+| `programs[]` | only with `--programs`: the enabled `programs.<name>` of the listed scopes (`status.programs`, same scope and filter rules), sorted by name: `scope`, `user`, `name`, `option` (`programs.<name>.enable`) |
+| `warnings[]` | the scanner's: an import it could not follow, or a host/user whose modules it could not read from `flake.nix` (then that scope's `declared[]` stay empty) |
+| `cache` | as in `status` |
+| `timings` | `packages` (seconds the package-list eval took when it ran, possibly an earlier run: see `cache.hits`), `declared` (the scan), `total` |
+
+Human output: one line per package, `scope  name  version  (user)  file:line` (pname or
+the derivation name; `(user)` for home rows; the first `declared` entry, `+N` for more),
+columns aligned and sorted by name, then a footer with the count per scope, the folded
+repeats and whether the list came from the cache. The location column is cut from the
+left to fit `NIXIN_WIDTH` (or the terminal) and dropped when fewer than 12 columns are
+left. `--programs` adds a block of `scope  name  (user)` lines.
+
+Errors: `usage` (a positional argument, `--home` with `--scope system`, an unknown
+`--scope`), `unknown-user` (`--home USER` is not an HM user of the host), `config-not-found`,
+`not-a-flake`, `unknown-host`, `eval-failed`, `nix-missing`, `internal`.
+
+Costs: runs nix once per tree change (the package-list eval, shared with `status` and
+`where`), reads the config's modules, writes the cache file. A few seconds cold, under
+half a second warm.
 
 ### `add`
 
@@ -606,7 +652,7 @@ mode, as under `tui`, so their logs stream into the window.
 | `eval-failed` | truth, writer | the host does not evaluate (assertions, syntax, an untracked file the config imports) |
 | `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
 | `not-a-workspace` | writer, apply | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
-| `unknown-user` | writer | `--home USER` is not an HM user of the host |
+| `unknown-user` | truth, writer | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |
 | `ambiguous` | writer | several declarations match; `candidates[]`, repeat with `--where` |
@@ -652,6 +698,7 @@ real `~/nixos` workspace and `/etc/nixos`, plan's cache cold for the first plan.
 | `status --full` | — | yes | cache | **92 s** more (NixOS index 61 s, HM 29 s) | 1.1 s | 1.7 GiB |
 | `where PACKAGE` | — | yes | cache | 12 s (packages + 2 prefix evals) | 0.6–1 s | 440 MiB |
 | `where OPTION` | — | yes | cache | 3.5–9 s | 0.6–1 s | 200–230 MiB |
+| `list` | — | yes (the package lists) | cache | 2.5 s (mbp13) / 3.2 s (19BK: system + brucking in one eval); quiet box (load 1.5), 2026-11-02 | 0.36–0.41 s | 340–450 MiB (cold), 42 MiB (warm) |
 | `add --dry-run --no-eval` | — | parse only | — | 0.8 s | — | 36 MiB |
 | `add --dry-run` | — | 1 small eval | — | 1.7 s | — | 200 MiB |
 | `add`, `rm` (NixOS) | — | 1–2 evals | workspace + git index | 5–7 s (2.4–3.3 s at load 2.6) | — | 350 MiB |
@@ -684,7 +731,7 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `nixhub/<sha1>.json` | NixHub version history | 6 h |
 | `noogle/<sha1>.json` | noogle function data | 1 day |
 | `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers | 30 days, keyed by resolved rev |
-| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages`, `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary` | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
+| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where` and `list`), `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary` | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
 | `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree and by `apply`); `status.pending` and `nothing-to-apply` read it without nix | last 40 per host |
