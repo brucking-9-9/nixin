@@ -29,7 +29,7 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
-from tui_fake import COWSAY, FakeBackend, load
+from tui_fake import COWSAY, PACKAGES, FakeBackend, load
 
 from nixin.cli import main
 from nixin.gui import app as gui_app
@@ -59,8 +59,8 @@ def ui(qapp, qtbot):
     """`ui(routes)` → a window on a FakeBackend: .gui, .win, .fake, and helpers."""
     made: list[SimpleNamespace] = []
 
-    def make(routes=None, delay: float = 0.0) -> SimpleNamespace:
-        fake = FakeBackend(dict(COWSAY if routes is None else routes), delay=delay)
+    def make(routes=None, delay: float = 0.0, host: str = "mbp13") -> SimpleNamespace:
+        fake = FakeBackend(dict(COWSAY if routes is None else routes), delay=delay, host=host)
         gui = Gui(fake)
         win = Window(gui)
         assert win.window is not None, win.errors
@@ -529,12 +529,142 @@ def test_quit_while_writing_takes_a_second_try(ui):
     settle(u)
 
 
+# --- packages: installed (`list`), updates (`outdated`), `update` --------------------------
+
+
+def open_packages(u: SimpleNamespace) -> None:
+    keys(u, Qt.Key.Key_4, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "packages" and shown(u, "packagesPage")
+
+
+def test_packages_installed_filter_scope_details_remove(ui):
+    u = ui(PACKAGES, host="19BK")
+    open_packages(u)
+    vm = u.gui.packages
+    assert prop(u, "pkList", "count") == 78 and prop(u, "pkList", "activeFocus")
+    assert prop(u, "pkFooter", "text").startswith(
+        "78 packages: 26 system, 52 home brucking · 67 repeats folded"
+    )
+    assert vm["scopeLabels"] == ["all", "system", "home brucking"]
+    click(u, "pkFilter")
+    keys(u, "zsh")
+    assert prop(u, "pkList", "count") == 2
+    vm.setScope("home:brucking")
+    settle(u)
+    assert prop(u, "pkScope", "displayText") == "for: home brucking"
+    assert vm.rows("packages").rows == [
+        {
+            "name": "zsh",
+            "drv": vm.shown[0].drv,
+            "version": vm.shown[0].version,
+            "tag": "brucking",
+            "where": vm.shown[0].where,
+            "isHome": True,
+        }
+    ]
+    keys(u, Qt.Key.Key_Down, Qt.Key.Key_Return)  # filter → the list → the row
+    d = u.gui.details
+    assert d["owner"] == "packages" and d["name"] == "zsh" and d["homeUser"] == "brucking"
+    assert d["homeKnown"] and d["homeChoices"] == ["", "brucking"]  # from list's users[]
+    assert shown(u, "detailsName") and prop(u, "homeBox", "displayText") == "home: brucking"
+    click(u, "removeButton")
+    assert u.fake.verbs()[-1] == ["rm", "zsh", "--home", "brucking", "--dry-run"]
+    keys(u, Qt.Key.Key_Escape)
+    keys(u, Qt.Key.Key_1, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "search" and not shown(u, "detailsName")  # Search's own pane
+    verbs = u.fake.verbs()
+    assert verbs[0] == ["list"] and verbs.count(["list"]) == 1
+    assert ["where", "zsh", "--kind", "package"] in verbs
+
+
+def test_packages_updates_then_update_lock_to_pending(ui):
+    u = ui(PACKAGES, host="19BK")
+    open_packages(u)
+    click(u, "pk-tab-updates")
+    vm = u.gui.packages
+    assert vm["tab"] == "updates" and prop(u, "upList", "count") == 14
+    assert prop(u, "upKernel", "text") == "kernel 7.2.12 → 7.2.14"
+    assert prop(u, "upSummary", "text") == "13 of 325 packages would change; kernel 7.2.12 → 7.2.14"
+    assert prop(u, "upHead", "text").startswith(
+        "19BK: nixpkgs (github:nixos/nixpkgs/nixos-unstable)"
+    )
+    fuse = next(r for r in vm.rows("updates").rows if r["name"] == "fuse")
+    assert (fuse["before"], fuse["after"], fuse["style"]) == ("2.9.9", "removed", "del")
+    vm.setMode("published")
+    settle(u)
+    assert prop(u, "upList", "count") == 13 and vm["kernel"].endswith("latest 7.3")
+    assert prop(u, "upMode", "displayText") == "vs search.nixos.org"
+    assert vm["notes"].startswith("search.nixos.org has many attributes per pname")
+    vm.setMode("lock")  # kept: not evaluated again
+    settle(u)
+    keys(u, Qt.Key.Key_Return)  # the first row, in details
+    assert u.gui.details["owner"] == "packages" and u.gui.details["name"] == "firefox"
+    click(u, "updateButton")
+    assert shown(u, "updateDialog") and vm["updatePhase"] == "confirm"
+    fields = {r["label"]: r["value"] for r in vm.rows("updateFields").rows}
+    assert fields["runs"] == "nix flake update nixpkgs --flake /home/master/nixos"
+    assert fields["to"].startswith("0bb2eed (2026-11-01), as compared: 13 of 325")
+    click(u, "updateConfirm")
+    assert not shown(u, "updateDialog")
+    assert u.gui["page"] == "pending" and shown(u, "pendingPage")
+    assert u.gui.writes == ["nixpkgs 3ec6363 → 0bb2eed (flake.lock)"]
+    assert u.gui.notice["message"].startswith("updated: nixpkgs 3ec6363 → 0bb2eed")
+    assert {
+        "label": "wrote",
+        "value": "nixpkgs 3ec6363 → 0bb2eed (flake.lock)",
+        "style": "accent",
+    } in (u.gui.pending.rows("session").rows)
+    open_packages(u)  # the lock moved: both documents again
+    assert u.fake.verbs() == [
+        ["list"],
+        ["outdated"],
+        ["outdated", "--published"],
+        ["info", "firefox", "--kind", "pkg", "--channel", "unstable"],
+        ["versions", "firefox", "--limit", "8"],
+        ["where", "firefox", "--kind", "package"],
+        ["update", "--dry-run"],
+        ["update"],
+        ["status"],
+        ["list"],
+        ["outdated"],
+    ]
+
+
+def test_packages_nothing_to_update_and_errors(ui):
+    routes = {
+        **PACKAGES,
+        "outdated": {**load("outdated_19BK"), "up_to_date": True, "changed": [], "count": 0},
+        "outdated --published": {
+            "ok": False,
+            "error": {"code": "network", "message": "search.nixos.org: timed out"},
+        },
+    }
+    u = ui(routes, host="19BK")
+    open_packages(u)
+    click(u, "pk-tab-updates")
+    assert not prop(u, "updateButton", "enabled")
+    assert u.gui.packages["summary"].endswith("nothing would change")
+    u.gui.packages.setMode("published")
+    settle(u)
+    vm = u.gui.packages
+    assert vm["updatesNote"] == "outdated: network: search.nixos.org: timed out"
+    assert prop(u, "upList", "count") == 0 and prop(u, "updateButton", "enabled")
+    assert u.fake.verbs() == [["list"], ["outdated"], ["outdated", "--published"]]
+
+
 def test_every_page_and_dialog_grabs(ui, tmp_path):
     u = ui()
     open_details(u)
     sizes = []
-    for step in ("details", "diff", "pending", "status"):
-        if step == "diff":
+    for step in ("details", "diff", "pending", "status", "packages", "updates", "update"):
+        if step == "packages":
+            u.fake.routes |= {k: [v] for k, v in PACKAGES.items() if k not in u.fake.routes}
+            u.gui.go("packages")
+        elif step == "updates":
+            u.gui.packages.setTab("updates")
+        elif step == "update":
+            u.gui.packages.startUpdate()
+        elif step == "diff":
             u.gui.details.add()
         elif step == "pending":
             u.gui.writer.cancel()

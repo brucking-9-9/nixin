@@ -42,9 +42,9 @@ PACKAGES = {
     "update --dry-run": "update_dry",
     "update": "update_ok",
     "status": "status_updated",
-    "info": "info_cowsay",
-    "versions": "versions_cowsay",
-    "where": "where_cowsay",
+    "info": "info_ripgrep",
+    "versions": "versions_ripgrep",
+    "where": "where_ripgrep_19BK",
 }
 
 

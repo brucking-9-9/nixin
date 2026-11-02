@@ -163,9 +163,11 @@ class NixinApp(App[str]):
         )
 
     def hm_users(self, where: Doc | None = None) -> list[str]:
-        """Home Manager users of the host: from status, else from a `where` document."""
+        """Home Manager users of the host: from status or list, else from a `where`."""
         if self.status_doc and self.status_doc.get("hm_users"):
             return list(self.status_doc["hm_users"])
+        if self.list_doc and self.list_doc.get("users"):
+            return list(self.list_doc["users"])
         users = []
         for s in (where or {}).get("scopes") or []:
             if s.get("scope") == "home" and s.get("user") and s["user"] not in users:
@@ -327,7 +329,7 @@ class NixinApp(App[str]):
             self.push_screen(HelpModal())
 
     def action_quit_safely(self) -> None:
-        if self.busy in ("writing", "applying"):
+        if self.busy in ("writing", "updating", "applying"):
             self.notify(f"{self.busy} is running; ctrl+q quits anyway", severity="warning")
             return
         self.exit(view.farewell(self.writes, self.applied))

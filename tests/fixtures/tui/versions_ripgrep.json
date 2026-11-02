@@ -1,0 +1,192 @@
+{
+  "cached": false,
+  "channel": null,
+  "count": 8,
+  "homepage": "https://github.com/BurntSushi/ripgrep",
+  "host": "mbp13",
+  "latest": "15.2.0",
+  "license": "Unlicense",
+  "limit": 8,
+  "ok": true,
+  "package": "ripgrep",
+  "programs": [
+    "rg"
+  ],
+  "results": [
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2026-10-02",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "55ba7f49ef2962b42cbd126522b7df5f95037679",
+      "source": "nixhub.io",
+      "version": "15.2.0"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2026-07-08",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "389ed85304b281ca7f306cf8a1eb4378651ca44e",
+      "source": "nixhub.io",
+      "version": "15.1.0"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2025-10-22",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "01b6809f7f9d1183a2b3e081f0a1e6f8f415cb09",
+      "source": "nixhub.io",
+      "version": "15.0.0"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2025-10-07",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "bce5fe2bb998488d8e7e7856315f90496723793c",
+      "source": "nixhub.io",
+      "version": "14.1.1"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2024-08-31",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "5629520edecb69630a3f4d17d3d33fc96c13f6fe",
+      "source": "nixhub.io",
+      "version": "14.1.0"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2024-01-02",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "63143ac2c9186be6d9da6035fa22620018c85932",
+      "source": "nixhub.io",
+      "version": "14.0.3"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2023-11-28",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "010c7296f3b19a58b206fdf7d68d75a5b0a09e9e",
+      "source": "nixhub.io",
+      "version": "14.0.2"
+    },
+    {
+      "attr": "ripgrep",
+      "channel": null,
+      "date": "2023-11-27",
+      "kind": "version",
+      "name": "ripgrep",
+      "platforms": [
+        "aarch64-darwin",
+        "aarch64-linux",
+        "x86_64-darwin",
+        "x86_64-linux"
+      ],
+      "programs": [
+        "rg"
+      ],
+      "rev": "21ea9c80732bc4168ed38c5c2f1f4df37c57a6dd",
+      "source": "nixhub.io",
+      "version": "14.0.1"
+    }
+  ],
+  "rev": null,
+  "source": "nixhub.io",
+  "sources": {
+    "nixhub.io": {
+      "cached": false,
+      "channel": null,
+      "count": 8,
+      "error": null,
+      "homepage": "https://github.com/BurntSushi/ripgrep",
+      "kinds": [
+        "version"
+      ],
+      "latest": "15.2.0",
+      "license": "Unlicense",
+      "programs": [
+        "rg"
+      ],
+      "rev": null,
+      "summary": "Utility that combines the usability of The Silver Searcher with the raw speed of grep",
+      "total": 10
+    }
+  },
+  "summary": "Utility that combines the usability of The Silver Searcher with the raw speed of grep",
+  "total": 10,
+  "verb": "versions"
+}

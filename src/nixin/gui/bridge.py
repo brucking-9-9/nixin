@@ -1,7 +1,7 @@
 """The GUI's state and flows, as Qt objects the QML binds to.
 
 `Gui` is the root; Main.qml gets it as its required `backend` property. It owns one
-object per area (search, details, writer, pending, apply, status, notice), each a `VM`:
+object per area (search, packages, details, writer, pending, apply, status, notice), each a `VM`:
 state in a dict that QML reads through properties notifying on the object's own `changed`
 signal, and slots QML calls. Lists are `models.Rows`.
 
@@ -10,7 +10,8 @@ verb handler in-process) and becomes rows through nixin.ui.view, as in the TUI. 
 are the TUI's: a write is always `--dry-run` → the diff dialog → write → `where` again; an
 apply is `apply --dry-run` → confirm (message) → apply; writer, plan and apply runs are
 serialised by `busy` (two writer runs on one workspace race on installer/state.json);
-`status` is stale after a write or an apply, and a plan after an apply.
+`status` is stale after a write or an apply, and a plan after an apply. A nixpkgs update is
+`update --dry-run` → confirm → `update` → Pending; it counts as a write (flake.lock).
 """
 
 from __future__ import annotations
@@ -295,6 +296,7 @@ class SearchVM(VM):
     def select(self, i: int) -> None:
         if 0 <= i < len(self.hits):
             self.set(selected=i)
+            self.gui.packages.set(selected=-1, upSelected=-1)
             self.gui.details.show(self.hits[i])
 
 
@@ -308,6 +310,7 @@ class DetailsVM(VM):
     changed = Signal()
     defaults: ClassVar = {
         "present": False,
+        "owner": "",  # the page whose row this is: search | packages (each pane shows its own)
         "kind": "",
         "badge": "",
         "name": "",
@@ -334,6 +337,7 @@ class DetailsVM(VM):
     }
     lists: ClassVar = {"info": models.FIELD, "versions": models.FIELD, "where": models.FIELD}
     present = state(bool, "present", changed)
+    owner = state(str, "owner", changed)
     kind = state(str, "kind", changed)
     badge = state(str, "badge", changed)
     name = state(str, "name", changed)
@@ -367,12 +371,15 @@ class DetailsVM(VM):
         self.record: dict[str, Any] = {}
         self.where_doc: Doc | None = None
 
-    def show(self, hit: view.Hit) -> None:
+    def show(self, hit: view.Hit, *, user: str = "", owner: str = "search") -> None:
+        """`user`: the Home Manager user to start with (an installed row's own)."""
         g = self.gui
         self.hit, self.record, self.where_doc = hit, hit.record, None
-        user = (g.hm_users() or [""])[0] if hit.kind == "hm" else ""
+        if hit.kind == "hm" and not user:
+            user = (g.hm_users() or [""])[0]
         self.set(
             present=True,
+            owner=owner,
             kind=hit.kind,
             badge=view.KIND_BADGE.get(hit.kind, hit.kind),
             name=hit.name,
@@ -1097,6 +1104,339 @@ class ApplyVM(VM):
         self.set(open=False)
 
 
+# --- packages: list, outdated, update -------------------------------------------------------
+
+PACKAGE_TABS = ("installed", "updates")
+OUTDATED_MODES = ("lock", "published")
+OUTDATED_HINT = {
+    "lock": "two package-list evals: seconds; about a minute when nixpkgs has a new commit",
+    "published": "one eval and a few search.nixos.org queries: seconds",
+}
+
+
+class PackagesVM(VM):
+    """What the host has installed (`list`, loaded once, narrowed here by the filter and the
+    scope with `list --filter`/`--scope` semantics) and what a nixpkgs update would change
+    (`outdated`, lock or --published), with the dialog that takes it: `update --dry-run` →
+    confirm → `update` → Pending. A selected row opens in the details pane, for its user."""
+
+    changed = Signal()
+    defaults: ClassVar = {
+        "tab": "installed",
+        "listLoading": False,
+        "listNote": "",
+        "listNoteStyle": "",
+        "footer": "",
+        "filter": "",
+        "scope": "all",
+        "scopeKeys": ["all"],
+        "scopeLabels": ["all"],
+        "selected": -1,
+        "mode": "lock",
+        "updatesLoading": False,
+        "updatesNote": "",
+        "updatesNoteStyle": "",
+        "head": "",
+        "kernel": "",
+        "kernelStyle": "dim",
+        "summary": "",
+        "notes": "",
+        "canUpdate": False,
+        "upSelected": -1,
+        "updateOpen": False,
+        "updatePhase": "",  # checking | confirm | running
+        "updateTitle": "",
+    }
+    lists: ClassVar = {
+        "packages": models.PACKAGE,
+        "updates": models.UPDATE,
+        "updateFields": models.FIELD,
+    }
+    tab = state(str, "tab", changed)
+    listLoading = state(bool, "listLoading", changed)
+    listNote = state(str, "listNote", changed)
+    listNoteStyle = state(str, "listNoteStyle", changed)
+    footer = state(str, "footer", changed)
+    filter = state(str, "filter", changed)
+    scope = state(str, "scope", changed)
+    scopeKeys = state("QVariantList", "scopeKeys", changed)
+    scopeLabels = state("QVariantList", "scopeLabels", changed)
+    selected = state(int, "selected", changed)
+    mode = state(str, "mode", changed)
+    updatesLoading = state(bool, "updatesLoading", changed)
+    updatesNote = state(str, "updatesNote", changed)
+    updatesNoteStyle = state(str, "updatesNoteStyle", changed)
+    head = state(str, "head", changed)
+    kernel = state(str, "kernel", changed)
+    kernelStyle = state(str, "kernelStyle", changed)
+    summary = state(str, "summary", changed)
+    notes = state(str, "notes", changed)
+    canUpdate = state(bool, "canUpdate", changed)
+    upSelected = state(int, "upSelected", changed)
+    updateOpen = state(bool, "updateOpen", changed)
+    updatePhase = state(str, "updatePhase", changed)
+    updateTitle = state(str, "updateTitle", changed)
+    packages = model("packages")
+    updates = model("updates")
+    updateFields = model("updateFields")
+
+    def __init__(self, gui: Gui) -> None:
+        super().__init__(gui)
+        self.list_doc: Doc | None = None
+        self.list_stale = True
+        self.outdated_docs: dict[str, Doc] = {}  # mode → its last ok document
+        self.rows_all: list[view.PackageRow] = []
+        self.shown: list[view.PackageRow] = []
+        self.update_rows: list[view.UpdateRow] = []
+        self._update_args: list[str] = []
+        self._list_error = ""
+
+    def visit(self) -> None:
+        if self.list_doc is None or self.list_stale:
+            self.loadList()
+        if self["tab"] == "updates":
+            self.loadUpdates()
+
+    def stale(self) -> None:
+        """A write or an update since: the next visit evaluates again; if the page is still
+        open once the flow that wrote is done (an update goes on to Pending), now."""
+        self.list_stale = True
+        QTimer.singleShot(0, lambda: self.gui["page"] == "packages" and self.visit())
+
+    @Slot(str)
+    def setTab(self, tab: str) -> None:
+        if tab in PACKAGE_TABS and tab != self["tab"]:
+            self.set(tab=tab)
+            if tab == "updates":
+                self.loadUpdates()
+
+    # --- installed
+
+    @Slot()
+    def loadList(self, refresh: bool = False) -> None:
+        self.set(listLoading=True)
+        self.gui.fetch(
+            "list",
+            *(["--refresh"] if refresh else []),
+            done=self._listed,
+            group="list",
+            exclusive=True,
+            label=f"list: evaluating {self.gui.backend.config_label}",
+            hint="a few seconds cold, under a second warm",
+        )
+
+    def _listed(self, doc: Doc) -> None:
+        self.set(listLoading=False)
+        n = view.notice(doc)
+        if n is not None:
+            self.rows_all = []
+            self._list_error = f"list: {n.code}: {n.message}"
+        else:
+            self.list_doc, self.list_stale = doc, False
+            self.rows_all = view.package_rows(doc)
+            self._list_error = ""
+            scopes = view.package_scopes(list(doc.get("users") or []))
+            keys = [sc.key for sc in scopes]
+            self.set(
+                scopeKeys=keys,
+                scopeLabels=[sc.label for sc in scopes],
+                scope=self["scope"] if self["scope"] in keys else "all",
+            )
+            self.gui.details._home_choices()  # the users are known now
+        self.render_list()
+
+    def _scope(self) -> view.Scope:
+        keys, labels = self["scopeKeys"], self["scopeLabels"]
+        i = keys.index(self["scope"]) if self["scope"] in keys else 0
+        return view.Scope(keys[i], labels[i])
+
+    def render_list(self) -> None:
+        self.shown = view.filter_packages(self.rows_all, self["filter"], self["scope"])
+        self.rows("packages").reset(models.packages(self.shown))
+        doc = self.list_doc
+        footer = ""
+        if doc is not None and self.rows_all:
+            footer = view.list_footer(doc, len(self.shown), self["filter"], self._scope())
+        note = self._list_error
+        if not note and doc is not None and not self.shown:
+            note = "nothing matches · change the filter or the scope"
+        self.set(
+            footer=footer,
+            selected=-1,
+            listNote=note,
+            listNoteStyle="error" if self._list_error else "dim",
+        )
+
+    @Slot(str)
+    def setFilter(self, text: str) -> None:
+        if text != self["filter"]:
+            self.set(filter=text)
+            self.render_list()
+
+    @Slot(str)
+    def setScope(self, key: str) -> None:
+        if key in self["scopeKeys"] and key != self["scope"]:
+            self.set(scope=key)
+            self.render_list()
+
+    @Slot(int)
+    def select(self, i: int) -> None:
+        if 0 <= i < len(self.shown):
+            r = self.shown[i]
+            self.set(selected=i, upSelected=-1)
+            self.gui.search.set(selected=-1)
+            self.gui.details.show(view.package_hit(r), user=r.user or "", owner="packages")
+
+    # --- updates
+
+    @Slot()
+    def loadUpdates(self, refresh: bool = False) -> None:
+        mode = self["mode"]
+        doc = self.outdated_docs.get(mode)
+        if doc is not None and not refresh:
+            self.show_updates(doc)
+            return
+        self.set(updatesLoading=True, updatesNote="")
+        self.gui.fetch(
+            "outdated",
+            *(["--published"] if mode == "published" else []),
+            *(["--refresh"] if refresh else []),
+            done=lambda d, m=mode: self._outdated(m, d),
+            group="outdated",
+            exclusive=True,
+            label=f"outdated{' --published' if mode == 'published' else ''}: evaluating",
+            hint=OUTDATED_HINT[mode],
+        )
+
+    def _outdated(self, mode: str, doc: Doc) -> None:
+        if doc.get("ok"):
+            self.outdated_docs[mode] = doc
+        if mode == self["mode"]:
+            self.show_updates(doc)
+
+    def show_updates(self, doc: Doc) -> None:
+        self.set(updatesLoading=False, upSelected=-1)
+        n = view.notice(doc)
+        if n is not None:
+            self.update_rows = []
+            self.rows("updates").reset([])
+            self.set(
+                updatesNote=f"outdated: {n.code}: {n.message}",
+                updatesNoteStyle="error",
+                head="",
+                kernel="",
+                summary="",
+                notes="",
+                canUpdate=True,  # the lock can move without a comparison
+            )
+            return
+        self.update_rows = view.update_rows(doc)
+        self.rows("updates").reset(models.updates(self.update_rows))
+        k = view.kernel_line(doc)
+        self.set(
+            updatesNote="",
+            head=view.outdated_head(doc, self.gui.backend.host),
+            kernel=k.text,
+            kernelStyle=k.style,
+            summary=view.outdated_summary(doc),
+            notes=" · ".join(view.outdated_notes(doc)),
+            canUpdate=view.update_args(doc) is not None,
+        )
+
+    @Slot(str)
+    def setMode(self, mode: str) -> None:
+        if mode in OUTDATED_MODES and mode != self["mode"]:
+            self.set(mode=mode)
+            self.loadUpdates()
+
+    @Slot(int)
+    def selectUpdate(self, i: int) -> None:
+        if 0 <= i < len(self.update_rows):
+            r = self.update_rows[i]
+            row = view.PackageRow(r.scope, r.user, r.pname, r.pname, r.old, "", r.pname)
+            self.set(upSelected=i, selected=-1)
+            self.gui.search.set(selected=-1)
+            self.gui.details.show(view.package_hit(row), user=r.user or "", owner="packages")
+
+    @Slot()
+    def refresh(self) -> None:
+        if self["tab"] == "installed":
+            self.loadList(refresh=True)
+        else:
+            self.loadUpdates(refresh=True)
+
+    # --- update
+
+    @Slot()
+    def startUpdate(self) -> None:
+        """`update --dry-run` → the dialog (confirm) → `update` → Pending."""
+        doc = self.outdated_docs.get(self["mode"])
+        args = view.update_args(doc) if doc is not None else []
+        if args is None:
+            self.gui.notice.say("nothing to update: the lock already has the target", "info")
+            return
+        self._update_args = args
+        started = self.gui.fetch(
+            "update",
+            *args,
+            "--dry-run",
+            done=lambda d, o=doc: self._dry(d, o),
+            busy="checking",
+            label="update --dry-run",
+            hint="reads flake.lock: instant",
+        )
+        if started:
+            self.rows("updateFields").reset([])
+            self.set(updateOpen=True, updatePhase="checking", updateTitle="update nixpkgs")
+
+    def _dry(self, dry: Doc, outdated: Doc | None) -> None:
+        if not self["updateOpen"]:
+            return
+        if not dry.get("ok"):
+            self.set(updateOpen=False, updatePhase="")
+            self.gui.notice.show(dry, "update")
+            return
+        lock = outdated if outdated is not None and outdated.get("mode") == "lock" else None
+        self.rows("updateFields").reset(models.fields(view.update_confirm_fields(dry, lock)))
+        self.set(updatePhase="confirm", updateTitle=f"update {dry.get('input')} in flake.lock")
+
+    @Slot()
+    def confirmUpdate(self) -> None:
+        if self["updatePhase"] != "confirm":
+            return
+        args = self._update_args
+        if self.gui.fetch(
+            "update",
+            *args,
+            done=self._updated,
+            busy="updating",
+            label="update: " + shell(["nix", "flake", "update", "nixpkgs", *args]),
+            hint="nix fetches the new nixpkgs: about a minute the first time",
+        ):
+            self.set(updatePhase="running")
+
+    @Slot()
+    def cancelUpdate(self) -> None:
+        if self["updatePhase"] == "running":
+            self.gui.notice.say("the update is running; it finishes on its own", "warn")
+            return
+        self.set(updateOpen=False, updatePhase="")
+
+    def _updated(self, doc: Doc) -> None:
+        g = self.gui
+        self.set(updateOpen=False, updatePhase="")
+        if not doc.get("ok"):
+            g.notice.show(doc, "update")
+            return
+        if not doc.get("changed"):
+            g.notice.say(view.update_fields(doc)[0].value, "info")
+            return
+        self.outdated_docs.clear()
+        g.wrote(view.update_summary(doc))
+        g.notice.say(f"updated: {view.update_summary(doc)} · Pending: plan, apply", "ok")
+        g.go("pending")
+
+
 # --- status ---------------------------------------------------------------------------------
 
 
@@ -1160,7 +1500,7 @@ class Gui(VM):
         "host": "",
         "configLabel": "",
         "channel": "unstable",
-        "busy": "",  # writing | planning | checking | applying while one runs
+        "busy": "",  # writing | updating | planning | checking | applying while one runs
         "running": False,  # any verb is running
         "activity": "",  # the newest running verb, as the busy indicator says it
         "activityHint": "",
@@ -1201,6 +1541,7 @@ class Gui(VM):
         self._areas: dict[str, VM] = {
             "notice": NoticeVM(self),
             "search": SearchVM(self),
+            "packages": PackagesVM(self),
             "details": DetailsVM(self),
             "writer": WriterVM(self),
             "pending": PendingVM(self),
@@ -1212,6 +1553,7 @@ class Gui(VM):
 
     notice = area("notice")
     search = area("search")
+    packages = area("packages")
     details = area("details")
     writer = area("writer")
     pending = area("pending")
@@ -1318,9 +1660,12 @@ class Gui(VM):
         )
 
     def hm_users(self, where: Doc | None = None) -> list[str]:
-        """Home Manager users of the host: from status, else from a `where` document."""
+        """Home Manager users of the host: from status or list, else from a `where`."""
         if self.status_doc and self.status_doc.get("hm_users"):
             return list(self.status_doc["hm_users"])
+        listed = self.packages.list_doc
+        if listed and listed.get("users"):
+            return list(listed["users"])
         users: list[str] = []
         for s in (where or {}).get("scopes") or []:
             if s.get("scope") == "home" and s.get("user") and s["user"] not in users:
@@ -1340,6 +1685,7 @@ class Gui(VM):
         self.plan_doc = None
         self.pending.render_session()
         self.pending.render_plan()
+        self.packages.stale()
 
     def applied_doc(self, doc: Doc) -> None:
         if doc.get("ok"):
@@ -1357,10 +1703,12 @@ class Gui(VM):
 
     @Slot(str)
     def go(self, page: str) -> None:
-        if page not in ("search", "pending", "status"):
+        if page not in ("search", "packages", "pending", "status"):
             return
         self.set(page=page)
-        if page == "pending":
+        if page == "packages":
+            self.packages.visit()
+        elif page == "pending":
             self.pending.visit()
         elif page == "status":
             self.status.visit()
@@ -1380,7 +1728,7 @@ class Gui(VM):
     def mayQuit(self) -> bool:
         """Closing while a write, a plan or an apply runs takes a second try."""
         busy = self["busy"]
-        if busy in ("writing", "planning", "applying"):
+        if busy in ("writing", "updating", "planning", "applying"):
             now = time.monotonic()
             if now - self._refused > QUIT_AGAIN:
                 self._refused = now
