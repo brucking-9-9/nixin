@@ -57,16 +57,35 @@ def link_time(n: int) -> str | None:
     return dt.datetime.fromtimestamp(t, dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def pick_generation(gens: list[tuple[int, str]], path: str | None) -> int | None:
-    """Which generation `path` is: the profile's own when it points there (after a
-    rollback two generations can share a path), else the newest that does."""
+def pick_generation(
+    gens: list[tuple[int, str]], path: str | None, since: str | None = None
+) -> int | None:
+    """Which generation `path` is. Two generations can share a path (a rollback, a revert
+    that rebuilds an older tree). Without `since`: the profile's own when it points
+    there, else the newest that does. With `since` (a /run link, e.g. /run/booted-system):
+    the newest made before that link was."""
     if not path:
         return None
-    prof = profile_generation()
-    if any(n == prof and p == path for n, p in gens):
-        return prof
     hits = [n for n, p in gens if p == path]
+    if since is None:
+        prof = profile_generation()
+        return prof if prof in hits else (hits[-1] if hits else None)
+    try:
+        at = os.lstat(since).st_mtime
+    except OSError:
+        at = None
+    if at is not None:
+        before = [n for n in hits if _mtime(link(n)) <= at]
+        if before:
+            return before[-1]
     return hits[-1] if hits else None
+
+
+def _mtime(p: Path) -> float:
+    try:
+        return os.lstat(p).st_mtime
+    except OSError:
+        return float("inf")
 
 
 def kernel_version(out: str | None) -> str | None:

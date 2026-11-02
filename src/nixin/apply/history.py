@@ -18,7 +18,7 @@ import argparse
 import datetime as dt
 from typing import Any
 
-from ..configrepo import ConfigRepo, NixinError, local_hostname
+from ..configrepo import ConfigRepo, NixinError
 from ..truth.render import term_width
 from . import build, system
 from .git import Git
@@ -41,7 +41,7 @@ def generation_rows(entries: list[dict[str, Any]]) -> dict[str, Any]:
     """Every system generation, newest first, joined with the history lines."""
     gens = system.generations()
     current = system.pick_generation(gens, system.realpath(system.CURRENT))
-    booted = system.pick_generation(gens, system.realpath(system.BOOTED))
+    booted = system.pick_generation(gens, system.realpath(system.BOOTED), since=system.BOOTED)
     default = system.profile_generation()
     by_out: dict[str, list[dict[str, Any]]] = {}
     for e in entries:
@@ -99,6 +99,8 @@ def _history(ns: argparse.Namespace) -> dict[str, Any]:
         raise NixinError("usage", f"history takes no arguments (got {' '.join(ns.args)!r})")
     if ns.limit < 0:
         raise NixinError("usage", "--limit must be 0 (all) or more")
+    from . import authoritative_path, local_hostname  # the package's; no cycle at call time
+
     repo = ConfigRepo.locate(ns.config)  # read only: /etc/nixos is fine here
     if ns.host != local_hostname():
         raise NixinError(
@@ -107,8 +109,6 @@ def _history(ns: argparse.Namespace) -> dict[str, Any]:
             f"on {ns.host}",
         )
     warnings = []
-    from . import authoritative_path  # the package's; no cycle at call time
-
     auth = authoritative_path(getattr(ns, "authoritative", None))
     if auth.exists() and auth.resolve() == repo.path:
         warnings.append(
@@ -203,7 +203,7 @@ def _what(r: dict[str, Any]) -> str:
         return ""
     text = f"{(r['commit'] or '-------')[:7]}  {r['message'] or ''}".rstrip()
     if r["match"] == "out":
-        text += f" (the system of gen {r['match_generation']})"
+        text += f" (= gen {r['match_generation']})"
     elif r["mode"] and r["mode"] != "switch":
         text += f" [{r['mode']}]"
     return text
