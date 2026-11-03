@@ -91,6 +91,7 @@ def log_path(name: str) -> Path:
 
 def _spawn(argv: list[str], *, log: Path | None) -> int:
     out: Any = subprocess.DEVNULL
+    home = os.path.expanduser("~")
     if log is not None:
         log.parent.mkdir(parents=True, exist_ok=True)
         out = log.open("wb")
@@ -102,7 +103,7 @@ def _spawn(argv: list[str], *, log: Path | None) -> int:
             stderr=subprocess.STDOUT,
             start_new_session=True,  # setsid(): no controlling terminal, outlives nixin
             close_fds=True,
-            cwd=os.path.expanduser("~"),
+            cwd=home if os.path.isdir(home) else None,  # the nix sandbox has no HOME
             env=child_env(),
         )
     finally:
