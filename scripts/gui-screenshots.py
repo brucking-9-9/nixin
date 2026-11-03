@@ -12,6 +12,8 @@ update confirmation. --live drives the real verb handlers instead (network for
 discovery, nix against --config): search, details with `where`, the `add --dry-run`
 preview, an option's details and Set dialog, Packages (`list`, `outdated`); it writes
 nothing (the dialogs are cancelled, `update` is never run). OUTDIR defaults to docs/gui.
+--try: only the Try dialog on the recorded `try` documents (a CLI program opened in the
+terminal, a GUI app launched, the program picker); nothing is started.
 Files are named <n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
 """
 
@@ -152,6 +154,35 @@ def packages(outdir: Path) -> None:
     s.done()
 
 
+def trying(outdir: Path) -> None:
+    from tui_fake import COWSAY, FakeBackend
+
+    from nixin.tryout import launch
+
+    launch.SPAWN = lambda argv, *, log: 4242  # the shots say "launched", nothing starts
+    routes = {
+        **COWSAY,
+        "try": "try_cowsay",
+        "try gnome-calculator": "try_gnome_calculator",
+        "try coreutils": "try_coreutils_ambiguous",
+    }
+    gui = Gui(FakeBackend(routes))
+    s = Shooter(gui, outdir)
+    g = gui
+    s.search("cowsay")
+    g.search.select(0)
+    s.settle()
+    for step, target in (("14-try-cli", "cowsay"), ("15-try-gui-app", "gnome-calculator")):
+        g.trying.start(target)
+        s.shot(step)
+        g.trying.close()
+        s.settle()
+    g.trying.start("coreutils")
+    s.shot("16-try-pick")
+    g.trying.close()
+    s.done()
+
+
 def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str) -> None:
     gui = Gui(Backend(host=host, config=config))
     s = Shooter(gui, outdir, "live-")
@@ -186,6 +217,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("outdir", nargs="?", default=str(ROOT / "docs" / "gui"))
     ap.add_argument("--live", action="store_true")
+    ap.add_argument("--try", dest="try_only", action="store_true", help="only the Try shots")
     ap.add_argument("--config")
     ap.add_argument("--host", default=socket.gethostname())
     ap.add_argument("--query", default="cowsay")
@@ -194,10 +226,13 @@ def main() -> int:
     a = ap.parse_args()
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
-    if a.live:
+    if a.try_only:
+        trying(out)
+    elif a.live:
         live(out, a.host, a.config, a.query, a.package, a.option)
     else:
         fixtures(out)
+        trying(out)
     return 0
 
 

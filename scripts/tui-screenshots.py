@@ -11,7 +11,8 @@ updates (lock, --published), the update confirmation. --live drives the real ver
 handlers instead (network for discovery, nix against --config): search, details with
 `where`, the `add --dry-run` preview, and the Packages page (`list`, `outdated`); it
 writes nothing (the diff modal is cancelled, `update` is never run). OUTDIR defaults to
-docs/tui.
+docs/tui. --try: only the Try screen on the recorded `try` documents (a CLI program, a GUI
+app with its streamed fetch, the program picker); nothing is launched.
 Files are named <size>-<step>.svg (live-<size>-<step>.svg with --live).
 """
 
@@ -110,6 +111,28 @@ async def packages(size: str, outdir: Path) -> None:
         shot(app, outdir / f"{size}-12-update-confirm.svg", "update nixpkgs")
 
 
+async def trying(size: str, outdir: Path) -> None:
+    from tui_fake import FakeBackend
+
+    from nixin.tryout import launch
+    from nixin.tui.trying import TryScreen
+
+    launch.SPAWN = lambda argv, *, log: 4242  # the shots show "launched", nothing starts
+    routes = {
+        "try": "try_cowsay",
+        "try gnome-calculator": "try_gnome_calculator",
+        "try coreutils": "try_coreutils_ambiguous",
+    }
+    steps = (("13-try-cli", "cowsay"), ("14-try-gui-app", "gnome-calculator"))
+    steps += (("15-try-pick", "coreutils"),)
+    for step, target in steps:
+        app = NixinApp(FakeBackend(routes))
+        async with app.run_test(size=SIZES[size]) as pilot:
+            app.push_screen(TryScreen(target))
+            await settle(app, pilot)
+            shot(app, outdir / f"{size}-{step}.svg", f"try {target}")
+
+
 async def live(size: str, outdir: Path, host: str, config: str, query: str, pkg: str) -> None:
     app = NixinApp(Backend(host=host, config=config))
     async with app.run_test(size=SIZES[size]) as pilot:
@@ -141,6 +164,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("outdir", nargs="?", default=str(ROOT / "docs" / "tui"))
     ap.add_argument("--live", action="store_true")
+    ap.add_argument("--try", dest="try_only", action="store_true", help="only the Try shots")
     ap.add_argument("--config")
     ap.add_argument("--host", default=socket.gethostname())
     ap.add_argument("--query", default="cowsay")
@@ -149,11 +173,14 @@ def main() -> int:
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
     for size in SIZES:
-        if a.live:
+        if a.try_only:
+            asyncio.run(trying(size, out))
+        elif a.live:
             asyncio.run(live(size, out, a.host, a.config, a.query, a.package))
         else:
             asyncio.run(fixtures(size, out))
             asyncio.run(packages(size, out))
+            asyncio.run(trying(size, out))
     return 0
 
 
