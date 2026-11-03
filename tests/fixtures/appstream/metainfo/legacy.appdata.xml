@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The pre-1.0 appdata form: an <application> root, the id names the desktop file, the
+     screenshot URL is the element's text, `licence`, translated paragraphs inline. -->
+<application>
+  <id type="desktop">legacy-viewer.desktop</id>
+  <licence>CC0</licence>
+  <name>Legacy Viewer</name>
+  <summary>Look at old files</summary>
+  <summary xml:lang="fr">Regarder de vieux fichiers</summary>
+  <description>
+    <p>Legacy Viewer opens
+       files from the past.</p>
+    <p xml:lang="fr">Legacy Viewer ouvre des fichiers du passé.</p>
+    <ol>
+      <li>Open</li>
+      <li xml:lang="fr">Ouvrir</li>
+      <li>Look</li>
+    </ol>
+  </description>
+  <screenshots>
+    <screenshot type="default">https://example.org/legacy.png</screenshot>
+    <screenshot>not-a-url</screenshot>
+  </screenshots>
+  <url type="homepage">https://example.org/legacy</url>
+</application>
