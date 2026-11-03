@@ -1,4 +1,158 @@
-# HANDOFF: apply layer (branch `apply`; then `core-history-safety`)
+# HANDOFF: apply layer (branch `apply`; then `core-history-safety`, `gc-generations-speed`)
+
+## `gc-generations-speed`: generations, gc, speed (2026-11-02)
+
+Written on mbp13, headless, as `master`, with the TEMP 24 h sudo ticket armed. Branch
+`gc-generations-speed`, cut from `origin/main` @ 318e6cc (core-history-safety merged).
+Nothing pushed. It ran one real `gc --keep 3` on mbp13 (no switch, no rebuild) and was
+the only session on the machine while it did (`ps`: no other claude, no nixos-rebuild).
+
+### State
+
+Done; nothing half-done.
+
+- `nixin generations [--keep N] [--older-than DAYS]`: history's rows (the same reader,
+  `history.generation_rows`, so the commits from `installer/history.jsonl` come along)
+  plus `closure_size` (`nix path-info --closure-size`, cached by store path in
+  `apply/closure-sizes.json`: a closure never changes), `boot_entry` (systemd-boot's
+  `loader/entries/nixos-generation-N*.conf` when /boot is readable, else the boot
+  default's `configurationLimit` window, as plan's boot check reads it; null for another
+  bootloader), `drop` and `kept_by[]` (`current`, `booted`, `default`, `newest`,
+  `recent`, `cutoff`). Without flags it previews `gc --keep 3`. Human: history's table
+  with a closure column, `drop`, and an `e` flag for a boot entry.
+- `nixin gc [--keep N] [--older-than DAYS] [--dry-run]`: the same policy (`decide` in
+  generations.py; never current, booted or boot default; with both flags a generation
+  stays when either keeps it; `--older-than` keeps the one running at the cutoff, as
+  `nix-collect-garbage --delete-older-than` does). Without either flag it deletes no
+  generation and only collects. Preview: the rows that go and an estimate (their
+  closures minus what the remaining GC roots reach, `nix-store --gc --print-roots` +
+  `-qR`; `--dry-run` adds `nix-store --gc --print-dead`, sized with `nix-store -q
+  --size`). Root, through apply's `run_privileged` and the `Sudo` backend (needs-sudo
+  with every remaining command): `nix-env --profile … --delete-generations N…`, then
+  `/nix/var/nix/profiles/system/bin/switch-to-configuration boot`, then
+  `nix-collect-garbage`. Verifies the links are gone, parses "N store paths deleted, X
+  MiB freed", reports `df` of the store and /boot before/after and the boot entries
+  before/after. Shares apply's lock. New error code `gc-failed` (`step`, `deleted[]`,
+  `done[]`).
+- `outdated`: the lock-side eval runs in a thread while the target is resolved and
+  evaluated; errors keep the old order (resolve, lock, target).
+- Startup: `requests` is imported on first HTTP use, `traceback` only in the error
+  paths, the writer only where apply opens the workspace or writes a commit message,
+  `concurrent.futures` only inside outdated's and gc's parallel parts; truth caches
+  `nixosConfigurations`' names by the flake fingerprint (`truth.hosts`, file
+  `truth/_flake-<key>-hosts.json`), so a warm `status`/`list`/`where` runs one `nix flake
+  metadata` and no eval. No CLI verb imports Textual, PySide6, rich or requests
+  (`tests/test_startup.py`, fresh interpreter).
+- `cli.py`: two `VERBS` lines (generations, gc). `tests/test_cli.py`: gc has no
+  `--config`, so its stub check expects `host-not-local`.
+
+Gates: see the last commit of the branch (`HANDOFF-apply: gates at …`).
+
+### Speed (warm, mbp13, `~/nixos`, median of 9 runs, output discarded)
+
+| | before (318e6cc, `pfi9p68n…`) | after (`18bc90bj…`) |
+|---|---|---|
+| `status` | 0.318 s | **0.195 s** |
+| `list` | 0.354 s | **0.231 s** |
+| `history` | 0.209 s | 0.141 s |
+| `generations` | — | 0.143 s (cold: 3.2 s, 33 closures sized) |
+| `--version` (start-up floor) | 0.200 s | 0.132 s |
+| `import nixin.cli` (`-X importtime`) | 160 ms | ~97 ms |
+| `outdated --refresh` | 4.06–4.19 s (lock 1.8 + target 2.0 + resolve 0.2) | **2.27–2.44 s** |
+
+Where the warm `status` went (profiled): imports 160 → ~97 ms (`requests` 74 ms,
+`traceback`/`_colorize` 20 ms, the writer 12 ms off the path), and one of its two nix
+calls (the hosts eval, 49 ms). What is left: Python start + site dirs (~35 ms), imports
+(~97 ms), `nix flake metadata` for the cache key (~50 ms), four git calls for `pending`.
+Going lower means not asking nix for the fingerprint (a cache key of our own from git),
+which changes what a hit means; not done.
+
+### Live run on mbp13
+
+Built binary `/nix/store/18bc90bj…-nixin-0.1.0` (16427a6). Outputs in
+`/tmp/nixin-gc/live/`. Before: 35 generations (87–121), `*` 120, `b` 118, profile 120,
+boot entries 120–121 (`configurationLimit 2`), `~/nixos` = `/etc/nixos` = a198757.
+
+| step | result | wall |
+|---|---|---|
+| `generations` (sizes cold) | 35 rows, closures 19.6–21.7 GiB each (shared), `--keep 3` would delete 31 (87–117); boot entries `[120, 121]` from the window (/boot is root-only); 8 history lines joined | 3.2 s (nix 3.05 s) |
+| `generations` again | sizes from the cache | 0.15 s |
+| `gc --keep 3 --dry-run` | delete 31, keep 118–121 (118 booted, 120 running and default); estimate **4.8 GiB**: 1.27 GB only those generations reach (894 paths), 3.6–3.9 GB garbage already (5957–6097 paths, two runs); `sudo` ready; the three commands | **30 s** (dead scan) |
+| `gc --keep 3` | `nix-env --delete-generations 87 … 117`, `…/profiles/system/bin/switch-to-configuration boot`, `nix-collect-garbage`; deleted **31**, 4 left (118–121); nix: "7972 store paths deleted, 2.4 GiB freed" | **77.5 s** (preview 6 s, delete 0.05 s, bootloader 0.23 s, collect 71.2 s) |
+| store (`df /nix/store`) | free 284,977,553,408 → 288,521,895,936 B: **+3.54 GB** (more than nix's 2.4 GiB count: hard-link targets) | — |
+| /boot (`df /boot`) | 84,253,184 B free before and after (80.4 MiB of 196.9 MiB): nothing to free, the entries were already 120–121 only | — |
+| after | `/run/current-system` = gen 120, booted 118, profile → `system-120-link`; 0 failed units; `history`: 4 generations, 6 history lines now unmatched (gens 110–115); `~/nixos` untouched (`installer/history.jsonl` dirty as before) | — |
+
+Estimate vs actual: the dry run said 4.8 GiB (generations 1.27 GB + garbage 3.6–3.9 GB),
+`df` says 3.54 GB, nix says 2.4 GiB. The estimate is high by ~40 %: auto-optimise-store's
+hard links (files shared with live paths free nothing) are the expected cause. Good
+enough as an upper bound; the note in `estimate` says so.
+
+### Judgement calls
+
+1. **The estimate is ours, not `nix-collect-garbage --dry-run`'s.** Its dry run prints
+   the paths that are garbage *now* and "N store paths would be deleted" (no bytes), and
+   it cannot see what deleting the generations frees: it does not delete them in a dry
+   run, and as a user it does not even list the system profile's (not writable). So gc
+   lists the same garbage with `nix-store --gc --print-dead` (same code path in nix) and
+   adds the closures only the doomed generations reach (`--print-roots` minus their
+   links, `-qR`), sized with `nix-store -q --size`. The whole-store dead scan costs
+   ~30 s, so only `--dry-run` runs it. Also: this agent's permission layer denies
+   running `nix-collect-garbage` directly (even `--help`), so its output format was
+   taken from nix's source (`printFreed`) and checked by the real run.
+2. **The bootloader step uses the profile's `switch-to-configuration`, not
+   `/run/current-system`'s.** Same thing normally; after `apply --no-switch` (or in a
+   specialisation) `/run/current-system`'s would make the running system the boot
+   default, since systemd-boot's builder makes the entry of the toplevel it is given
+   the default. Through `/nix/var/nix/profiles/system/bin/…` the default stays.
+3. **Order: delete, bootloader, collect** (the brief listed the collection first). If
+   the collection is interrupted, the boot menu already matches the profile: no entry
+   points at a collected system.
+4. **`gc` without flags deletes no generation** (only collects); `generations` without
+   flags previews `--keep 3`. A bare `nixin gc` from an agent or a UI should not drop
+   rollback targets.
+5. **`--keep` counts generations by number, newest first, and protected ones count
+   too**: `--keep 3` here kept 119–121 and the booted 118 on top. `--keep` below 1 is a
+   usage error (the running one stays anyway; 0 reads like "delete everything").
+6. **Boot entries are modelled when /boot is root-only** (mbp13: vfat, 0700): the
+   newest `configurationLimit` generations, i.e. as of the last bootloader install.
+7. **Closure sizes overlap** (21–22 GiB each here, nearly all shared): shown per row
+   because the brief asked; the human output says so, and points at `gc --dry-run` for
+   what deleting frees.
+8. **Speed work touched other layers' import lines** (http.py, discovery, truth, cli),
+   import placement only, plus truth's `hosts()` cache; behaviour is unchanged.
+
+### Gaps / next
+
+- The UIs do not show `generations`/`gc` yet: a Generations page (the table, a keep
+  spinner showing `drop`, "Delete N generations…" → `gc --dry-run` → confirm → `gc`) is
+  the natural next UI piece.
+- The estimate leaves out the deleted systems' derivations (keep-derivations) and
+  counts hard-linked files (auto-optimise-store) as freed; compare with the live numbers
+  above.
+- `history.jsonl` keeps the lines of deleted generations (`history.unmatched` counts
+  them); nothing prunes them.
+- Not verified on 19BK (no NOPASSWD there: `gc` answers `needs-sudo` with the three
+  commands).
+
+### How to test
+
+```
+nix develop -c pytest -q tests/test_gc.py          # 18 offline: policy, generations, gc on the Machine fake
+nix develop -c pytest -q tests/test_startup.py tests/test_outdated.py -k "startup or side"
+nix develop -c pytest -q                            # everything
+nix build
+B=$(nix build --no-link --print-out-paths .)/bin/nixin
+$B --config ~/nixos generations                     # read only; --keep N / --older-than D
+$B gc --keep 3 --dry-run                            # read only, ~30 s (the dead scan)
+$B gc --keep 3                                      # root: deletes generations, rewrites /boot, collects
+python3 -X importtime -c "import nixin.cli" 2>&1 | sort -t'|' -k2 -n | tail   # startup
+```
+
+Scratch: `/tmp/nixin-gc/` (timings, live JSON/human outputs in `live/`, the baseline
+build log); delete with `rm -rf /tmp/nixin-gc` (this run cannot).
+
+---
 
 ## `core-history-safety`: history, rollback, plan safety (2026-11-02)
 

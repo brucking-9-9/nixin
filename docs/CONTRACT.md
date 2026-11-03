@@ -849,7 +849,7 @@ Result:
 | `store`, `boot` | `{path, total, free_before, free_after, freed}` of the store's filesystem and of /boot (`df`'s free space; `free_after`/`freed` null with `--dry-run`); `boot` also `entries_before[]`, `entries_after[]` and `entries_source` (as `generations`' `boot`) |
 | `commands[]`, `privilege`, `duration_s` | `--dry-run`: `{step, privileged, argv, command, backend, by_hand}` for `delete`, `bootloader`, `collect`; `{backend, ready, why}` |
 | `deleted[]` | the generation numbers deleted (verified: their links are gone) |
-| `freed` | `{paths, bytes, text}`: what nix-collect-garbage said it freed; null (and a warning) when it did not say |
+| `freed` | `{paths, bytes, text}`: what nix-collect-garbage said it freed (`bytes` only as precise as nix prints it: `2.4 GiB` is 0.1 GiB; with auto-optimise-store nix also frees hard-link targets it does not count, so `store.freed`, `df`'s delta, is the better number); null (and a warning) when it did not say |
 | `generations_left` | how many system generations remain |
 | `privileged_commands[]`, `backends` | the root commands as run; `{delete, bootloader, collect}` → `sudo` |
 | `timings` | seconds: `prepare` (listing, sizes, the estimate), `delete`, `bootloader`, `collect`, `total` |
@@ -1135,6 +1135,11 @@ The `history`/`rollback` rows and the boot check are from 2026-11-02 on mbp13 (l
 the real workspace and `/etc/nixos`: one cowsay apply (gen 121: 101 s, build 72 s,
 switch 30 s) and the rollback to gen 120.
 
+The `generations` and `gc` rows, and the second warm figures of `status`, `list`,
+`history` and `outdated` (after the start-up work: lazy imports, the hosts list cached),
+are from the evening of 2026-11-02 on mbp13 (load 0.6–0.9, nix 2.34.9), the real
+`~/nixos`, the built binary; warm = median of 9 runs.
+
 The `outdated` rows are from 2026-11-02 on mbp13, quiet (load 0.4–0.7), against `~/nixos`
 (lock nixpkgs 3ec6363, target nixos-unstable 0bb2eed): nixin's cache empty, nix's own
 fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too (load 2.4).
@@ -1148,11 +1153,11 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `info` | yes | — | cache | 1.2–1.9 s | 0.2 s | 40–50 MiB |
 | `info --kind pkg --nixpkgs REV` | — | `nix eval` | cache | 1.2 s | 0.2 s | 105 MiB |
 | `versions` | yes | — | cache | 1.3 s | 0.2 s | 40 MiB |
-| `status` | — | yes | cache | **77 s** (toplevel 68 s, packages 7 s) | 0.8 s | 1.4 GiB |
+| `status` | — | yes | cache | **77 s** (toplevel 68 s, packages 7 s) | 0.8 s under load; 0.2 s quiet (one `nix flake metadata`, no eval) | 1.4 GiB |
 | `status --full` | — | yes | cache | **92 s** more (NixOS index 61 s, HM 29 s) | 1.1 s | 1.7 GiB |
 | `where PACKAGE` | — | yes | cache | 12 s (packages + 2 prefix evals) | 0.6–1 s | 440 MiB |
 | `where OPTION` | — | yes | cache | 3.5–9 s | 0.6–1 s | 200–230 MiB |
-| `list` | — | yes (the package lists) | cache | 2.5 s (mbp13) / 3.2 s (19BK: system + brucking in one eval); quiet box (load 1.5), 2026-11-02 | 0.36–0.41 s | 340–450 MiB (cold), 42 MiB (warm) |
+| `list` | — | yes (the package lists) | cache | 2.5 s (mbp13) / 3.2 s (19BK: system + brucking in one eval); quiet box (load 1.5), 2026-11-02 | 0.36–0.41 s; 0.23 s after the start-up work | 340–450 MiB (cold), 42 MiB (warm) |
 | `add --dry-run --no-eval` | — | parse only | — | 0.8 s | — | 36 MiB |
 | `add --dry-run` | — | 1 small eval | — | 1.7 s | — | 200 MiB |
 | `add`, `rm` (NixOS) | — | 1–2 evals | workspace + git index | 5–7 s (2.4–3.3 s at load 2.6) | — | 350 MiB |
@@ -1162,11 +1167,14 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `apply` | — | git, nix (unless cached), sudo | workspace commit, authoritative tree, system profile, /boot | **30–31 s** after `plan` or for a tree plan's cache knows: build 0.4–0.9 s (cache), pull 0.05 s, `nixos-rebuild switch` 29–30 s (root's own eval + activation) | `nothing-to-apply` 0.2 s | — |
 | `apply --dry-run` | — | `nix flake metadata`, `sudo -n true` | — | 1.3 s | — | — |
 | boot check (in `plan`, `apply`, `rollback`) | — | — (reads two toplevels, the profile's generations' kernel links, the installer scripts up to the builder, `statvfs /boot`) | — | under 0.1 s | — | — |
-| `history` | — | — | — | 0.2 s (35 generations) | — | — |
+| `history` | — | — | — | 0.2 s (35 generations); 0.14 s after the start-up work | — | — |
+| `generations` | — | `nix path-info -S` for closures not sized before | cache (`closure-sizes.json`) | 3.2 s (35 generations, 33 closures sized: nix 3.05 s) | 0.14 s | — |
+| `gc --dry-run` | — | `nix-store --gc --print-roots`, `-qR` over the roots, `--gc --print-dead`, `-q --size`; `sudo -n true` | — | **30 s** (the whole-store dead scan; it runs alongside the rest, ~6 s) | — | — |
+| `gc` | — | the preview without the dead scan; sudo: nix-env, switch-to-configuration boot, nix-collect-garbage | system profile, /boot, the store | **77.5 s** for 31 generations (preview 6 s, delete 0.05 s, bootloader 0.23 s, collect 71 s: 7972 paths) | — | — |
 | `rollback --dry-run` | — | `sudo -n true`, `nix store diff-closures` | — | 1.3 s | — | — |
 | `rollback` | — | git, sudo (no nix eval or build: the generation is in the store) | workspace commit, system profile, /boot, authoritative tree | **2.9 s** (switch-to-configuration 1.7 s, pull 0.05 s); `nixos-rebuild`'s root eval is skipped | `nothing-to-apply` 0.2 s | — |
 | `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
-| `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked) | 410 MiB mbp13, 540 MiB 19BK |
+| `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals (side by side since `gc-generations-speed`: **2.3 s** on mbp13) + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked; 2.3 s with the evals side by side) | 410 MiB mbp13, 540 MiB 19BK |
 | `outdated --published` | yes (search.nixos.org: 3–6 queries) | the lock-side eval only (shared with lock mode) | cache | 1.1–1.2 s with the eval cached, 1–3 s for the queries; + 2–3 s for a cold eval | 0.33 s | 43 MiB (+ the eval's) |
 
 nixin streams no progress under `--json` (in human mode `plan`/`apply` tee nix's build

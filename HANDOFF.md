@@ -23,6 +23,16 @@ on merge it moves here.
   `/etc/nixos`), and the boot block in `plan`/`apply` (`reboot_needed`, `boot_space` from
   systemd-boot's window; `boot-space` refuses). Round trip run for real on mbp13: gen 121
   (cowsay) → rollback to 120 in 2.9 s, trees in sync. First section of HANDOFF-apply.
+  Branch `gc-generations-speed`: `nixin generations` (history's rows + closure size,
+  boot entry, what `gc --keep N` drops) and `nixin gc [--keep N] [--older-than DAYS]
+  [--dry-run]` (never the running/booted/default generation; preview with an estimate,
+  then `nix-env --delete-generations`, the boot default's `switch-to-configuration
+  boot`, `nix-collect-garbage` through `sudo -n`; `gc-failed`); `outdated`'s two evals
+  side by side (4.1 → 2.3 s); warm `status` 0.32 → 0.20 s and `list` 0.35 → 0.23 s
+  (lazy imports: no requests/Textual/PySide6 at CLI start; the hosts list cached).
+  Real `gc --keep 3` on mbp13: 31 generations deleted (87–117), 3.5 GB freed (`df`;
+  estimate 4.8 GiB), /boot unchanged (already 2 entries), 77.5 s. First section of
+  HANDOFF-apply.
 - [tui](docs/HANDOFF-tui.md) — branch `tui`: `nixin tui` / `nixin-tui` (Textual) over the same
   documents, `view.py` as the view-model for the GUI; the cowsay round trip ran from a
   50×25 terminal on mbp13 (gens 113–114).
