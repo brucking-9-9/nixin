@@ -4,11 +4,14 @@
 what a failure means). `stream` tees the child's output to our stderr while it runs
 (human mode: nix's build progress, nixos-rebuild's activation log), so stdout stays the
 verb's own. Under --json nothing is streamed: the contract keeps stderr empty.
-stdin is always closed: nothing nixin starts may stop to ask.
+stdin is closed: nothing nixin starts may stop to ask. The one exception is `tty=True`,
+apply on another host: `ssh -t` keeps the terminal, so the remote sudo can ask for its
+password there (remote.py refuses that run under --json and without a terminal).
 """
 
 from __future__ import annotations
 
+import codecs
 import os
 import re
 import shlex
@@ -51,13 +54,17 @@ def run_process(
     stream: bool | str = False,
     timeout: float | None = None,
     env: dict[str, str] | None = None,
+    tty: bool = False,
 ) -> Proc:
     """Run argv (argv[0] looked up on PATH). `stream`: False, "stderr" (tee the child's
-    stderr), or "all" (stdout merged into stderr and teed: the child's stdout is a log)."""
+    stderr), or "all" (stdout merged into stderr and teed: the child's stdout is a log).
+    `tty`: stdin stays ours (the terminal), output as with "all"."""
     exe = shutil.which(argv[0])
     if exe is None:
         return Proc(argv, 127, "", f"{argv[0]}: not on PATH", missing=True)
     full_env = None if env is None else {**os.environ, **env}
+    if tty:
+        return _run_tty([exe, *argv[1:]], argv, full_env)
     if not stream:
         try:
             p = subprocess.run(
@@ -100,6 +107,26 @@ def run_process(
     p.wait()
     t.join()
     return Proc(argv, p.returncode, out, "".join(teed))
+
+
+def _run_tty(cmd: list[str], argv: list[str], env: dict[str, str] | None) -> Proc:
+    """stdin inherited; stdout and stderr merged, teed to our stderr in chunks as they
+    arrive (a password prompt has no newline). ssh -t puts the terminal in raw mode and
+    the remote pty sends CRLF, so the bytes go out as they came; the captured text has
+    plain newlines."""
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+    dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    seen: list[str] = []
+    fd = p.stdout.fileno()
+    while chunk := os.read(fd, 4096):
+        text = dec.decode(chunk)
+        seen.append(text)
+        sys.stderr.write(text)
+        sys.stderr.flush()
+    seen.append(dec.decode(b"", final=True))
+    p.stdout.close()
+    p.wait()
+    return Proc(argv, p.returncode, "", "".join(seen).replace("\r\n", "\n"))
 
 
 RUN: Runner = run_process  # tests swap this for a fake
