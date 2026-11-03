@@ -78,8 +78,8 @@ Item {
             DangerButton {
                 objectName: "opUnset"
                 text: "Unset"
-                enabled: pane.backend.busy === "" && !pane.o.template
-                ToolTip.visible: hovered && pane.o.template
+                enabled: pane.backend.busy === "" && pane.o.canUnset
+                ToolTip.visible: hovered && !pane.o.canUnset
                 ToolTip.text: "a template: unset takes the full name"
                 onClicked: pane.o.unset()
             }

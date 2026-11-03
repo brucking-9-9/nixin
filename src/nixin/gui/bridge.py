@@ -1496,7 +1496,8 @@ class OptionsVM(VM):
         "present": False,
         "badge": "",
         "name": "",
-        "template": False,
+        "template": False,  # a <name> to fill in: no where, Set asks for the name
+        "canUnset": False,  # not for a template or a list element
         "cue": "",
         "cueStyle": "",
         "about": "",
@@ -1524,6 +1525,7 @@ class OptionsVM(VM):
     badge = state(str, "badge", changed)
     name = state(str, "name", changed)
     template = state(bool, "template", changed)
+    canUnset = state(bool, "canUnset", changed)
     cue = state(str, "cue", changed)
     cueStyle = state(str, "cueStyle", changed)
     about = state(str, "about", changed)
@@ -1616,13 +1618,14 @@ class OptionsVM(VM):
         hit = self.hits[i]
         self.hit, self.where_doc = hit, None
         user = (self.gui.hm_users() or [""])[0] if hit.kind == "hm" else ""
-        template = view.option_template(hit.target)
+        template = view.option_template(view.option_set_name(hit.target))
         self.set(
             selected=i,
             present=True,
             badge=view.KIND_BADGE.get(hit.kind, hit.kind),
             name=hit.name,
             template=template,
+            canUnset=not view.option_template(hit.target),
             homeUser=user,
             hostTitle=f"on {self.gui.backend.host}",
         )
@@ -1667,7 +1670,7 @@ class OptionsVM(VM):
         self.set(whereLoading=True)
         self.gui.fetch(
             "where",
-            *(hit.target, "--kind", "option"),
+            *(view.option_set_name(hit.target), "--kind", "option"),
             done=lambda doc, h=hit: self._where(h, doc),
             group="options-where",
             exclusive=True,
@@ -1703,12 +1706,24 @@ class OptionsVM(VM):
             return None
         if hit.kind != "hm":
             return ""
-        if not self["homeUser"]:
-            self.gui.notice.say(
-                f"Home Manager options need a user; {self.gui.backend.host} has none", "error"
-            )
+        if self["homeUser"]:
+            return self["homeUser"]
+        if self["template"] and self.gui.status_doc is None:  # no where: the users from status
+            self.gui.notice.say("loading the host's Home Manager users (status)…", "info")
+            self.gui.load_status_for_users(self._users_loaded)
             return None
-        return self["homeUser"]
+        self.gui.notice.say(
+            f"Home Manager options need a user; {self.gui.backend.host} has none", "error"
+        )
+        return None
+
+    def _users_loaded(self, users: list[str]) -> None:
+        if users and not self["homeUser"]:
+            self.set(homeUser=users[0])
+            self.render()
+            self.gui.notice.say(f"for home {users[0]}: Set… again", "ok")
+        elif not users:
+            self.gui.notice.say(f"no Home Manager users on {self.gui.backend.host}", "info")
 
     @Slot()
     def editOption(self) -> None:
@@ -1716,9 +1731,11 @@ class OptionsVM(VM):
         if hit is None or user is None:
             return
         rec = hit.record
+        option = view.option_set_name(hit.target)
+        prefill_rec = rec if option == hit.target else {}  # the list: no default of its own
         self.gui.writer.open_set(
-            hit.target,
-            view.option_prefill(rec, self.where_doc, hit.kind, user or None),
+            option,
+            view.option_prefill(prefill_rec, self.where_doc, hit.kind, user or None),
             type_=str(rec.get("type") or hit.detail or ""),
             user=user,
             can_home=hit.kind == "hm",
@@ -1733,7 +1750,7 @@ class OptionsVM(VM):
         hit, user = self.hit, self._home()
         if hit is None or user is None:
             return
-        if self["template"]:
+        if not self["canUnset"]:
             self.gui.notice.say("a template: unset takes the full name", "warn")
             return
         self.gui.writer.start(

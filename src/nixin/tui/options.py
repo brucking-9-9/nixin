@@ -235,7 +235,9 @@ class OptionScreen(Base):
         self.record = hit.record
         self.where: dict | None = None
         self.user = user  # --home USER, for `hm`
-        self.template = view.option_template(hit.target)
+        # what where and set take: the list, for an element of a list of submodules
+        self.set_name = view.option_set_name(hit.target)
+        self.template = view.option_template(self.set_name)  # a <name> to fill in: no where
 
     def compose(self) -> ComposeResult:
         h = self.hit
@@ -266,7 +268,7 @@ class OptionScreen(Base):
     def on_mount(self) -> None:
         if self.kind == "hm" and self.user is None:
             self.user = (self.nixin.hm_users() or [None])[0]
-        self.query_one("#op-unset", Button).disabled = self.template
+        self.query_one("#op-unset", Button).disabled = view.option_template(self.hit.target)
         self.render_sections()
         if not self.template:
             self.action_where()
@@ -292,7 +294,7 @@ class OptionScreen(Base):
             return
         self.nixin.fetch(
             "where",
-            self.hit.target,
+            self.set_name,
             "--kind",
             "option",
             done=self._where,
@@ -318,30 +320,46 @@ class OptionScreen(Base):
             return
         users = self.users()
         if not users:
-            self.notify(f"no Home Manager users on {self.nixin.backend.host}", severity="warning")
+            if self.nixin.status_doc is None:
+                self.nixin.load_status_for_users(self._users_loaded)
+            else:
+                host = self.nixin.backend.host
+                self.notify(f"no Home Manager users on {host}", severity="warning")
             return
         i = users.index(self.user) if self.user in users else -1
         self.user = users[(i + 1) % len(users)]
         self.render_sections()
 
+    def _users_loaded(self, users: list[str]) -> None:
+        if users and not self.user:
+            self.user = users[0]
+            self.render_sections()
+            self.notify(f"for home {self.user} · h: another user · e: set")
+        elif not users:
+            self.notify(f"no Home Manager users on {self.nixin.backend.host}", severity="warning")
+
     def _home_args(self) -> list[str] | None:
         if self.kind != "hm":
             return []
-        if not self.user:
-            self.notify(
-                f"Home Manager options need a user; {self.nixin.backend.host} has none",
-                severity="error",
-            )
+        if self.user:
+            return ["--home", self.user]
+        if self.template and self.nixin.status_doc is None:  # no where: the users from status
+            self.nixin.load_status_for_users(self._users_loaded)
             return None
-        return ["--home", self.user]
+        self.notify(
+            f"Home Manager options need a user; {self.nixin.backend.host} has none",
+            severity="error",
+        )
+        return None
 
     def action_set(self) -> None:
         home = self._home_args()
         if home is None:
             return
+        rec = self.record if self.set_name == self.hit.target else {}  # the list: no default
         self.nixin.set_option(
-            self.hit.target,
-            view.option_prefill(self.record, self.where, self.kind, self.user),
+            self.set_name,
+            view.option_prefill(rec, self.where, self.kind, self.user),
             self.user if home else None,
             home,
             hint=view.option_set_hint(self.record),
@@ -350,7 +368,7 @@ class OptionScreen(Base):
         )
 
     def action_unset(self) -> None:
-        if self.template:
+        if view.option_template(self.hit.target):
             self.notify("a template: unset takes the full name", severity="warning")
             return
         home = self._home_args()

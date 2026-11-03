@@ -324,6 +324,8 @@ def test_option_search_args_and_templates():
     assert view.option_placeholder("users.users.<name>.shell") == (12, 18)
     assert view.option_placeholder("programs.git.includes.*.path") == (22, 23)
     assert view.option_placeholder("services.openssh.enable") is None
+    assert view.option_set_name("programs.git.includes.*.path") == "programs.git.includes"
+    assert view.option_set_name("users.users.<name>.shell") == "users.users.<name>.shell"
     assert not view.option_template("services.openssh.enable")
 
 
@@ -391,7 +393,11 @@ def test_option_prefill_never_writes_a_placeholder_back():
         assert view.option_prefill(rec, where(lossy), "opt", None) == '"text"'  # the default
     assert view.option_prefill({"name": "x.y", "default": "{\n}"}, None, "opt", None) == ""
     template = view.option_fields({"name": "users.users.<name>.shell", "type": "shell"})
-    assert template[-1].label == "path"
+    assert template[-1] == view.Field(
+        "path", "a template: Set asks for the name in place of <name>", "warn"
+    )
+    element = view.option_fields({"name": "programs.git.includes.*.path", "type": "path"})
+    assert element[-1].value == "a list element: Set writes the list, programs.git.includes"
 
 
 def test_backend_runs_the_real_verb_handlers(tmp_path):
@@ -1179,7 +1185,7 @@ def test_options_home_manager_without_users_and_templates():
 
     async def nobody(app, pilot, fake):
         screen = await open_options(app, pilot)
-        await pilot.press("k", *"git", "enter")
+        await pilot.press(*"git", "enter", "k")  # the query, then Home Manager options
         await settle(app, pilot)
         details = await pick_option(app, pilot, screen, "programs.git.lfs.enable")
         assert details.user is None
@@ -1190,3 +1196,105 @@ def test_options_home_manager_without_users_and_templates():
 
     _, fake = drive(nobody, {**HM_OPTIONS, "where": hm_nobody})
     assert not [v for v in fake.verbs() if v[0] == "set"]
+
+
+def test_options_list_element_and_home_manager_template():
+    includes = {
+        **load("options_where_hm_git_lfs"),
+        "name": "programs.git.includes",
+    }
+    for sc in includes["scopes"]:
+        for o in sc["options"]:
+            o.update(name="programs.git.includes", option="programs.git.includes", value=[])
+    routes = {
+        **HM_OPTIONS,
+        "where": includes,
+        "status": {**load("status_clean"), "hm_users": ["brucking"]},
+    }
+
+    async def script(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        await pilot.press(*"git", "enter", "k")  # the query, then Home Manager options
+        await settle(app, pilot)
+        details = await pick_option(app, pilot, screen, "programs.git.includes.*.path")
+        host = details.query_one("#op-host", Fields).text
+        assert host.startswith("list programs.git.includes (Set writes it whole)")
+        assert details.user == "brucking" and details.query_one("#op-unset").disabled
+        await pilot.press("e")
+        await settle(app, pilot)
+        modal = app.screen
+        assert modal.option == "programs.git.includes" and not modal.path  # the list itself
+        assert modal.query_one("#value").value == "[ ]"  # the list's value, not the element's
+        await pilot.press(*'[ { path = "~/.gitconfig.local"; } ]', "enter")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+
+    _, fake = drive(script, routes, host="19BK")
+    verbs = fake.verbs()
+    assert ["where", "programs.git.includes", "--kind", "option"] in verbs
+    assert verbs[-1] == [
+        "set",
+        "programs.git.includes",
+        '[ { path = "~/.gitconfig.local"; } ]',
+        "--home",
+        "brucking",
+        "--dry-run",
+    ]
+
+    hm_template = {
+        "ok": True,
+        "kind": "hm",
+        "query": "matchBlocks",
+        "count": 1,
+        "results": [
+            {
+                "kind": "hm",
+                "name": "programs.ssh.matchBlocks.<name>.hostname",
+                "type": "null or string",
+                "default": "null",
+                "example": None,
+                "description": "Specifies the real host name to log into.",
+                "declarations": ["modules/programs/ssh.nix"],
+                "declaration_urls": [],
+                "source": "home-manager-options",
+                "channel": "unstable",
+                "rev": None,
+            }
+        ],
+        "source": "home-manager-options",
+        "channel": "unstable",
+        "rev": None,
+        "cached": True,
+        "sources": {},
+    }
+
+    async def template(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        await pilot.press(*"matchBlocks", "enter", "k")  # the query, then Home Manager options
+        await settle(app, pilot)
+        details = await pick_option(app, pilot, screen, "programs.ssh.matchBlocks.<name>.hostname")
+        assert details.user is None  # no where for a template: nobody known yet
+        await pilot.press("e")  # the users from status first
+        await settle(app, pilot)
+        assert app.screen is details and details.user == "brucking"
+        await pilot.press("e")
+        await settle(app, pilot)
+        assert isinstance(app.screen, SetOptionModal)
+        await pilot.press(*"gh", "enter", *'"github.com"', "enter")
+        await settle(app, pilot)
+
+    _, fake = drive(template, {**routes, "search": hm_template}, host="19BK")
+    assert [v[:3] for v in fake.verbs()[:2]] == [["search", "--kind", "opt"]] + [
+        ["search", "--kind", "hm"]
+    ]
+    assert fake.verbs()[2:] == [
+        ["status"],
+        [
+            "set",
+            "programs.ssh.matchBlocks.gh.hostname",
+            '"github.com"',
+            "--home",
+            "brucking",
+            "--dry-run",
+        ],
+    ]

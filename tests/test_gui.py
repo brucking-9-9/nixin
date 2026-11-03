@@ -807,6 +807,28 @@ def test_options_templates_and_no_home_manager_user(ui):
     assert not [v for v in u.fake.verbs() if v[0] == "set"]
 
 
+def test_options_list_element_sets_the_list(ui):
+    includes = {**load("options_where_hm_git_lfs"), "name": "programs.git.includes"}
+    for sc in includes["scopes"]:
+        for o in sc["options"]:
+            o.update(name="programs.git.includes", option="programs.git.includes", value=[])
+    u = ui({**HM_OPTIONS, "where": includes}, host="19BK")
+    o = u.gui.options
+    u.gui.go("options")
+    o.setKind("hm")
+    o.search("git")
+    settle(u)
+    o.select([h.target for h in o.hits].index("programs.git.includes.*.path"))
+    settle(u)
+    assert not o["template"] and not o["canUnset"] and not prop(u, "opUnset", "enabled")
+    assert o.rows("host").rows[0]["value"] == "programs.git.includes (Set writes it whole)"
+    assert o["homeUser"] == "brucking"
+    click(u, "opSet")
+    w = u.gui.writer
+    assert w["setOption"] == "programs.git.includes" and w["setValue"] == "[ ]"
+    assert ["where", "programs.git.includes", "--kind", "option"] in u.fake.verbs()
+
+
 def test_every_page_and_dialog_grabs(ui, tmp_path):
     u = ui()
     open_details(u)

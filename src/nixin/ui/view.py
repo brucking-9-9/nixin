@@ -1283,6 +1283,14 @@ def option_template(name: str) -> bool:
     return "<" in name or ".*." in name or name.endswith(".*")
 
 
+def option_set_name(name: str) -> str:
+    """The option Set starts from: the list itself for an element of a list of submodules
+    (`programs.git.includes.*.path` → `programs.git.includes`: `set` writes whole values),
+    else the name (a `<name>` in it is filled in by the person)."""
+    head, star, _ = name.partition(".*")
+    return head if star else name
+
+
 def option_placeholder(name: str) -> tuple[int, int] | None:
     """Where the first `<name>` (or `*`) of a template is, to select it for typing over."""
     m = re.search(r"<[^>]*>|(?:^|(?<=\.))\*(?=\.|$)", name)
@@ -1377,10 +1385,13 @@ def option_fields(rec: dict[str, Any], where: Doc | None = None) -> list[Field]:
     )
     if rec.get("read_only"):
         out.append(Field("read-only", "yes: set by the module itself", "warn"))
-    if option_template(str(rec.get("name") or "")):
+    name = str(rec.get("name") or "")
+    if option_set_name(name) != name:
         out.append(
-            Field("path", "a template: Set asks for the name in place of <name> / *", "warn")
+            Field("path", f"a list element: Set writes the list, {option_set_name(name)}", "warn")
         )
+    elif option_template(name):
+        out.append(Field("path", "a template: Set asks for the name in place of <name>", "warn"))
     return out
 
 
@@ -1480,11 +1491,15 @@ def option_sections(
 
     The seam for `explain` (branch typed-set-explain): it joins the same two sides in one
     document; a front end can call it instead of `where` and map it onto these sections."""
-    template = option_template(str(rec.get("name") or ""))
+    name = str(rec.get("name") or "")
+    target = option_set_name(name)  # an element of a list: `where` asked about the list
+    on_host = option_host(where, host, kind, user, template=option_template(target))
+    if target != name and on_host.fields:
+        on_host.fields.insert(0, Field("list", f"{target} (Set writes it whole)", "dim"))
     return [
         Section("option", option_fields(rec, where)),
         Section("about", [], option_about(rec, where), ""),
-        option_host(where, host, kind, user, template=template),
+        on_host,
         Section("declared", option_declared(rec, where, kind)),
     ]
 
