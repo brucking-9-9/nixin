@@ -60,3 +60,12 @@ on merge it moves here.
   - How to test: `nix develop -c pytest tests/test_update.py tests/test_tui.py
     tests/test_gui.py`; `nix build`; by hand `nixin-tui --config ~/nixos` → `i`, `t`, `m`
     and `nixin-gui --config ~/nixos` → Ctrl+4 (read-only; use Update only on a clone).
+- [modules](docs/HANDOFF-modules.md) — branch `modules-optindex`: `nixosModules.default`
+  / `homeModules.default` (`programs.nixin.{enable, package, optionIndex, outdated,
+  pending}`) and build-time option indexes (`lib/options-index.nix`:
+  `/etc/nixin/options-nixos.json`, `$XDG_CONFIG_HOME/nixin/options-home.json`), read by
+  `search --kind opt|hm`, `info`, `where` (docs, skipped scopes) and `status.indexes`;
+  `nixin-state` moved in from the hub's `nixin-integration` lane. mbp13 switched to the
+  module from the hub worktree `~/nixos-modules-wt` (branch `nixin-modules`, 1c1da1e;
+  gen 125), tested, and put back on main (gen 126). The hub's nixin lock is bumped
+  after this merges.
