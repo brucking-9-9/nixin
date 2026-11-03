@@ -917,6 +917,11 @@ through `apply` (after `apply --dry-run` and a confirmation). The Packages page 
 `list` (one call, every scope; its filter and for-whom toggle narrow the loaded rows with
 `--filter`/`--scope` semantics, so they cost nothing) and `outdated` (lock mode, or
 `--published`); both documents are kept until a write or an `update` makes them stale.
+The Options page shows `search --kind opt|hm --limit 50` and, for the selected option,
+`where NAME --kind option` (no `info`: the search row has the upstream fields); Set and
+Unset are `set`/`unset` (with `--home USER` for a Home Manager option) after their
+`--dry-run` diff. A template name (`users.users.<name>.shell`) gets no `where`; Set asks
+for the full name first.
 
 Under `--json`, or when stdin or stderr is not a terminal (Textual draws on stderr, so
 `nixin tui 2>file` would show nothing), it is a `usage` error (exit 2). When the person
@@ -941,7 +946,7 @@ the same verb handlers in-process, on a thread pool, and renders their documents
 the same view-model (`nixin.ui.view`). It writes only through `add`/`rm`/`set`/`unset`
 (after showing their `--dry-run` diff in a dialog) and `update` (after `update --dry-run`
 in a dialog), and switches only through `apply` (after `apply --dry-run` and a
-confirmation). Its Packages page uses `list` and `outdated` as the TUI's does.
+confirmation). Its Packages and Options pages use the verbs the TUI's do.
 
 Under `--json` it is a `usage` error, and so it is without a display (none of
 `WAYLAND_DISPLAY`, `DISPLAY`, `QT_QPA_PLATFORM` set). `--self-test` loads the window,
@@ -956,8 +961,9 @@ apply)`), and exits 0; if a verb is still running it waits for it first. It sets
 Costs: whatever the verbs it calls cost. It loads nothing on start (no `status`): search
 and its details (`info`, `versions`, `where`) when asked, `status` when Pending or
 Status is opened or the Home Manager users are needed, `list` when Packages is opened,
-`outdated` when its Updates tab is. `plan` and `apply` run in human
-mode, as under `tui`, so their logs stream into the window.
+`outdated` when its Updates tab is, `search` and `where` on the Options page when typed
+and selected. `plan` and `apply` run in human mode, as under `tui`, so their logs stream
+into the window.
 
 ## Error codes
 
