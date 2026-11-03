@@ -76,6 +76,10 @@ ERROR_CODES = {
     "boot-space",
     "unknown-generation",
     "workspace-dirty",
+    "needs-tty",
+    "push-failed",
+    "ssh-failed",
+    "invalid-hosts-config",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 

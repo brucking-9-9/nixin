@@ -20,6 +20,8 @@ initrd, module tree or command line needs a reboot (`reboot_needed`), and its ne
 kernel/initrd files must fit on /boot (`boot_space`; apply refuses with `boot-space`).
 `history` lists the system generations with the apply history; `rollback` goes back to
 one, the config with it (history.py, rollback.py).
+`apply --host H` for another host commits, pushes to the hub and runs the pulls and
+the switch on H over `ssh -t` (remote.py; hosts.py reads ~/.config/nixin/hosts.toml).
 
 `register(subparsers)` is the only thing cli.py calls (same pattern as truth/writer).
 """
@@ -362,12 +364,10 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
     t0 = time.monotonic()
     ctx = _context(ns)
     mode = "boot" if ns.no_switch else "switch"
-    if not ctx.local:
-        raise NixinError(
-            "host-not-local",
-            f"apply switches this machine ({local_hostname()}); {ctx.host!r} is another host. "
-            f"Run nixin apply on {ctx.host}, or plan it here with --host {ctx.host}",
-        )
+    if not ctx.local:  # push to the hub, then pull and switch there over ssh
+        from . import remote
+
+        return remote.apply(ctx)
     auth = _auth_doc(ctx)
     if not auth["exists"]:
         raise NixinError(

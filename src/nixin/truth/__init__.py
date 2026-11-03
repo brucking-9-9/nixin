@@ -1,6 +1,6 @@
 """truth — what THIS host actually has, from evaluating the config flake itself.
 
-Verbs: `status`, `where` and `list`. `register(subparsers)` is the only thing cli.py
+Verbs: `status`, `where` and `list` (`list --diff A B` compares two hosts: hostdiff.py). `register(subparsers)` is the only thing cli.py
 calls: it adds the truth arguments to the stub parsers and installs the handlers via
 `set_defaults(run=...)`. A handler takes the argparse namespace and returns the --json
 document (without verb/host, which cli adds); in human mode it also puts the rendered
@@ -16,7 +16,7 @@ import time
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system, unknown_host
-from . import listing, render, scan
+from . import hostdiff, listing, render, scan
 from . import options as opts
 from . import packages as pkgs
 from .cache import TruthCache
@@ -53,6 +53,13 @@ def register(sub: argparse._SubParsersAction) -> None:
     ls.add_argument("--filter", metavar="TEXT", help="name or pname contains TEXT (any case)")
     ls.add_argument(
         "--programs", action="store_true", help="also the enabled programs.<x> (as in status)"
+    )
+    ls.add_argument(
+        "--diff",
+        nargs="+",
+        metavar="HOST",
+        help="HOST_B, or HOST_A HOST_B: packages one host has and the other does not, and "
+        "versions that differ (HOST_A defaults to --host)",
     )
 
 
@@ -161,6 +168,11 @@ def _list(ns: argparse.Namespace) -> dict[str, Any]:
         )
     host = ns.host
     hosts = repo.hosts()
+    if ns.diff is not None:  # two hosts of this config, compared
+        doc = hostdiff.collect(repo, ns, hosts)
+        if not ns.json:
+            doc["message"] = hostdiff.render(doc, expand=ns.home is not None)
+        return doc
     if host not in hosts:
         raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
