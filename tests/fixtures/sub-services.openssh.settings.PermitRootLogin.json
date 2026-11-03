@@ -1,0 +1,27 @@
+{
+ "declarations": [
+  "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
+ ],
+ "default": {
+  "value": "prohibit-password"
+ },
+ "description": "Whether the root user can login using ssh. ",
+ "option": "services.openssh.settings.PermitRootLogin",
+ "typeInfo": {
+  "description": "null or one of \"yes\", \"without-password\", \"prohibit-password\", \"forced-commands-only\", \"no\"",
+  "name": "nullOr",
+  "nested": {
+   "elemType": {
+    "description": "one of \"yes\", \"without-password\", \"prohibit-password\", \"forced-commands-only\", \"no\"",
+    "name": "enum",
+    "values": [
+     "yes",
+     "without-password",
+     "prohibit-password",
+     "forced-commands-only",
+     "no"
+    ]
+   }
+  }
+ }
+}

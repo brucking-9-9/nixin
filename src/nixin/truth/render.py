@@ -64,8 +64,8 @@ def _tag(scope: str, user: str | None) -> str:
     return f"[{scope}{' ' + user if user else ''}]"
 
 
-def _place(loc: dict[str, Any]) -> str:
-    """config files as path:line, inputs as `input path:line`, inline as such."""
+def place(loc: dict[str, Any]) -> str:
+    """A location (where's declarations/definitions): config files as path:line, inputs as `input path:line`, inline as such."""
     if loc["source"] == "inline":
         return "inline in nixosSystem"
     line = loc.get("line")
@@ -154,10 +154,10 @@ def _where_package(d: dict[str, Any]) -> str:
     lines = [f"{d['name']}: {head}"]
     for v in d["programs"]:
         for df in v["definitions"]:
-            text = f"{v['option']} = {nix_text(df.get('value'))} in {_place(df)}"
+            text = f"{v['option']} = {nix_text(df.get('value'))} in {place(df)}"
             lines.append(sub("enabled", f"{text}  {_tag(v['scope'], v['user'])}"))
     for loc in d["declared"]:
-        text = f"{loc['option']} in {_place(loc)}"
+        text = f"{loc['option']} in {place(loc)}"
         lines.append(sub("listed", f"{text}  {_tag(loc['scope'], loc['user'])}"))
     # the text grep, minus lines already shown, strongest first (pkgs.x, bare list items,
     # programs.x); comments and passing mentions only in --json
@@ -180,7 +180,7 @@ def _where_option(d: dict[str, Any]) -> str:
             lines += _prefix(d["name"], s, tag)
         else:
             for o in s["options"]:
-                lines += _option(o, tag)
+                lines += option_lines(o, tag)
         for name, msg in s["excluded"].items():
             lines.append(sub("skipped", f"{name}: {cap(msg.splitlines()[0], 80)}"))
     return "\n".join(lines)
@@ -194,25 +194,38 @@ def _value(o: dict[str, Any]) -> str:
     return nix_text(o.get("value"))
 
 
-def _option(o: dict[str, Any], tag: str) -> list[str]:
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def option_lines(o: dict[str, Any], tag: str) -> list[str]:
+    """An option entry (`where`, `set OPTION`, `explain`): the name and value, its type,
+    default and example, where it is declared and set, and what it is about."""
     value = _value(o) if "value" in o or o.get("value_error") else None
     lines = [o["name"] + (f" = {cap(value)}" if value is not None else "") + f"  {tag}"]
+    ti = o.get("type_info") or {}
     if o["option"] == o["name"]:
-        lines.append(sub("type", cap(str(o.get("type")), 90)))
+        lines.append(sub("type", cap(str(ti.get("description") or o.get("type")), 90)))
     else:  # a path inside an attrsOf / submodule option
+        if ti.get("description"):
+            lines.append(sub("type", cap(ti["description"], 90)))
         lines.append(sub("inside", cap(f"{o['option']} ({o.get('type')})", 90)))
+    for label in ("default", "example"):
+        if o.get(label) is not None:
+            lines.append(sub(label, cap(_one_line(o[label]), 90)))
     for dec in o["declarations"]:
-        lines.append(sub("declared", _place(dec)))
+        lines.append(sub("declared", place(dec)))
     many = len(o["definitions"]) > 1
     for df in o["definitions"]:
         own = f"  = {cap(nix_text(df.get('value')), 60)}" if many else ""
-        lines.append(sub("set in", _place(df) + own))
+        lines.append(sub("set in", place(df) + own))
         for c in df.get("candidates", [])[:3]:
             lines.append(sub("", f"maybe {c['file']}:{c['line']}  {cap(c['text'], 50)}"))
     if not o["definitions"]:
         lines.append(sub("set in", "nothing (the default)"))
-    if o.get("description"):
-        lines.append(sub("about", cap(o["description"].strip(), 90)))
+    about = o.get("sub_description") or o.get("description")
+    if about:
+        lines.append(sub("about", cap(about.strip(), 90)))
     return lines
 
 
@@ -226,7 +239,7 @@ def _prefix(name: str, s: dict[str, Any], tag: str) -> list[str]:
     for rel, o in zip(rels, opts, strict=True):
         mine = [df for df in o["definitions"] if df["source"] in ("config", "inline")]
         value = nix_text(mine[0].get("value")) if len(mine) == 1 else _value(o)
-        places = [_place(df) for df in mine] + sorted(
+        places = [place(df) for df in mine] + sorted(
             {f"+ {df['source']}" for df in o["definitions"] if df not in mine}
         )
         lines.append(f"  {rel:<{width}} = {cap(value, 44)}  {' '.join(places) or '?'}")

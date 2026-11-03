@@ -241,6 +241,7 @@ def _entry_doc(repo: ConfigRepo, e: dict, rest: list[str]) -> dict[str, Any]:
         "declarations": [_location(repo, f, positions.get(f)) for f in e.get("declarations", [])],
         "definitions": [],
     }
+    out.update(_docs(e, rest))
     if "value" in e:
         found, v = opts.dig(e["value"], rest)
         out["value"] = v if found else None
@@ -260,6 +261,64 @@ def _entry_doc(repo: ConfigRepo, e: dict, rest: list[str]) -> dict[str, Any]:
     return out
 
 
+def _docs(e: dict, rest: list[str]) -> dict[str, Any]:
+    """`type_info`, `default`, `example` of the name asked (the option itself, or the path
+    `rest` below it, followed through its type by options.nix's `sub`); in sub mode also
+    `sub_description` when that path is a declared sub-option."""
+    d = e if not rest else (e.get("sub") or {})
+    out: dict[str, Any] = {
+        "type_info": d.get("typeInfo"),
+        "default": opts.literal_text(d.get("default")),
+        "example": opts.literal_text(d.get("example")),
+    }
+    if rest and d.get("description"):
+        out["sub_description"] = d["description"].strip()
+    return out
+
+
+def _resolve(entries: list[dict], path: list[str]) -> tuple[str, dict | None, list[str]]:
+    """(mode, entry, rest): the path is an option (`exact`), a path inside one (`sub`, the
+    option and the rest of the path), or has only options below it (`prefix`, None)."""
+    exact = opts.lookup(entries, ".".join(path))
+    if exact is not None:
+        return "exact", exact, []
+    parent, rest = opts.longest_parent(entries, path)
+    if parent is not None:
+        return "sub", parent, rest
+    return "prefix", None, []
+
+
+def option_info(
+    repo: ConfigRepo,
+    host: str,
+    path: list[str] | str,
+    *,
+    hm: str | None = None,
+    cache: TruthCache | None = None,
+) -> dict[str, Any] | None:
+    """An option path (parsed, or dotted) in one scope (the NixOS tree, or HM user `hm`): `where`'s option entry (type,
+    `type_info`, default, example, value, declarations, definitions) plus `mode` (`exact`,
+    `sub`) and `excluded`; for a path that only has options below it, `mode` `prefix` with
+    `options[]` (their names). None when the scope has nothing at or under NAME. One prefix
+    eval, cached like `where`'s (the writer's type check and `explain` call it)."""
+    path = path.split(".") if isinstance(path, str) else list(path)
+    name = ".".join(path)
+    cache = cache or TruthCache(repo, host)
+    q = opts.prefix_query(repo, host, cache, path, hm=hm)
+    entries, excluded = q["entries"], q["excluded"]
+    mode, entry, rest = _resolve(entries, path)
+    if entry is not None:
+        doc = {"mode": mode, **_entry_doc(repo, entry, rest)}
+    elif entries:
+        doc = {"mode": mode, "name": name, "options": [e["name"] for e in entries]}
+    elif excluded:
+        doc = {"mode": "excluded", "name": name}
+    else:
+        return None
+    doc.update({"scope": "nixos" if hm is None else "home", "user": hm, "excluded": excluded})
+    return doc
+
+
 def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str) -> dict:
     path = name.split(".")
     scopes_out = []
@@ -268,16 +327,11 @@ def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name
         entries, excluded = q["entries"], q["excluded"]
         if not entries and not excluded:
             continue
-        exact = opts.lookup(entries, name)
-        if exact is not None:
-            mode, items = "exact", [_entry_doc(repo, exact, [])]
+        mode, entry, rest = _resolve(entries, path)
+        if entry is not None:
+            items = [_entry_doc(repo, entry, rest)]
         else:
-            parent, rest = opts.longest_parent(entries, path)
-            if parent is not None:
-                mode, items = "sub", [_entry_doc(repo, parent, rest)]
-            else:
-                mode = "prefix"
-                items = [_entry_doc(repo, e, []) for e in entries if opts.is_set(e)]
+            items = [_entry_doc(repo, e, []) for e in entries if opts.is_set(e)]
         scopes_out.append(
             {
                 "scope": scope,

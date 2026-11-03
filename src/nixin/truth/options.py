@@ -5,8 +5,9 @@ Two shapes of query, both cached by TruthCache (nix's flake fingerprint invalida
 * `index()`     every option of a scope (NixOS tree, or one HM user's tree) without values —
                 heavy (19BK: ~20-40 s, 1.4 GiB; see README) but needed once per tree change
                 for counts and for "which option is declared in that module file".
-* `prefix_query()` everything under one option path WITH values and per-definition values —
-                cheap (~3-4 s), what `where` runs.
+* `prefix_query()` everything under one option path WITH values, per-definition values and
+                docs (structured type, default, example; `sub` for a path below an
+                option) — cheap (~1-4 s), what `where`, `explain` and `set` run.
 
 A scope is the NixOS tree (hm=None) or a Home Manager user's tree (hm="brucking").
 """
@@ -24,6 +25,7 @@ from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, nix_value
 from .cache import TruthCache, cache_dir
+from .render import nix_text
 
 HELPER = files("nixin.truth") / "options.nix"
 MARKER = re.compile(r"nixin-option ([^\s'\"`]+)")
@@ -76,6 +78,7 @@ def evaluate(
     max_items: int | None = None,
     exclude: list[str] | tuple[str, ...] = (),
     max_retries: int = MAX_RETRIES,
+    docs: bool = False,
 ) -> dict[str, Any]:
     """Run options.nix; when an option's definitions raise an uncatchable error, exclude it
     (its name comes from the `nixin-option` marker in the trace) and run again."""
@@ -91,6 +94,8 @@ def evaluate(
         }
         if max_items:
             args["maxItems"] = max_items
+        if docs:
+            args["docs"] = True
         try:
             entries = repo.eval_json(repo.host_attr(host), apply=f"({helper}) {nix_value(args)}")
         except NixinError as e:
@@ -231,9 +236,21 @@ def prefix_query(
     hit = cache.get(name, salt)
     if hit is not None:
         return hit
-    doc = evaluate(repo, host, hm=hm, prefix=prefix, values="all", max_items=PREFIX_MAX_ITEMS)
+    doc = evaluate(
+        repo, host, hm=hm, prefix=prefix, values="all", max_items=PREFIX_MAX_ITEMS, docs=True
+    )
     cache.put(name, doc, salt)
     return doc
+
+
+def literal_text(lit: dict | None) -> str | None:
+    """A default/example from options.nix (`{text, kind}` as the module wrote it, or
+    `{value}` serialised) as text: Nix source, or Markdown for a `literalMD`."""
+    if not lit:
+        return None
+    if "text" in lit:
+        return str(lit["text"]).strip()
+    return nix_text(lit.get("value"))
 
 
 # --- reading an index -------------------------------------------------------------------

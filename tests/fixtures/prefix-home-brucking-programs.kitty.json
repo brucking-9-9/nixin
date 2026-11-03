@@ -10,6 +10,9 @@
   "declarations": [
    "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix"
   ],
+  "default": {
+   "value": false
+  },
   "definitionValues": [
    {
     "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/home/modules/terminal/kitty.nix",
@@ -20,12 +23,19 @@
    "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/home/modules/terminal/kitty.nix"
   ],
   "description": "Whether to enable Kitty terminal emulator.",
+  "example": {
+   "value": true
+  },
   "highestPrio": 100,
   "internal": false,
   "isDefined": true,
   "name": "programs.kitty.enable",
   "readOnly": false,
   "type": "boolean",
+  "typeInfo": {
+   "description": "boolean",
+   "name": "bool"
+  },
   "value": true,
   "visible": true
  },
@@ -40,6 +50,10 @@
   "declarations": [
    "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix"
   ],
+  "default": {
+   "kind": "expression",
+   "text": "pkgs.kitty"
+  },
   "definitionValues": [
    {
     "file": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/kitty.nix",
@@ -56,6 +70,16 @@
   "name": "programs.kitty.package",
   "readOnly": false,
   "type": "null or package",
+  "typeInfo": {
+   "description": "null or package",
+   "name": "nullOr",
+   "nested": {
+    "elemType": {
+     "description": "package",
+     "name": "package"
+    }
+   }
+  },
   "value": "<derivation kitty-0.49.2>",
   "visible": true
  }
