@@ -10,6 +10,7 @@ from textual.binding import Binding, BindingType
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, OptionList, Static
+from textual.widgets.input import Selection
 from textual.widgets.option_list import Option
 
 from ..ui import view
@@ -67,23 +68,60 @@ class DiffModal(Modal):
 
 
 class SetOptionModal(Modal):
-    """`set OPTION VALUE`: the Nix expression, prefilled with the current value."""
+    """`set OPTION VALUE`: the Nix expression, prefilled with the current value; under it the
+    type and the example (`hint`). `path`: OPTION is a template (`users.users.<name>.shell`)
+    and the full name is asked first. Dismisses with (option, value)."""
 
-    def __init__(self, option: str, value: str, user: str | None) -> None:
+    def __init__(
+        self,
+        option: str,
+        value: str,
+        user: str | None,
+        *,
+        hint: list[view.Field] | None = None,
+        path: bool = False,
+    ) -> None:
         super().__init__()
         self.option, self.value, self.user = option, value, user
+        self.hint = hint or []
+        self.path = path
 
     def compose(self) -> ComposeResult:
         with Vertical(classes="dialog"):
             yield Label(f"set {self.option}", classes="dialog-title")
             who = f"Home Manager user {self.user}" if self.user else "NixOS"
-            yield Static(f"a Nix expression · {who}", classes="dim")
+            if self.path:
+                yield Static(f"the option, with the name filled in · {who}", classes="dim")
+                yield Input(self.option, id="option", compact=True, select_on_focus=False)
+            yield Static(f"a Nix expression{'' if self.path else ' · ' + who}", classes="dim")
             yield Input(self.value, placeholder='true, 2, "text", [ … ]', id="value", compact=True)
+            if self.hint:
+                with VerticalScroll():
+                    yield Fields(id="set-hint", label_width=8)
             with Horizontal(classes="buttons"):
                 yield Button("Preview (enter)", id="ok", variant="primary", compact=True)
                 yield Button("Cancel (esc)", id="cancel", compact=True)
 
+    def on_mount(self) -> None:
+        if self.hint:
+            self.query_one("#set-hint", Fields).show(self.hint)
+        if self.path:
+            self._placeholder()
+        else:
+            self.query_one("#value", Input).focus()
+
+    def _placeholder(self) -> None:
+        """Focus the option name with its `<name>` selected: typing replaces it."""
+        option = self.query_one("#option", Input)
+        option.focus()
+        span = view.option_placeholder(option.value)
+        if span is not None:
+            self.call_after_refresh(lambda: setattr(option, "selection", Selection(*span)))
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "option":
+            self.query_one("#value", Input).focus()
+            return
         self._done()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -94,7 +132,12 @@ class SetOptionModal(Modal):
 
     def _done(self) -> None:
         value = self.query_one("#value", Input).value.strip()
-        self.dismiss(value or None)
+        option = self.query_one("#option", Input).value.strip() if self.path else self.option
+        if self.path and view.option_template(option):
+            self.notify("fill in the name in place of <name> / *", severity="warning")
+            self._placeholder()
+            return
+        self.dismiss((option, value) if value and option else None)
 
 
 class NoticeModal(Modal):
@@ -212,6 +255,7 @@ KEYS = [
     ("esc", "back"),
     ("/", "search"),
     ("i", "packages: installed, updates (ctrl+4)"),
+    ("o", "options: NixOS and Home Manager (ctrl+5)"),
     ("p", "pending: status.pending, plan, apply"),
     ("s", "status"),
     ("ctrl+p", "command palette"),
@@ -233,6 +277,12 @@ KEYS = [
     ("m", "updates: lock ↔ --published"),
     ("u", "update the nixpkgs lock (confirm first)"),
     ("r", "refresh (re-evaluate)"),
+    ("options", ""),
+    ("f", "the query (esc: to the results)"),
+    ("k", "NixOS ↔ Home Manager options"),
+    ("enter", "the option in full: value on this host, set where"),
+    ("e / u", "set (current value, example as hint) / unset"),
+    ("h", "Home Manager user"),
     ("pending", ""),
     ("b", "plan: build + closure diff"),
     ("a", "apply… (confirm first)"),

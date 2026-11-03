@@ -1,0 +1,43 @@
+{
+  "actions": [
+    {
+      "action": "unset",
+      "file": "hosts/mbp13/default.nix",
+      "line": 249,
+      "name": "services.openssh.enable"
+    }
+  ],
+  "changes": [
+    {
+      "diff": "--- a/hosts/mbp13/default.nix\n+++ b/hosts/mbp13/default.nix\n@@ -246,7 +246,6 @@\n \n   # SSH: key-only.\n   services.openssh = {\n-    enable = false;\n     settings = {\n       PasswordAuthentication = false;\n       KbdInteractiveAuthentication = false;\n",
+      "file": "hosts/mbp13/default.nix",
+      "kind": "modified"
+    }
+  ],
+  "checks": {
+    "eval": {
+      "attr": "nixosConfigurations.mbp13.config.services.openssh.enable",
+      "note": "services.openssh.enable = false",
+      "ok": true,
+      "value": false
+    },
+    "parse": [
+      {
+        "error": null,
+        "file": "hosts/mbp13/default.nix",
+        "ok": true
+      }
+    ]
+  },
+  "config": "/home/master/nixos",
+  "dry_run": false,
+  "host": "mbp13",
+  "imports_added": [],
+  "imports_removed": [],
+  "ok": true,
+  "option": "services.openssh.enable",
+  "scope": "nixos",
+  "user": null,
+  "verb": "unset",
+  "warnings": []
+}

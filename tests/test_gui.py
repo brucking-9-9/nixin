@@ -29,7 +29,7 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
-from tui_fake import COWSAY, PACKAGES, FakeBackend, load
+from tui_fake import COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load
 
 from nixin.cli import main
 from nixin.gui import app as gui_app
@@ -646,6 +646,187 @@ def test_packages_nothing_to_update_and_errors(ui):
     assert vm["updatesNote"] == "outdated: network: search.nixos.org: timed out"
     assert prop(u, "upList", "count") == 0 and prop(u, "updateButton", "enabled")
     assert u.fake.verbs() == [["list"], ["outdated"], ["outdated", "--published"]]
+
+
+# --- the Options page ------------------------------------------------------------------------
+
+
+def open_options(u: SimpleNamespace) -> None:
+    keys(u, Qt.Key.Key_5, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "options" and shown(u, "optionsPage")
+    assert prop(u, "opQuery", "activeFocus")  # type at once
+
+
+def pick_option(u: SimpleNamespace, name: str) -> None:
+    """The cursor down to `name`, Enter: the option in the pane."""
+    rows = [h.target for h in u.gui.options.hits]
+    keys(u, *[Qt.Key.Key_Down] * rows.index(name), Qt.Key.Key_Return)
+    o = u.gui.options
+    assert o["present"] and o["name"] == name and shown(u, "opName")
+
+
+def test_options_search_details_set_then_pending(ui, tmp_path):
+    u = ui(OPTIONS)
+    open_options(u)
+    assert u.gui.options["message"] == "type to search NixOS options"
+    keys(u, "openssh", Qt.Key.Key_Return)
+    o = u.gui.options
+    assert prop(u, "opResults", "count") == 12 and prop(u, "opResults", "activeFocus")
+    assert prop(u, "opSource", "text").startswith(
+        "12 result(s) · search.nixos.org unstable@0bb2eedc"
+    )
+    assert o.rows("results").rows[0]["isOption"] and o.rows("results").column("badge")[0] == "opt"
+    pick_option(u, "services.openssh.enable")
+    assert prop(u, "opCue", "text") == "= true"
+    assert {"label": "type", "value": "boolean", "style": "option"} in o.rows("option").rows
+    assert o["about"].startswith("Whether to enable the OpenSSH secure shell daemon")
+    assert {
+        "label": "set in",
+        "value": "hosts/mbp13/default.nix:249  enable = true;",
+        "style": "",
+    } in o.rows("host").rows
+    assert o.rows("declared").rows[0]["value"].endswith("ssh/sshd.nix:247")
+    assert not shown(u, "opHome")  # a NixOS option: no user to pick
+    assert u.win.grab().save(str(tmp_path / "options.png"), "PNG", 0)
+    click(u, "opSet")
+    assert shown(u, "setDialog") and prop(u, "setValue", "text") == "true"
+    assert prop(u, "setValue", "activeFocus") and not shown(u, "setOptionPath")
+    assert u.gui.writer.rows("setHint").column("label") == ["default"]  # no example upstream
+    keys(u, "false", Qt.Key.Key_Return)  # the value was selected: typing replaces it
+    assert not shown(u, "setDialog") and shown(u, "diffDialog")
+    assert {"text": "+    enable = false;", "style": "add"} in u.gui.writer.rows("diff").rows
+    click(u, "diffWrite")
+    assert not shown(u, "diffDialog")
+    assert o["cue"] == "= false"  # where again
+    assert u.gui.writes == ["services.openssh.enable = false (hosts/mbp13/default.nix)"]
+    assert u.gui.notice["message"].startswith("written: services.openssh.enable = false")
+    keys(u, Qt.Key.Key_2, mods=Qt.KeyboardModifier.ControlModifier)  # Pending shows it
+    assert u.gui["page"] == "pending"
+    p = u.gui.pending
+    assert {"label": "changed", "value": "hosts/mbp13/default.nix", "style": "accent"} in (
+        p.rows("pending").rows
+    )
+    assert p.rows("session").rows[0]["value"].startswith("services.openssh.enable = false")
+    keys(u, Qt.Key.Key_5, mods=Qt.KeyboardModifier.ControlModifier)
+    assert prop(u, "opResults", "count") == 12 and o["name"] == "services.openssh.enable"
+    assert u.fake.verbs() == [
+        ["search", "--kind", "opt", "--channel", "unstable", "--limit", "50", "--", "openssh"],
+        ["where", "services.openssh.enable", "--kind", "option"],
+        ["set", "services.openssh.enable", "false", "--dry-run"],
+        ["set", "services.openssh.enable", "false"],
+        ["where", "services.openssh.enable", "--kind", "option"],
+        ["status"],
+    ]
+
+
+def test_options_unset_previews_the_diff(ui):
+    u = ui(OPTIONS)
+    open_options(u)
+    keys(u, "openssh", Qt.Key.Key_Return)
+    pick_option(u, "services.openssh.enable")
+    click(u, "opUnset")
+    assert shown(u, "diffDialog")
+    assert {"text": "-    enable = true;", "style": "del"} in u.gui.writer.rows("diff").rows
+    assert u.fake.verbs()[-1] == ["unset", "services.openssh.enable", "--dry-run"]
+    keys(u, Qt.Key.Key_Escape)
+    assert not shown(u, "diffDialog") and not u.gui.writes
+
+
+def test_options_home_manager_for_a_user(ui):
+    u = ui(HM_OPTIONS, host="19BK")
+    open_options(u)
+    u.gui.options.setKind("hm")
+    settle(u)
+    assert prop(u, "opKind", "displayText") == "Home Manager"
+    assert prop(u, "opQuery", "placeholderText") == "search Home Manager options…"
+    keys(u, "git", Qt.Key.Key_Return)
+    pick_option(u, "programs.git.lfs.enable")
+    o = u.gui.options
+    assert o["homeUser"] == "brucking" and o["homeChoices"] == ["brucking"]  # from where
+    assert prop(u, "opHome", "displayText") == "home: brucking"
+    assert o.rows("host").rows[0]["value"] == "true  [home brucking]"  # not NixOS's false
+    assert o.rows("declared").rows[0]["value"] == "home-manager modules/programs/git.nix:273"
+    click(u, "opSet")
+    w = u.gui.writer
+    assert w["setUser"] == "brucking" and prop(u, "setValue", "text") == "true"
+    assert w.rows("setHint").column("label") == ["example", "default"]
+    keys(u, "false", Qt.Key.Key_Return)
+    assert shown(u, "diffDialog") and w["homeChoices"] == ["brucking"]  # no system for HM
+    assert u.fake.verbs()[-1] == [
+        "set",
+        "programs.git.lfs.enable",
+        "false",
+        "--home",
+        "brucking",
+        "--dry-run",
+    ]
+
+
+def test_options_templates_and_no_home_manager_user(ui):
+    u = ui(OPTIONS)
+    open_options(u)
+    keys(u, "openssh", Qt.Key.Key_Return)
+    name = "users.users.<name>.openssh.authorizedKeys.keys"
+    pick_option(u, name)
+    o = u.gui.options
+    assert o["template"] and o["hostNote"].startswith("a template")
+    assert not prop(u, "opUnset", "enabled")
+    click(u, "opSet")
+    assert shown(u, "setOptionPath") and prop(u, "setOptionPath", "activeFocus")
+    assert prop(u, "setOptionPath", "selectedText") == "<name>"  # type over it
+    u.gui.writer.previewSetPath(name, "[ ]")  # still a template: refused, the dialog stays
+    settle(u)
+    assert shown(u, "setDialog") and u.gui.notice["severity"] == "warn"
+    keys(u, "master", Qt.Key.Key_Return)  # the name, then the value field
+    assert prop(u, "setValue", "activeFocus")
+    keys(u, '[ "ssh-ed25519 AAAA" ]', Qt.Key.Key_Return)
+    assert shown(u, "diffDialog")
+    verbs = u.fake.verbs()
+    assert ["where", name, "--kind", "option"] not in verbs
+    assert verbs[-1] == [
+        "set",
+        "users.users.master.openssh.authorizedKeys.keys",
+        '[ "ssh-ed25519 AAAA" ]',
+        "--dry-run",
+    ]
+
+    hm_nobody = {**load("options_where_hm_git_lfs"), "host": "mbp13"}
+    hm_nobody["scopes"] = hm_nobody["scopes"][:1]  # mbp13: no Home Manager users
+    u = ui({**HM_OPTIONS, "where": hm_nobody})
+    u.gui.go("options")
+    u.gui.options.setKind("hm")
+    u.gui.options.search("git")
+    settle(u)
+    u.gui.options.select([h.target for h in u.gui.options.hits].index("programs.git.lfs.enable"))
+    settle(u)
+    o = u.gui.options
+    assert o["hostNote"] == "no Home Manager user of this host has it" and shown(u, "opNoUser")
+    click(u, "opSet")
+    assert not shown(u, "setDialog")
+    assert u.gui.notice["message"] == "Home Manager options need a user; mbp13 has none"
+    assert not [v for v in u.fake.verbs() if v[0] == "set"]
+
+
+def test_options_list_element_sets_the_list(ui):
+    includes = {**load("options_where_hm_git_lfs"), "name": "programs.git.includes"}
+    for sc in includes["scopes"]:
+        for o in sc["options"]:
+            o.update(name="programs.git.includes", option="programs.git.includes", value=[])
+    u = ui({**HM_OPTIONS, "where": includes}, host="19BK")
+    o = u.gui.options
+    u.gui.go("options")
+    o.setKind("hm")
+    o.search("git")
+    settle(u)
+    o.select([h.target for h in o.hits].index("programs.git.includes.*.path"))
+    settle(u)
+    assert not o["template"] and not o["canUnset"] and not prop(u, "opUnset", "enabled")
+    assert o.rows("host").rows[0]["value"] == "programs.git.includes (Set writes it whole)"
+    assert o["homeUser"] == "brucking"
+    click(u, "opSet")
+    w = u.gui.writer
+    assert w["setOption"] == "programs.git.includes" and w["setValue"] == "[ ]"
+    assert ["where", "programs.git.includes", "--kind", "option"] in u.fake.verbs()
 
 
 def test_every_page_and_dialog_grabs(ui, tmp_path):

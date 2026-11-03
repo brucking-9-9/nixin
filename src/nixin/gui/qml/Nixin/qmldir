@@ -8,6 +8,8 @@ HitRow 1.0 HitRow.qml
 PackagesPage 1.0 PackagesPage.qml
 PackageRow 1.0 PackageRow.qml
 UpdateRow 1.0 UpdateRow.qml
+OptionsPage 1.0 OptionsPage.qml
+OptionPane 1.0 OptionPane.qml
 DetailsPane 1.0 DetailsPane.qml
 PendingPage 1.0 PendingPage.qml
 StatusPage 1.0 StatusPage.qml

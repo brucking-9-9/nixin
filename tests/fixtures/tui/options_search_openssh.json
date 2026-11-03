@@ -1,0 +1,231 @@
+{
+  "cached": true,
+  "channel": "unstable",
+  "count": 12,
+  "host": "mbp13",
+  "kind": "opt",
+  "limit": 12,
+  "ok": true,
+  "query": "openssh",
+  "results": [
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "programs.ssh.package",
+      "description": "OpenSSH package to use for sshd.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.openssh.package",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/programs/ssh.nix"
+      ],
+      "declarations": [
+        "nixos/modules/programs/ssh.nix"
+      ],
+      "default": "pkgs.openssh",
+      "description": "The openssh package to use.",
+      "example": null,
+      "kind": "opt",
+      "name": "programs.ssh.package",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable the OpenSSH secure shell daemon, which allows secure remote logins.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.openssh.enable",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/virtualisation/libvirtd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/virtualisation/libvirtd.nix"
+      ],
+      "default": "true",
+      "description": "Whether to configure OpenSSH to use the SSH Proxy.",
+      "example": null,
+      "kind": "opt",
+      "name": "virtualisation.libvirtd.sshProxy",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/programs/ssh.nix"
+      ],
+      "declarations": [
+        "nixos/modules/programs/ssh.nix"
+      ],
+      "default": "false",
+      "description": "Whether to start the OpenSSH agent when you log in. The OpenSSH agent remembers private keys for you so that you don\u2019t have to type in passphrases every time you make an SSH connection. Use ssh-add to add a key to the agent.",
+      "example": null,
+      "kind": "opt",
+      "name": "programs.ssh.startAgent",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/continuous-integration/gradient/worker.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/continuous-integration/gradient/worker.nix"
+      ],
+      "default": "config.programs.ssh.package",
+      "description": "OpenSSH package used as GIT_SSH_COMMAND to fetch private flake inputs.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.gradient.worker.packages.ssh",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/continuous-integration/buildkite-agents.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/continuous-integration/buildkite-agents.nix"
+      ],
+      "default": "null",
+      "description": "OpenSSH private key\nA run-time path to the key file, which is supposed to be provisioned outside of Nix store.",
+      "example": null,
+      "kind": "opt",
+      "name": "services.buildkite-agents.<name>.privateSshKeyPath",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "null or absolute path"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "[ ]",
+      "description": "A list of files each containing one OpenSSH public key that should be added to the user\u2019s authorized keys. The contents of the files are read at build time and added to a file that the SSH daemon reads in addition to the the user\u2019s authorized_keys file. You can combine the keyFiles and keys options.",
+      "example": null,
+      "kind": "opt",
+      "name": "users.extraUsers.<name>.openssh.authorizedKeys.keyFiles",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "list of absolute path"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "[ ]",
+      "description": "A list of files each containing one OpenSSH public key that should be added to the user\u2019s authorized keys. The contents of the files are read at build time and added to a file that the SSH daemon reads in addition to the the user\u2019s authorized_keys file. You can combine the keyFiles and keys options.",
+      "example": null,
+      "kind": "opt",
+      "name": "users.users.<name>.openssh.authorizedKeys.keyFiles",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "list of absolute path"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/system/boot/systemd/userdbd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/system/boot/systemd/userdbd.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable exposing OpenSSH public keys defined in userdb. Be aware that this enables modifying public keys at runtime, either by users managed by services.homed, or globally via drop-in files .",
+      "example": "true",
+      "kind": "opt",
+      "name": "services.userdbd.enableSSHSupport",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "[ ]",
+      "description": "A list of verbatim OpenSSH public keys that should be added to the user\u2019s authorized keys. The keys are added to a file that the SSH daemon reads in addition to the the user\u2019s authorized_keys file. You can combine the keys and keyFiles options. Warning: If you are using NixOps then don\u2019t use this option since it will replace the key required for deployment via ssh.",
+      "example": "[\n  \"ssh-rsa AAAAB3NzaC1yc2etc/etc/etcjwrsh8e596z6J0l7 example@host\"\n  \"ssh-ed25519 AAAAC3NzaCetcetera/etceteraJZMfk3QPfQ foo@bar\"\n]",
+      "kind": "opt",
+      "name": "users.extraUsers.<name>.openssh.authorizedKeys.keys",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "list of (optionally newline-terminated) single-line string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/NixOS/nixpkgs/blob/0bb2eedc20e4739f29e8045034f2828ad7054f8f/nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "declarations": [
+        "nixos/modules/services/networking/ssh/sshd.nix"
+      ],
+      "default": "[ ]",
+      "description": "A list of verbatim OpenSSH public keys that should be added to the user\u2019s authorized keys. The keys are added to a file that the SSH daemon reads in addition to the the user\u2019s authorized_keys file. You can combine the keys and keyFiles options. Warning: If you are using NixOps then don\u2019t use this option since it will replace the key required for deployment via ssh.",
+      "example": "[\n  \"ssh-rsa AAAAB3NzaC1yc2etc/etc/etcjwrsh8e596z6J0l7 example@host\"\n  \"ssh-ed25519 AAAAC3NzaCetcetera/etceteraJZMfk3QPfQ foo@bar\"\n]",
+      "kind": "opt",
+      "name": "users.users.<name>.openssh.authorizedKeys.keys",
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+      "source": "search.nixos.org",
+      "type": "list of (optionally newline-terminated) single-line string"
+    }
+  ],
+  "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+  "source": "search.nixos.org",
+  "sources": {
+    "search.nixos.org": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 12,
+      "error": null,
+      "kinds": [
+        "opt"
+      ],
+      "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+    }
+  },
+  "verb": "search"
+}

@@ -1,0 +1,35 @@
+{
+  "actions": [
+    {
+      "action": "set",
+      "file": "home/modules/git.nix",
+      "in_place": true,
+      "line": 6,
+      "name": "programs.git.lfs.enable",
+      "old": "true"
+    }
+  ],
+  "changes": [
+    {
+      "diff": "--- a/home/modules/git.nix\n+++ b/home/modules/git.nix\n@@ -3,7 +3,7 @@\n {\n   programs.git = {\n     enable = true;\n-    lfs.enable = true;\n+    lfs.enable = false;\n     settings = {\n       user = {\n         name = \"brucking-9-9\";\n",
+      "file": "home/modules/git.nix",
+      "kind": "modified"
+    }
+  ],
+  "checks": {
+    "eval": null,
+    "parse": []
+  },
+  "config": "/home/master/nixos",
+  "dry_run": true,
+  "host": "19BK",
+  "imports_added": [],
+  "imports_removed": [],
+  "ok": true,
+  "option": "programs.git.lfs.enable",
+  "scope": "home",
+  "user": "brucking",
+  "value": "false",
+  "verb": "set",
+  "warnings": []
+}

@@ -1,0 +1,59 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages"
+    ],
+    "misses": [
+      "prefix-nixos-2df525f14a"
+    ]
+  },
+  "host": "mbp13",
+  "kind": "option",
+  "name": "services.openssh.ports",
+  "ok": true,
+  "scopes": [
+    {
+      "excluded": {},
+      "mode": "exact",
+      "options": [
+        {
+          "declarations": [
+            {
+              "column": 7,
+              "file": "nixos/modules/services/networking/ssh/sshd.nix",
+              "line": 304,
+              "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+              "source": "nixpkgs"
+            }
+          ],
+          "definitions": [
+            {
+              "file": "nixos/modules/services/networking/ssh/sshd.nix",
+              "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
+              "source": "nixpkgs",
+              "value": [
+                22
+              ]
+            }
+          ],
+          "description": "Specifies on which ports the SSH daemon listens. ",
+          "highestPrio": 1500,
+          "isDefined": true,
+          "name": "services.openssh.ports",
+          "option": "services.openssh.ports",
+          "type": "list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+          "value": [
+            22
+          ],
+          "value_found": true
+        }
+      ],
+      "scope": "nixos",
+      "under_prefix": 1,
+      "user": null
+    }
+  ],
+  "verb": "where"
+}

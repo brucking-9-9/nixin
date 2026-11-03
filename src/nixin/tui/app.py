@@ -24,6 +24,7 @@ from .. import cli
 from ..ui import view
 from ..ui.backend import Backend
 from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal
+from .options import OptionsScreen
 from .packages import PackagesScreen
 from .screens import ApplyScreen, PendingScreen, SearchScreen, StatusScreen, TopBar
 from .theme import THEME
@@ -48,9 +49,12 @@ class NixinApp(App[str]):
         Binding("slash", "search", "Search", show=False),
         # ctrl+4 as in the GUI; a terminal without the kitty keyboard protocol sends ctrl+\
         Binding("i,ctrl+4,ctrl+backslash", "packages", "Packages"),
+        # ctrl+5: ctrl+] without the kitty protocol
+        Binding("o,ctrl+5,ctrl+right_square_bracket", "options", "Options"),
         Binding("p", "pending", "Pending"),
         Binding("s", "status", "Status"),
         Binding("i,ctrl+4,ctrl+backslash", "go('packages')", "Packages", group=PAGE_KEYS),
+        Binding("o,ctrl+5,ctrl+right_square_bracket", "go('options')", "Options", group=PAGE_KEYS),
         Binding("p", "go('pending')", "Pending", group=PAGE_KEYS),
         Binding("s", "go('status')", "Status", group=PAGE_KEYS),
     ]
@@ -68,6 +72,7 @@ class NixinApp(App[str]):
         self.list_doc: Doc | None = None
         self.list_stale = True
         self.outdated_docs: dict[str, Doc] = {}  # mode (lock | published) → document
+        self.options_last: tuple[str, str, Doc] | None = None  # the Options page's query, kind, doc
         self.register_theme(THEME)
         self.theme = THEME.name
 
@@ -232,13 +237,24 @@ class NixinApp(App[str]):
         self.push_screen(NoticeModal(doc, f"{verb} {' '.join(args)}", can_pick=can_pick), picked)
 
     def set_option(
-        self, option: str, value: str, user: str | None, home: list[str], *, after=None
+        self,
+        option: str,
+        value: str,
+        user: str | None,
+        home: list[str],
+        *,
+        hint: list[view.Field] | None = None,
+        path: bool = False,
+        after=None,
     ) -> None:
-        def entered(new: str | None) -> None:
-            if new:
-                self.write("set", [option, new, *home], after=after)
+        """The value dialog (`hint`: the type and example under it; `path`: the option name is
+        a template to fill in), then the writer flow for `set`."""
 
-        self.push_screen(SetOptionModal(option, value, user), entered)
+        def entered(answer: tuple[str, str] | None) -> None:
+            if answer:
+                self.write("set", [answer[0], answer[1], *home], after=after)
+
+        self.push_screen(SetOptionModal(option, value, user, hint=hint, path=path), entered)
 
     # --- packages: list, outdated, update ------------------------------------------------------
 
@@ -282,6 +298,7 @@ class NixinApp(App[str]):
 
     PAGES: ClassVar[dict[str, type[Screen]]] = {
         "packages": PackagesScreen,
+        "options": OptionsScreen,
         "pending": PendingScreen,
         "status": StatusScreen,
     }
@@ -318,6 +335,9 @@ class NixinApp(App[str]):
     def action_packages(self) -> None:
         self._go(PackagesScreen)
 
+    def action_options(self) -> None:
+        self._go(OptionsScreen)
+
     def action_go(self, page: str) -> None:
         self._go(self.PAGES[page])
 
@@ -338,6 +358,9 @@ class NixinApp(App[str]):
         yield SystemCommand("Search", "find packages and options", self.action_search)
         yield SystemCommand(
             "Packages", "installed (list), updates (outdated)", self.action_packages
+        )
+        yield SystemCommand(
+            "Options", "NixOS and Home Manager options: browse, set, unset", self.action_options
         )
         yield SystemCommand("Pending", "status.pending, plan, apply", self.action_pending)
         yield SystemCommand("Plan", "build the workspace, closure diff", self._palette_plan)

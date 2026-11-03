@@ -1,0 +1,94 @@
+{
+  "cache": {
+    "dir": "/home/master/.cache/nixin/truth",
+    "enabled": true,
+    "hits": [
+      "packages",
+      "prefix-home-brucking-e7f3c19292",
+      "prefix-nixos-e7f3c19292"
+    ],
+    "misses": []
+  },
+  "host": "19BK",
+  "kind": "option",
+  "name": "programs.git.lfs.enable",
+  "ok": true,
+  "scopes": [
+    {
+      "excluded": {},
+      "mode": "exact",
+      "options": [
+        {
+          "declarations": [
+            {
+              "column": 9,
+              "file": "nixos/modules/programs/git.nix",
+              "line": 81,
+              "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/programs/git.nix",
+              "source": "nixpkgs"
+            }
+          ],
+          "definitions": [
+            {
+              "file": "nixos/modules/programs/git.nix",
+              "raw": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/programs/git.nix",
+              "source": "nixpkgs",
+              "value": false
+            }
+          ],
+          "description": "Whether to enable git-lfs (Large File Storage).",
+          "highestPrio": 1500,
+          "isDefined": true,
+          "name": "programs.git.lfs.enable",
+          "option": "programs.git.lfs.enable",
+          "type": "boolean",
+          "value": false,
+          "value_found": true
+        }
+      ],
+      "scope": "nixos",
+      "under_prefix": 1,
+      "user": null
+    },
+    {
+      "excluded": {},
+      "mode": "exact",
+      "options": [
+        {
+          "declarations": [
+            {
+              "column": 11,
+              "file": "modules/programs/git.nix",
+              "line": 273,
+              "raw": "/nix/store/9k8yg0sk8ka6krz4qp58n7b6gc9malqk-source/modules/programs/git.nix",
+              "source": "home-manager"
+            }
+          ],
+          "definitions": [
+            {
+              "file": "home/modules/git.nix",
+              "line": 6,
+              "line_heuristic": true,
+              "raw": "/nix/store/in3f42sb5wfx9y7iin2x9hifg89jifkf-source/home/modules/git.nix",
+              "source": "config",
+              "text": "lfs.enable = true;",
+              "value": true
+            }
+          ],
+          "description": "Whether to enable Git Large File Storage.",
+          "highestPrio": 100,
+          "isDefined": true,
+          "name": "programs.git.lfs.enable",
+          "option": "programs.git.lfs.enable",
+          "type": "boolean",
+          "value": true,
+          "value_found": true
+        }
+      ],
+      "scope": "home",
+      "under_prefix": 1,
+      "user": "brucking"
+    }
+  ],
+  "verb": "where"
+}

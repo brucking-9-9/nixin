@@ -145,11 +145,18 @@ user, a filter and a for-whom toggle on the loaded rows; Enter opens the row in 
 for its user, with Remove) and, on its Updates tab, what a nixpkgs update would change
 (`outdated`, the lock's next commit or `--published`; the kernel line, the summary) with
 "Update nixpkgs lock": `update --dry-run` → confirm → `update` → Pending, where Plan and
-Apply take it as any other change. Error documents show as `code` + message.
+Apply take it as any other change. Options browses NixOS or Home Manager options (`search
+--kind opt|hm`, `k` toggles; name, type and the description) and shows one in full: type,
+default, example, the whole description, its value on this host and the file and line
+that set it (`where`; for a Home Manager option, the user's tree), and the module that
+declares it with upstream's link. Set opens the value dialog (the current value, the type
+and the example under it; for a template like `users.users.<name>.shell` the name first)
+→ the `set --dry-run` diff → write; Unset the same; both land on Pending. Error documents
+show as `code` + message.
 
-Keys: `/` search, `i` packages (`ctrl+4`), `p` pending, `s` status, `?` all keys, `ctrl+p`
-command palette, `esc` back, `q` quit (`ctrl+q` while typing or while something runs).
-Below 80 cells the footer groups the page keys (`i p s go`). It is laid out for a
+Keys: `/` search, `i` packages (`ctrl+4`), `o` options (`ctrl+5`), `p` pending, `s` status,
+`?` all keys, `ctrl+p` command palette, `esc` back, `q` quit (`ctrl+q` while typing or
+while something runs). Below 80 cells the footer groups the page keys (`i o p s go`). It is laid out for a
 phone over ssh (50×25: panes stacked, the description column dropped) as well as 120+
 columns. Colours: `src/nixin/tui/theme.py`. Screenshots of both sizes: `docs/tui/`
 (`scripts/tui-screenshots.py` makes them, from the test fixtures or `--live`).
@@ -181,10 +188,16 @@ counts and caches. **Packages** has the installed list (`list`: a filter and a f
 combo; the selected row opens in the details pane for its user, with Remove) and Updates
 (`outdated` against the lock's next commit or search.nixos.org, the kernel line, the
 summary; "Update nixpkgs lock…" opens a dialog with `update --dry-run`, then `update`
-runs and the window goes to Pending). Error documents appear as a notice over the page
-(`code` + message, the candidates to pick for an ambiguous write, commands to copy).
+runs and the window goes to Pending). **Options** searches NixOS or Home Manager options
+(a combo picks which) and shows the selected one beside the list: type, default, example,
+the description, its value on this host and where it is set (`where`; for a Home Manager
+option the picked user's), the declaring module with upstream's link; Set… (prefilled with
+the current value, the example and default under it, a template's `<name>` selected to
+type over) and Unset go through the diff dialog and on to Pending. Error documents appear
+as a notice over the page (`code` + message, the candidates to pick for an ambiguous
+write, commands to copy).
 
-Keys: `/` search, `Ctrl+1/2/3/4` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
+Keys: `/` search, `Ctrl+1/2/3/4/5` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
 in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).
 The palette is the quickshell one (`src/nixin/gui/qml/Nixin/Theme.qml`: background
 `#120B10`, cyan accent, pink for errors and destructive actions, purple for options), and

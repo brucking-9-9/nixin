@@ -7,11 +7,14 @@
 Default: the cowsay flow on the recorded documents in tests/fixtures/tui (offline,
 reproducible): search, details, the add preview, plan, the apply confirmation,
 `needs-sudo`, status; then the Packages page on 19BK's documents: installed, a filter,
-updates (lock, --published), the update confirmation. --live drives the real verb
-handlers instead (network for discovery, nix against --config): search, details with
-`where`, the `add --dry-run` preview, and the Packages page (`list`, `outdated`); it
-writes nothing (the diff modal is cancelled, `update` is never run). OUTDIR defaults to
-docs/tui.
+updates (lock, --published), the update confirmation; then the Options page: mbp13's
+openssh options, one in full, the Set dialog, its diff, Pending after the write, and a
+Home Manager option on 19BK. --live drives the real verb handlers instead (network for
+discovery, nix against --config): search, details with `where`, the `add --dry-run`
+preview, the Packages page (`list`, `outdated`), and the Options page (an option, the Set
+dialog and its `set --dry-run` diff; with --hm-host a Home Manager option there); it
+writes nothing (the diff modals are cancelled, `update` is never run). `--only options`
+takes only the Options part. OUTDIR defaults to docs/tui.
 Files are named <size>-<step>.svg (live-<size>-<step>.svg with --live).
 """
 
@@ -110,6 +113,71 @@ async def packages(size: str, outdir: Path) -> None:
         shot(app, outdir / f"{size}-12-update-confirm.svg", "update nixpkgs")
 
 
+async def options(size: str, outdir: Path) -> None:
+    from tui_fake import HM_OPTIONS, OPTIONS, FakeBackend
+
+    app = NixinApp(FakeBackend(dict(OPTIONS)))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "o", *"openssh", "enter")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-13-options.svg", "options: NixOS")
+        await pilot.press("down", "down", "enter")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-14-option.svg", "option: services.openssh.enable")
+        await pilot.press("e")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-15-option-set.svg", "option: set")
+        await pilot.press(*["backspace"] * 4, *"false", "enter")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-16-option-diff.svg", "option: set --dry-run")
+        await pilot.press("w")
+        await settle(app, pilot)
+        await pilot.press("p")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-17-option-pending.svg", "pending after set")
+    app = NixinApp(FakeBackend(dict(HM_OPTIONS), host="19BK"))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "o", *"git", "enter", "k")
+        await settle(app, pilot)
+        rows = [h.target for h in app.screen.hits]
+        await pilot.press(*["down"] * rows.index("programs.git.lfs.enable"), "enter")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-18-option-hm.svg", "option: Home Manager")
+
+
+async def live_options(
+    size: str, outdir: Path, host: str, config: str, query: str, option: str, value: str
+) -> None:
+    """Options against the real config: search, the option, Set, its dry-run diff (cancelled)."""
+    app = NixinApp(Backend(host=host, config=config))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "o", *query, "enter")
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-8-options.svg", f"options {query}")
+        rows = [h.target for h in app.screen.hits]
+        await pilot.press(*["down"] * (rows.index(option) if option in rows else 0), "enter")
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-9-option.svg", option)
+        await pilot.press("e")
+        await settle(app, pilot)
+        shot(app, outdir / f"live-{size}-10-option-set.svg", f"set {option}")
+        await pilot.press("ctrl+e", "ctrl+u", *value, "enter")
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-11-option-diff.svg", f"set {option} {value} --dry-run")
+        await pilot.press("escape")  # cancel: nothing is written
+
+
+async def live_hm(size: str, outdir: Path, host: str, config: str, query: str, option: str) -> None:
+    app = NixinApp(Backend(host=host, config=config))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "o", *query, "enter", "k")
+        await settle(app, pilot, 0.5)
+        rows = [h.target for h in app.screen.hits]
+        await pilot.press(*["down"] * (rows.index(option) if option in rows else 0), "enter")
+        await settle(app, pilot, 0.5)
+        shot(app, outdir / f"live-{size}-12-option-hm.svg", f"{option} on {host}")
+
+
 async def live(size: str, outdir: Path, host: str, config: str, query: str, pkg: str) -> None:
     app = NixinApp(Backend(host=host, config=config))
     async with app.run_test(size=SIZES[size]) as pilot:
@@ -145,15 +213,30 @@ def main() -> int:
     ap.add_argument("--host", default=socket.gethostname())
     ap.add_argument("--query", default="cowsay")
     ap.add_argument("--package", default="cowsay")
+    ap.add_argument("--option-query", default="openssh")
+    ap.add_argument("--option", default="services.openssh.enable")
+    ap.add_argument("--value", default="false", help="the Set value previewed (never written)")
+    ap.add_argument("--hm-host", help="also a Home Manager option on this host (--live)")
+    ap.add_argument("--hm-query", default="git lfs")
+    ap.add_argument("--hm-option", default="programs.git.lfs.enable")
+    ap.add_argument("--only", choices=["all", "options"], default="all")
     a = ap.parse_args()
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
     for size in SIZES:
         if a.live:
-            asyncio.run(live(size, out, a.host, a.config, a.query, a.package))
+            if a.only == "all":
+                asyncio.run(live(size, out, a.host, a.config, a.query, a.package))
+            asyncio.run(
+                live_options(size, out, a.host, a.config, a.option_query, a.option, a.value)
+            )
+            if a.hm_host:
+                asyncio.run(live_hm(size, out, a.hm_host, a.config, a.hm_query, a.hm_option))
         else:
-            asyncio.run(fixtures(size, out))
-            asyncio.run(packages(size, out))
+            if a.only == "all":
+                asyncio.run(fixtures(size, out))
+                asyncio.run(packages(size, out))
+            asyncio.run(options(size, out))
     return 0
 
 
