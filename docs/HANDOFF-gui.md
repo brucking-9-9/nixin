@@ -261,3 +261,144 @@ functions, the `update` verb and the live findings), in the window:
 
 How to test the page: `nix develop -c pytest tests/test_gui.py -k packages`; by hand
 `nixin-gui --config ~/nixos`, Ctrl+4 (read-only); Update only on a clone.
+
+## AppStream and Browse (branch `appstream-categories`, 2026-11-02, mbp13)
+
+Borrowed from nix-software-center / GNOME Software: a package as an application (name,
+summary, description, categories, icon, screenshots, license, desktop id) in `info`, a
+GUI-app mark on `search`, a `browse` verb by freedesktop category, and both in the GUI.
+Cut from `origin/main` @ 318e6cc. Nothing pushed, nothing switched, `~/nixos` only read.
+
+### State
+
+Done and run live on mbp13; nothing half-written.
+
+- **New layer `src/nixin/appstream/`**: `parse.py` (metainfo XML incl. the legacy
+  `<application>` root and `<components>`, desktop entries, icon lookup in `share/icons`
+  and `share/pixmaps`, `read_output(path)`), `installed.py` (the profiles' desktop entries
+  and metainfo → store paths, matched by pname or `pname-unwrapped`), `store.py` (the
+  locked nixpkgs' out paths by `nix eval`, `--impure` + `NIXPKGS_ALLOW_*` retry for unfree,
+  reads cached per store path; `fetch_cheaply`: `nix build --dry-run` → ≤ 50 MiB and
+  nothing to build → `nix build --no-link --print-out-paths --max-jobs 0 --builders ''`),
+  `hint.py` (search.nixos.org's desktop fields), `curated.py` (11 categories, ~100
+  well-known attrs, checked against unstable 0bb2eedc), `browse.py` (the verb), `images.py`
+  (screenshots/icons for the GUI: 4 MiB cap each, 64 MiB LRU), `__init__.py`
+  (`for_package`, `merge`, `mark`, `register`).
+- **`info`**: package rows get `appstream` (CONTRACT "`info`": the object and the modes
+  `--appstream local|fetch|hint|off`, default `local`; `--config DIR` for the lock).
+  Problems become `notes`, never an error. **`search --appstream`**: the same object from
+  search.nixos.org's fields only (one request, as before). **`browse [CATEGORY]`**: the
+  categories with counts, or a category's apps (installed, shipped list, the most popular
+  on search.nixos.org; one row per app). Human output: an `appstream:` block in `info`,
+  an APP column in `search`, tables for `browse`.
+- **GUI**: **Browse** page (`Ctrl+B`, second in the rail): categories, the apps (local icons
+  only; nothing fetched for the list), the shared details pane (`owner: "browse"`). The
+  **details pane** (all pages) shows the app block when `appstream` says something: icon
+  (the output's file, else search.nixos.org's copy fetched now), name, summary, chips
+  (main categories first, toolkit names dropped), source line (`installed output (master)
+  · an application`), and up to three screenshots fetched when the details open, in
+  AppStream order, with a note for the ones that failed. `info`'s hint never replaces
+  what Browse read from an output.
+- **TUI**: the details' info pane lists `app`, `summary`, `category`, `app id`, `shots`,
+  `appstream`, `details`, `note` lines (view.appstream_fields); no images, no Browse
+  screen.
+- Gates (`nix develop -c pytest`): 657 passed, 25 skipped; `ruff check`, `ruff format
+  --check`, `nix fmt -- --check` clean; qmllint clean (test). `nix build`: see the index
+  entry in HANDOFF.md for the last result.
+
+### The finding that changed the plan
+
+The brief assumed search.nixos.org cannot say which packages have desktop files. Since
+index generation 52 (unstable and 26.05; 51 has none) its package documents carry
+`package_desktop_entries`, `package_desktop_icons`, `package_categories_set` (a keyword
+field: queryable), `package_component_ids` and `package_screenshots`, and the site serves
+the icons at `/icons/<file>` and small WebP screenshot copies at `/screenshots/<file>`.
+So the hint is richer than `programs`/`mainProgram`/homepage, and `browse CATEGORY` is a
+real query (3,203 packages have categories; 498 Game). It is still not complete, and that
+is the honest limitation: **no desktop data for unfree packages and wrappers** (firefox,
+chromium, thunderbird, steam, lutris, heroic, discord, spotify, vscode, obsidian, zotero,
+bottles, kicad, …). The shipped list is there for those, plus the installed set. No
+AppStream pool is scraped; the two asset paths are undocumented, like the ES endpoint
+itself.
+
+### Live on mbp13 (load ~1, `$NIXIN_CONFIG` unset → `/etc/nixos`'s lock, nixpkgs 3ec6363)
+
+| command | result |
+|---|---|
+| `nixin info --json kitty` | `appstream.source: installed`, `/nix/store/afvnxnvk…-kitty-0.49.2`, `kitty.desktop`, System/TerminalEmulator, icon `…/hicolor/scalable/apps/kitty.svg` + the search.nixos.org URL; 0.71 s cold. **kitty ships no metainfo in nixpkgs** (only the desktop entry and icons), so no description/license/screenshots for it |
+| `info steam` | installed `steam-unwrapped-1.0.0.87`: metainfo (description, `LicenseRef-proprietary`, 3 screenshots), icon PNG |
+| `info kdePackages.konsole` | installed: metainfo description and list, GPL-2.0+, search.nixos.org's screenshot copy; icon `utilities-terminal` is a theme icon, not in the output (no path) |
+| `info luanti` | not installed: out-path eval 3.4 s, `not in the local store`, search.nixos.org's hint (icon PNG URL, screenshots) |
+| `info gnome-mines --appstream fetch` | 323.2 KiB substituted, metainfo read; 26 s (two impure evals + narinfo queries). gnome-mines-50.0 is now in the store, unrooted |
+| `info supertuxkart --appstream fetch` | refused: `6 path(s), 690.9 MiB to download (the cap is 50.0 MiB)`; 6.2 s |
+| `info ripgrep` | `gui: false`: its output in the store ships neither |
+| `nixin search --appstream firefox` | firefox `gui: true`, `Network` (`curated`: search.nixos.org has nothing for it); the `-unwrapped`/`-esr` rows `null`; 0.58 s |
+| `browse`, `browse games` | 11 categories (51 installed apps, 46 by pname); Games: Bottles, Lunar Client, Lutris, Prism Launcher, Steam (installed; the wrapper attrs), the shipped list, then the popular ones; 0.6/0.76 s cold, 0.3 s warm |
+| GUI `--live` (`scripts/gui-screenshots.py --live --only browse`) | `docs/gui/live-10-browse.png`, `live-11-browse-installed.png` (Prism Launcher: its own icon, screenshots fetched from search.nixos.org), `live-12-browse-not-installed.png` (Luanti) |
+
+Found live, not fixed (truth layer): Prism Launcher shows `○ not installed` in the details
+because `where`/`list` count `environment.systemPackages` and Home Manager, not
+`users.users.<name>.packages` (mbp13's `master` has kate, prismlauncher, lunarclient,
+cool-retro-term, discord, lutris, bottles, gnome-software there; `nix eval` confirms).
+Browse says installed (`master`) from the profile. Next step for the truth layer.
+
+### Judgement calls
+
+1. **`info` looks locally by default** (`--appstream local`): an installed app costs ~50
+   ms more, one not installed one `nix eval` (3.4 s, 380 MiB, then cached 30 days). Never
+   a download by default; `fetch` is opt-in and capped. `--appstream hint` is the old cost.
+2. **Installed first, by profile scan, not by eval**: the installed output is what the
+   person has (overlays and all), costs no nix, and finds wrappers' metainfo in
+   `x-unwrapped`. The eval is the lock's nixpkgs without the config's overlays: an
+   overlaid package's out path may differ (then it is "not in the store").
+3. **`gui: null` rather than a guess**: "has binaries" is not "has a GUI"; only "no
+   programs at all" is `false`.
+4. **One row per app in Browse** (attr, pname, AppStream id, app name) and installed
+   `x-unwrapped` → the `x` attribute, so `steam` is one row listed by installed and curated.
+5. **Images are not a verb**: `Gui.fetch_image` (a `CallJob` on the pool, counted in
+   `idle`, not in the activity bar); `Gui.image_fetcher` is swapped in tests. Only the
+   details pane fetches, only for the row opened, each URL once per opening.
+6. **`qt6.qtimageformats`** joins the Qt modules (WebP; a test checks the formats).
+7. **Browse key `Ctrl+B`, not `Ctrl+5`**: branch `ui-options` takes `Ctrl+5` for Options.
+
+### Merge notes
+
+Conflicts to expect with `ui-options` (and anything else that adds a page): `Main.qml`'s
+page list and StackLayout children, `NavRail.qml`'s model, `bridge.py`'s `Gui._areas`/
+`go()`, `tests/tui_fake.py` (BROWSE appended), `tests/test_gui.py` (the grab test's step
+list). `cli.py`: one import, `VERBS["browse"]`, `appstream.register(sub)`. Discovery:
+`nixos_search.search/info_package(…, appstream=)`, `_appstream()` in `discovery/__init__.py`,
+`format.py` (APP column, the `appstream:` block). `ui/backend.py`: `info` in CONFIG_VERBS.
+`tests/conftest.py`: an autouse fixture keeps unit tests off this machine's profiles,
+`/etc/nixos`'s lock and nix (`_no_local_appstream`). `tests/test_cli.py`: `browse` left out
+of the stub-verb test (it has its own).
+
+### Gaps / next
+
+- No TUI Browse screen (the brief asked text only; `view.browse_categories`/`app_rows`
+  are ready for one).
+- Theme icons (`utilities-terminal`) are not resolved; a GUI could ask Qt's icon theme.
+- `--appstream fetch` takes ~26 s even for 300 KiB (evaluation twice, impure); passing
+  the out path from the first eval to `nix build` would save one.
+- The overlay case in judgement call 2; reading the config's own `pkgs` (as `where` does)
+  would fix it at the cost of a config eval.
+- Screenshots 1–13 in `docs/gui/` predate the Browse rail entry (not redrawn, to keep the
+  diff small); `scripts/gui-screenshots.py` redraws them all without `--only`.
+- Left behind (agent runs cannot `rm -rf`): `/tmp/appstream-run` (71 MiB: logs, the
+  recorder scripts, raw recordings, and a nix fetcher cache from one run with
+  `XDG_CACHE_HOME` pointed there): `rm -rf /tmp/appstream-run`. `~/.cache/nixin/images/`
+  holds the 7 images the live GUI fetched (180 KiB).
+
+### How to test
+
+```
+nix develop -c pytest tests/test_appstream.py            # parsers, hint, scan, store, verbs, images (50)
+nix develop -c pytest tests/test_gui.py -k "browse or screenshot or app_block or formats"
+nix develop -c pytest tests/test_tui.py -k appstream
+nix build                                                # everything in the sandbox, then the self-test
+nixin info kitty; nixin --json info kitty | jq '.results[0].appstream'
+nixin info gnome-mines --appstream fetch                 # substitutes ≤ 50 MiB, else says why not
+nixin search --appstream firefox; nixin browse; nixin browse games
+nixin-gui --config ~/nixos                               # Ctrl+B, a category, an app
+nix develop -c python3 scripts/gui-screenshots.py --only browse [--live --config ~/nixos]
+```

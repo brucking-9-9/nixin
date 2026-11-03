@@ -455,6 +455,10 @@ class DetailsVM(VM):
                 group="info",
                 exclusive=True,
                 label=f"info {hit.target}",
+                hint="a second; about 3 s more once when the package is not installed "
+                "(AppStream: its out paths are evaluated)"
+                if hit.is_package
+                else "",
             )
         else:
             self.set(infoLoading=False)

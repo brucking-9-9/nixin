@@ -60,3 +60,13 @@ on merge it moves here.
   - How to test: `nix develop -c pytest tests/test_update.py tests/test_tui.py
     tests/test_gui.py`; `nix build`; by hand `nixin-tui --config ~/nixos` → `i`, `t`, `m`
     and `nixin-gui --config ~/nixos` → Ctrl+4 (read-only; use Update only on a clone).
+- **appstream-categories** — branch `appstream-categories`: a package as an application
+  (AppStream metainfo + desktop entries) in `info` (`appstream`, `--appstream
+  local|fetch|hint|off`), `search --appstream` (GUI-app mark), the `browse` verb
+  (freedesktop categories: installed, a shipped well-known list, search.nixos.org's most
+  popular), the GUI's Browse page (`Ctrl+B`) and the details pane's icon, chips and lazily
+  fetched screenshots; the TUI shows it as text. search.nixos.org's index generation 52
+  turned out to carry desktop entries, categories, icons and screenshot copies (not for
+  unfree packages or wrappers: the shipped list covers those). Live on mbp13, read-only.
+  State, findings, judgement calls, merge notes, how to test: the last section of
+  [HANDOFF-gui](docs/HANDOFF-gui.md).
