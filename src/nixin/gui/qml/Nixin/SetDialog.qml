@@ -5,7 +5,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // The Nix value for an option (prefilled with its value on this host, else its default),
-// then the preview.
+// with the option's example (and default) under it, then the preview. For a template
+// (`users.users.<name>.shell`) the option's name comes first, its `<name>` selected.
 Dialog {
     id: dlg
 
@@ -23,8 +24,19 @@ Dialog {
     onWantChanged: want ? open() : close()
     onOpened: {
         value.text = writer.setValue;
-        value.forceActiveFocus();
-        value.selectAll();
+        option.text = writer.setOption;
+        if (writer.setPath) {
+            option.forceActiveFocus();
+            if (writer.setSelect.length === 2)
+                option.select(writer.setSelect[0], writer.setSelect[1]);
+        } else {
+            value.forceActiveFocus();
+            value.selectAll();
+        }
+    }
+
+    function preview() {
+        dlg.writer.previewSetPath(option.text, value.text);
     }
     onClosed: if (writer.setOpen) writer.cancelSet()
 
@@ -40,12 +52,31 @@ Dialog {
             labelWidth: 60
         }
         TextField {
+            id: option
+            objectName: "setOptionPath"
+            Layout.fillWidth: true
+            visible: dlg.writer.setPath
+            font.family: Theme.mono
+            placeholderText: "the option, with the name filled in"
+            onAccepted: {
+                value.forceActiveFocus();
+                value.selectAll();
+            }
+        }
+        TextField {
             id: value
             objectName: "setValue"
             Layout.fillWidth: true
             font.family: Theme.mono
             placeholderText: "a Nix value"
-            onAccepted: dlg.writer.previewSet(text)
+            onAccepted: dlg.preview()
+        }
+        FieldList {
+            objectName: "setHint"
+            Layout.fillWidth: true
+            visible: dlg.writer.setHint.count > 0
+            model: dlg.writer.setHint
+            labelWidth: 60
         }
         Text {
             Layout.fillWidth: true
@@ -68,7 +99,7 @@ Dialog {
             objectName: "setPreview"
             text: "Preview"
             highlighted: true
-            onClicked: dlg.writer.previewSet(value.text)
+            onClicked: dlg.preview()
         }
     }
 }

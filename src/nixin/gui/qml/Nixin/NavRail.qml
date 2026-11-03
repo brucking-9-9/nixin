@@ -4,7 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Search, Pending, Status, Packages, with their keys; under them what this session wrote and applied.
+// Search, Pending, Status, Packages, Options, with their keys; under them what runs.
 Rectangle {
     id: rail
 
@@ -22,7 +22,8 @@ Rectangle {
                 { page: "search", text: "Search", key: "/" },
                 { page: "pending", text: "Pending", key: "Ctrl+2" },
                 { page: "status", text: "Status", key: "Ctrl+3" },
-                { page: "packages", text: "Packages", key: "Ctrl+4" }
+                { page: "packages", text: "Packages", key: "Ctrl+4" },
+                { page: "options", text: "Options", key: "Ctrl+5" }
             ]
             delegate: ItemDelegate {
                 id: item
@@ -36,6 +37,8 @@ Rectangle {
                     rail.backend.go(modelData.page);
                     if (modelData.page === "search")
                         rail.searchRequested();
+                    else if (modelData.page === "options")
+                        rail.optionsRequested();
                 }
                 contentItem: RowLayout {
                     spacing: 6
@@ -70,4 +73,5 @@ Rectangle {
     }
 
     signal searchRequested()
+    signal optionsRequested()
 }

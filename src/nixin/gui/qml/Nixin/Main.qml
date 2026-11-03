@@ -4,7 +4,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// The window: the top bar, the navigation on the left (Search, Pending, Status, Packages),
+// The window: the top bar, the navigation on the left (Search, Pending, Status, Packages,
+// Options),
 // the page, the non-modal notice over the bottom of the page, and the dialogs (diff, set,
 // apply, update).
 // `backend` is the Python root object (nixin/gui/bridge.py: Gui); everything shown comes
@@ -59,6 +60,7 @@ ApplicationWindow {
         NavRail {
             backend: win.backend
             onSearchRequested: searchPage.focusQuery()
+            onOptionsRequested: optionsPage.focusQuery()
             Layout.fillHeight: true
             Layout.preferredWidth: Theme.navW
         }
@@ -71,7 +73,7 @@ ApplicationWindow {
             id: pages
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: ["search", "pending", "status", "packages"].indexOf(win.backend.page)
+            currentIndex: ["search", "pending", "status", "packages", "options"].indexOf(win.backend.page)
             // the keys follow the page: the query on Search, the page itself elsewhere (a
             // hidden text field keeping the focus would take "/" as a letter)
             onCurrentIndexChanged: {
@@ -79,6 +81,8 @@ ApplicationWindow {
                     searchPage.focusQuery();
                 else if (currentIndex === 3)
                     packagesPage.focusList();
+                else if (currentIndex === 4)
+                    optionsPage.focusQuery();
                 else if (currentIndex > 0)
                     children[currentIndex].forceActiveFocus();
             }
@@ -95,6 +99,10 @@ ApplicationWindow {
             }
             PackagesPage {
                 id: packagesPage
+                backend: win.backend
+            }
+            OptionsPage {
+                id: optionsPage
                 backend: win.backend
             }
         }
@@ -128,6 +136,8 @@ ApplicationWindow {
         win.backend.go(name);
         if (name === "search")
             searchPage.focusQuery();  // also when Search is already the page
+        else if (name === "options")
+            optionsPage.focusQuery();
     }
 
     Shortcut {
@@ -149,6 +159,10 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+4"
         onActivated: win.showPage("packages")
+    }
+    Shortcut {
+        sequence: "Ctrl+5"
+        onActivated: win.showPage("options")
     }
     Shortcut {
         sequence: "Ctrl+Q"

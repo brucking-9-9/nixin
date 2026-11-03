@@ -1,9 +1,9 @@
 """The GUI's state and flows, as Qt objects the QML binds to.
 
 `Gui` is the root; Main.qml gets it as its required `backend` property. It owns one
-object per area (search, packages, details, writer, pending, apply, status, notice), each a `VM`:
-state in a dict that QML reads through properties notifying on the object's own `changed`
-signal, and slots QML calls. Lists are `models.Rows`.
+object per area (search, packages, options, details, writer, pending, apply, status,
+notice), each a `VM`: state in a dict that QML reads through properties notifying on the
+object's own `changed` signal, and slots QML calls. Lists are `models.Rows`.
 
 Every document comes from `Gui.fetch` (a Job on the thread pool running the backend's
 verb handler in-process) and becomes rows through nixin.ui.view, as in the TUI. The flows
@@ -616,8 +616,10 @@ class WriterVM(VM):
         "setValue": "",
         "setType": "",
         "setUser": "",
+        "setPath": False,  # the option is a template: its name is edited in the dialog
+        "setSelect": [],  # [start, end] of the template's `<name>`, selected to type over
     }
-    lists: ClassVar = {"diff": models.SPAN, "fields": models.FIELD}
+    lists: ClassVar = {"diff": models.SPAN, "fields": models.FIELD, "setHint": models.FIELD}
     open = state(bool, "open", changed)
     phase = state(str, "phase", changed)
     title = state(str, "title", changed)
@@ -632,13 +634,17 @@ class WriterVM(VM):
     setValue = state(str, "setValue", changed)
     setType = state(str, "setType", changed)
     setUser = state(str, "setUser", changed)
+    setPath = state(bool, "setPath", changed)
+    setSelect = state("QVariantList", "setSelect", changed)
     diff = model("diff")
     fields = model("fields")
+    setHint = model("setHint")
 
     def __init__(self, gui: Gui) -> None:
         super().__init__(gui)
         self.req: WriteRequest | None = None
         self._set_req: dict[str, Any] = {}
+        self._users: list[str] | None = None  # the picker's users, as start() was given them
 
     def start(
         self,
@@ -649,12 +655,16 @@ class WriterVM(VM):
         can_home: bool = False,
         system_ok: bool = True,
         after: Callable[[], None] | None = None,
+        users: list[str] | None = None,
     ) -> None:
+        """`users`: the Home Manager users the dialog's picker offers (default: the host's,
+        as the details pane knows them)."""
         g = self.gui
         if g["busy"]:
             g.notice.say(f"wait: {g['busy']} is still running", "warn")
             return
-        users = g.hm_users(g.details.where_doc)
+        self._users = users
+        users = list(users) if users is not None else g.hm_users(g.details.where_doc)
         if user and user not in users:
             users = [user, *users]
         self.req = WriteRequest(verb, list(args), user, can_home, system_ok, after)
@@ -718,6 +728,7 @@ class WriterVM(VM):
                 can_home=req.can_home,
                 system_ok=req.system_ok,
                 after=req.after,
+                users=self._users,
             )
 
         context = f"{req.verb} {' '.join(req.argv())}"
@@ -730,7 +741,9 @@ class WriterVM(VM):
             return
         req.user = user
         self.set(homeUser=user)
-        self.gui.details.sync_home(req.args[0] if req.args else "", user)
+        target = req.args[0] if req.args else ""
+        self.gui.details.sync_home(target, user)
+        self.gui.options.sync_home(target, user)
         self._preview()
 
     @Slot()
@@ -784,27 +797,50 @@ class WriterVM(VM):
         user: str,
         can_home: bool,
         after: Callable[[], None] | None,
+        hint: list[view.Field] | None = None,
+        path: bool = False,
+        users: list[str] | None = None,
     ) -> None:
-        self._set_req = {"user": user, "can_home": can_home, "after": after}
-        self.set(setOpen=True, setOption=option, setValue=value, setType=type_, setUser=user)
+        """`hint`: fields under the value (the example); `path`: the option is a template
+        (`users.users.<name>.shell`) whose name is filled in here."""
+        self._set_req = {"user": user, "can_home": can_home, "after": after, "users": users}
+        self.rows("setHint").reset(models.fields(hint or []))
+        self.set(
+            setOpen=True,
+            setOption=option,
+            setValue=value,
+            setType=type_,
+            setUser=user,
+            setPath=path,
+            setSelect=list(view.option_placeholder(option) or ()) if path else [],
+        )
 
     @Slot(str)
     def previewSet(self, value: str) -> None:
-        value = value.strip()
+        self.previewSetPath(self["setOption"], value)
+
+    @Slot(str, str)
+    def previewSetPath(self, option: str, value: str) -> None:
+        """The dialog's Preview: OPTION (as edited, for a template) and VALUE."""
+        value, option = value.strip(), option.strip()
         if not self["setOpen"]:
             return
         if not value:
             self.gui.notice.say('a Nix value is needed: true, 42, "text", [ … ]', "warn")
             return
+        if not option or view.option_template(option):
+            self.gui.notice.say("fill in the name in place of <name> / * first", "warn")
+            return
         r = self._set_req
         self.set(setOpen=False, setValue=value)
         self.start(
             "set",
-            [self["setOption"], value],
+            [option, value],
             user=r["user"],
             can_home=r["can_home"],
             system_ok=not r["user"],
             after=r["after"],
+            users=r.get("users"),
         )
 
     @Slot()
@@ -1437,6 +1473,280 @@ class PackagesVM(VM):
         g.go("pending")
 
 
+# --- options --------------------------------------------------------------------------------
+
+
+class OptionsVM(VM):
+    """The Options page: `search --kind opt|hm` (NixOS or Home Manager options), and the
+    selected option in full: what it is (upstream's record: type, default, example, the
+    description), its value on this host and the files that set it (`where`, the Home
+    Manager user's tree for `hm`), where it is declared. Set… (the value dialog: the current
+    value, the type and example as a hint) and Unset go through the writer's diff dialog,
+    for the system or a Home Manager user (`--home`)."""
+
+    changed = Signal()
+    defaults: ClassVar = {
+        "query": "",
+        "kind": "opt",
+        "count": 0,
+        "source": "",
+        "message": "type to search NixOS options",
+        "loading": False,
+        "selected": -1,
+        "present": False,
+        "badge": "",
+        "name": "",
+        "template": False,
+        "cue": "",
+        "cueStyle": "",
+        "about": "",
+        "hostTitle": "",
+        "hostNote": "",
+        "hostNoteStyle": "",
+        "whereLoading": False,
+        "homeUser": "",
+        "homeChoices": [],
+    }
+    lists: ClassVar = {
+        "results": models.HIT,
+        "option": models.FIELD,
+        "host": models.FIELD,
+        "declared": models.FIELD,
+    }
+    query = state(str, "query", changed)
+    kind = state(str, "kind", changed)
+    count = state(int, "count", changed)
+    source = state(str, "source", changed)
+    message = state(str, "message", changed)
+    loading = state(bool, "loading", changed)
+    selected = state(int, "selected", changed)
+    present = state(bool, "present", changed)
+    badge = state(str, "badge", changed)
+    name = state(str, "name", changed)
+    template = state(bool, "template", changed)
+    cue = state(str, "cue", changed)
+    cueStyle = state(str, "cueStyle", changed)
+    about = state(str, "about", changed)
+    hostTitle = state(str, "hostTitle", changed)
+    hostNote = state(str, "hostNote", changed)
+    hostNoteStyle = state(str, "hostNoteStyle", changed)
+    whereLoading = state(bool, "whereLoading", changed)
+    homeUser = state(str, "homeUser", changed)
+    homeChoices = state("QVariantList", "homeChoices", changed)
+    results = model("results")
+    option = model("option")
+    host = model("host")
+    declared = model("declared")
+
+    def __init__(self, gui: Gui) -> None:
+        super().__init__(gui)
+        self.doc: Doc | None = None
+        self.hits: list[view.Hit] = []
+        self.hit: view.Hit | None = None
+        self.where_doc: Doc | None = None
+        self._last: tuple | None = None
+
+    # --- the list
+
+    @Slot(str)
+    def search(self, query: str) -> None:
+        self._run(query)
+
+    @Slot(str)
+    def setKind(self, kind: str) -> None:
+        if kind in view.OPTION_KINDS and kind != self["kind"]:
+            self.set(kind=kind)
+            self._run(self["query"])
+
+    def rerun(self) -> None:
+        self._run(self["query"], force=True)
+
+    def _message(self) -> str:
+        return f"type to search {view.OPTION_KIND_LABEL[self['kind']]} options"
+
+    def _run(self, query: str, force: bool = False) -> None:
+        query = query.strip()
+        self.set(query=query)
+        key = (query, self["kind"], self.gui["channel"])
+        if not query:
+            self._last = None
+            self.show(None)
+            return
+        if key == self._last and not force:
+            return
+        self._last = key
+        self.set(loading=True)
+        kind = self["kind"]
+        self.gui.fetch(
+            "search",
+            *view.option_search_args(query, kind, self.gui["channel"]),
+            done=self.show,
+            group="options-search",
+            exclusive=True,
+            label=f"searching {view.OPTION_KIND_LABEL[kind]} options for {query!r}",
+        )
+
+    def show(self, doc: Doc | None) -> None:
+        self.doc = doc
+        ok = bool(doc and doc.get("ok"))
+        if doc and not ok:
+            self.gui.notice.show(doc, f"search {self['query']}")
+        self.hits = view.hits(doc) if doc and ok else []
+        self.rows("results").reset(models.hits(self.hits))
+        if not doc:
+            message = self._message()
+        elif ok and not self.hits:
+            message = "no options match · try the other kind"
+        else:
+            message = ""
+        self.set(
+            loading=False,
+            count=len(self.hits),
+            source=" · ".join(view.source_lines(doc)) if doc and ok else "",
+            message=message,
+            selected=-1,
+        )
+
+    # --- the selected option
+
+    @Slot(int)
+    def select(self, i: int) -> None:
+        if not 0 <= i < len(self.hits):
+            return
+        hit = self.hits[i]
+        self.hit, self.where_doc = hit, None
+        user = (self.gui.hm_users() or [""])[0] if hit.kind == "hm" else ""
+        template = view.option_template(hit.target)
+        self.set(
+            selected=i,
+            present=True,
+            badge=view.KIND_BADGE.get(hit.kind, hit.kind),
+            name=hit.name,
+            template=template,
+            homeUser=user,
+            hostTitle=f"on {self.gui.backend.host}",
+        )
+        self.render()
+        if not template:
+            self.refreshWhere()
+
+    def _user(self) -> str | None:
+        return self["homeUser"] or None
+
+    def render(self) -> None:
+        hit = self.hit
+        if hit is None:
+            return
+        host = self.gui.backend.host
+        option, about, on_host, declared = view.option_sections(
+            hit.record, self.where_doc, host, hit.kind, self._user()
+        )
+        self.rows("option").reset(models.fields(option.fields))
+        self.rows("host").reset(models.fields(on_host.fields))
+        self.rows("declared").reset(models.fields(declared.fields))
+        cue = view.option_cue(self.where_doc, hit.kind, self._user())
+        users = self.users() if hit.kind == "hm" else []
+        self.set(
+            about=about.note,
+            hostNote=on_host.note,
+            hostNoteStyle=on_host.style or "dim",
+            cue=cue.text if cue else "",
+            cueStyle=cue.style if cue else "",
+            homeChoices=users,
+        )
+
+    def users(self) -> list[str]:
+        """The Home Manager users whose tree has the option (where), else the host's."""
+        return view.option_users(self.where_doc) or self.gui.hm_users(self.where_doc)
+
+    @Slot()
+    def refreshWhere(self) -> None:
+        hit = self.hit
+        if hit is None or self["template"]:
+            return
+        self.set(whereLoading=True)
+        self.gui.fetch(
+            "where",
+            *(hit.target, "--kind", "option"),
+            done=lambda doc, h=hit: self._where(h, doc),
+            group="options-where",
+            exclusive=True,
+            label=f"where: evaluating {self.gui.backend.config_label}",
+            hint="a few seconds cold, under one warm",
+        )
+
+    def _where(self, hit: view.Hit, doc: Doc) -> None:
+        if hit is not self.hit:
+            return
+        self.where_doc = doc
+        users = view.option_users(doc)
+        if hit.kind == "hm" and self["homeUser"] not in users and users:
+            self.set(homeUser=users[0])
+        self.set(whereLoading=False)
+        self.render()
+
+    @Slot(str)
+    def setHome(self, user: str) -> None:
+        if self.hit is not None and self.hit.kind == "hm" and user != self["homeUser"]:
+            self.set(homeUser=user)
+            self.render()
+
+    def sync_home(self, target: str, user: str) -> None:
+        """The diff dialog picked another user for this option: the picker here follows."""
+        if self.hit is not None and self.hit.target == target and self.hit.kind == "hm":
+            self.setHome(user)
+
+    def _home(self) -> str | None:
+        """The --home user ("" for NixOS); None (and a notice) for an HM option without one."""
+        hit = self.hit
+        if hit is None:
+            return None
+        if hit.kind != "hm":
+            return ""
+        if not self["homeUser"]:
+            self.gui.notice.say(
+                f"Home Manager options need a user; {self.gui.backend.host} has none", "error"
+            )
+            return None
+        return self["homeUser"]
+
+    @Slot()
+    def editOption(self) -> None:
+        hit, user = self.hit, self._home()
+        if hit is None or user is None:
+            return
+        rec = hit.record
+        self.gui.writer.open_set(
+            hit.target,
+            view.option_prefill(rec, self.where_doc, hit.kind, user or None),
+            type_=str(rec.get("type") or hit.detail or ""),
+            user=user,
+            can_home=hit.kind == "hm",
+            after=self.refreshWhere,
+            hint=view.option_set_hint(rec)[1:],  # the dialog shows the type itself
+            path=self["template"],
+            users=self.users(),
+        )
+
+    @Slot()
+    def unset(self) -> None:
+        hit, user = self.hit, self._home()
+        if hit is None or user is None:
+            return
+        if self["template"]:
+            self.gui.notice.say("a template: unset takes the full name", "warn")
+            return
+        self.gui.writer.start(
+            "unset",
+            [hit.target],
+            user=user,
+            can_home=hit.kind == "hm",
+            system_ok=hit.kind != "hm",
+            after=self.refreshWhere,
+            users=self.users(),
+        )
+
+
 # --- status ---------------------------------------------------------------------------------
 
 
@@ -1542,6 +1852,7 @@ class Gui(VM):
             "notice": NoticeVM(self),
             "search": SearchVM(self),
             "packages": PackagesVM(self),
+            "options": OptionsVM(self),
             "details": DetailsVM(self),
             "writer": WriterVM(self),
             "pending": PendingVM(self),
@@ -1554,6 +1865,7 @@ class Gui(VM):
     notice = area("notice")
     search = area("search")
     packages = area("packages")
+    options = area("options")
     details = area("details")
     writer = area("writer")
     pending = area("pending")
@@ -1703,7 +2015,7 @@ class Gui(VM):
 
     @Slot(str)
     def go(self, page: str) -> None:
-        if page not in ("search", "packages", "pending", "status"):
+        if page not in ("search", "packages", "options", "pending", "status"):
             return
         self.set(page=page)
         if page == "packages":
@@ -1718,6 +2030,7 @@ class Gui(VM):
         if channel in view.CHANNELS and channel != self["channel"]:
             self.set(channel=channel)
             self.search.rerun()
+            self.options.rerun()
 
     @Slot(str)
     def copy(self, text: str) -> None:
