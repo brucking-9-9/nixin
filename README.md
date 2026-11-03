@@ -324,7 +324,7 @@ nixosConfigurations.host = nixpkgs.lib.nixosSystem {
 | `optionIndex.enable` | true | writes the [option index](docs/CONTRACT.md#option-indexes): NixOS `/etc/nixin/options-nixos.json`, Home Manager `$XDG_CONFIG_HOME/nixin/options-home.json` |
 | `optionIndex.configRoot` | the source of the file that sets `enable` | the config's top directory, for config-relative declarations |
 | `optionIndex.prune` | NixOS: `[ [ "home-manager" "users" ] ]` | option paths whose sub-options the index leaves out |
-| `outdated.enable` | false | a user timer: `nixin-state outdated` at `outdated.interval` (OnCalendar, `*-*-* 09:00:00`) and 10 min after boot |
+| `outdated.enable` | false | a user timer: `nixin-state outdated` at `outdated.interval` (OnCalendar, `*-*-* 09:00:00`) and 10 min after login (OnStartupSec: the user manager's start) |
 | `outdated.notify`, `.notifyTimeout`, `.quietHours` | true, null, null | notify-send when the number of newer packages changes; how long it stays (ms); hours (`23-8`) it waits out |
 | `pending.enable`, `pending.interval` | false, `10min` | a user timer: `nixin-state status` (the workspace's unapplied changes), and right after a switch or a commit in either tree (a path unit) |
 | `authoritative`, `workspace` | `/etc/nixos`, null (`~/nixos` if a clone) | the trees the timers read |
