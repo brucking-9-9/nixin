@@ -45,6 +45,7 @@ history rollback            apply       the system generations with nixin's comm
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
 try                         try         run a package from the locked nixpkgs without installing it (--shell: a shell with it)
+doctor                      doctor      read-only health check: index, timers, trees, hosts (--full), secrets, /boot
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
@@ -175,6 +176,17 @@ which touch the network, run nix or write files, and the cache locations.
   proven by one eval; when that eval fails the change stays, the verb fails
   (`eval-failed`) and says how to undo it. It refuses `/etc/nixos`: it edits a clone
   you own.
+
+`nixin doctor` is the one read-only check of this machine, a line per check with the
+command that fixes it: the option indexes belong to the running generation and the
+lock; the outdated and status timers are enabled, their last run succeeded and
+`~/.local/state/nixin` parses and is recent; `~/nixos` vs `/etc/nixos` (dirty, ahead,
+diverged, lock drift); the hand-installed files the host's `.nix` files name
+(`environmentFile`, `passwordFile`, `keyFile`, `sshKey`, `/etc/*.env`, …) exist, with the
+`file:line` of each missing one; /boot can take the next kernel; failed units. It
+evaluates nothing and stays local (milliseconds); `--full` also asks the hub (`git
+ls-remote`) and the hosts in `hosts.toml` (`ssh -o BatchMode=yes`). Findings leave `ok`
+true; `healthy` and `failed[]` say whether something needs you.
 
 `--host` defaults to this machine; for a config without this machine but with exactly
 one host, to that host. With several, nixin asks for `--host` (`unknown-host`).
