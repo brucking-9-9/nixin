@@ -20,9 +20,9 @@ nixin --version | --help | VERB --help
 | verb | layer | does |
 |---|---|---|
 | `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
-| `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake) |
+| `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake); `list --diff A B`: two hosts compared |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
-| `plan`, `apply`, `sync` | apply | build + closure diff + boot check; commit, pull into the authoritative tree and switch (root); git sync with the hub |
+| `plan`, `apply`, `sync` | apply | build + closure diff + boot check; commit, pull into the authoritative tree and switch (root); for another host: push to the hub, pull and switch there over ssh; git sync with the hub |
 | `history`, `rollback` | apply | this machine's system generations with the commits nixin applied; switch back to one (root) and revert the config with it |
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 | `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
@@ -44,7 +44,14 @@ nixin --version | --help | VERB --help
   `rollback`.
 - Nothing prompts, ever. nix and git run with stdin closed, sudo always as `sudo -n`. A
   step that needs root and cannot get it fails with `needs-sudo` and the commands to run
-  (only `apply` and `rollback` need root).
+  (only `apply` and `rollback` need root). The one exception is `apply --host H` for
+  another host: it runs over `ssh -t`, and the sudo there may ask for a password on the
+  terminal, so it refuses (`needs-tty`) under `--json`, from a UI and without a terminal;
+  its `--dry-run` runs nothing and works everywhere.
+- `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/hosts.toml`) tells `apply` how to
+  reach another host: `[H] ssh = "alias-or-user@address"  workspace = "~/nixos"
+  authoritative = "/etc/nixos"` (those are the defaults, with `ssh` = the host name). No
+  file is needed. Only `apply` reads it.
 - `--help` and `--version` print text to stdout and exit 0, with or without `--json`.
 
 ## Envelope
@@ -287,6 +294,7 @@ the config (and greps it), writes cache files. A few seconds cold, under a secon
 ```
 nixin list [--home USER] [--scope system|home|all] [--filter TEXT] [--programs]
            [--config DIR] [--refresh]
+nixin list --diff [HOST_A] HOST_B [--home USER] [--scope …] [--filter TEXT] [--programs]
 ```
 
 The packages the host installs, one row per package: `environment.systemPackages` and
@@ -327,6 +335,46 @@ Errors: `usage` (a positional argument, `--home` with `--scope system`, an unkno
 Costs: runs nix once per tree change (the package-list eval, shared with `status` and
 `where`), reads the config's modules, writes the cache file. A few seconds cold, under
 half a second warm.
+
+#### `list --diff`
+
+`--diff HOST_A HOST_B` compares two hosts of the same config (`--diff HOST_B`: HOST_A is
+`--host`). Per scope: the system with the system, each Home Manager user with the user
+of the same name on the other host. Packages are matched by `pname` (else the
+derivation name) and compared as sets of versions. The hosts share the config's
+`flake.lock`, so versions normally match; an override, an overlay or another nixpkgs
+input shows up as `differ`. `--scope`, `--home USER` (a user of either host) and
+`--filter` narrow it as for `list`; `--programs` adds the `programs.<name>.enable` that
+only one host has. It reads the same package-list cache entry as `list`, `status` and
+`where` for each host (`--refresh` re-evaluates both). No `declared[]`.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `a`, `b` | the two hosts; `a`/`b` below refer to them |
+| `packages[]` | one row per package that only one host has or whose versions differ, by scope (system first), then name: `scope`, `user`, `name` (pname, else the derivation name), `state` (`only_a` \| `only_b` \| `differ`), `a`, `b` (the versions on each host, sorted; `[]` absent; `null` in the list for a derivation without a version) |
+| `scopes[]` | per scope: `scope`, `user`, `on` (`["a", "b"]`, or one side for a user only one host has), `only_a`, `only_b`, `differ`, `same` (counts) |
+| `counts` | `only_a`, `only_b`, `differ`, `same` over all scopes |
+| `scope`, `users[]`, `filter` | as resolved (`users`: the HM users compared, from both hosts) |
+| `programs[]` | only with `--programs`: `scope`, `user`, `name`, `state` (`only_a` \| `only_b`) |
+| `cache` | `{a: …, b: …}`, each as in `status` |
+| `timings` | `a`, `b` (seconds each package-list eval took when it ran), `total` |
+| `warnings[]` | none today |
+
+Human output: `scope  name  <HOST_A's version>  <HOST_B's version>  (user)`, `-` for
+absent and `yes` for a package without a version, then a line per scope (`system: 21
+only on 19BK, 223 only on mbp13, 0 versions differ, 114 the same`), then whether each
+list came from the cache. A user only one host has is one line (`home brucking: only
+19BK has this user (190 packages, none on mbp13; --home brucking lists them)`) unless
+`--home` names it.
+
+Errors: `usage` (`--diff` with no host, three hosts, the same host twice; `--home` with
+`--scope system`), `unknown-host` (either host), `unknown-user` (`--home USER` on neither
+host), `config-not-found`, `not-a-flake`, `eval-failed`, `nix-missing`, `internal`.
+
+Costs: the package-list eval of each host once per tree change (both cold: 4.9 s, 452
+MiB on mbp13 for 19BK and mbp13), 0.3 s and 42 MiB warm.
 
 ### `add`
 
@@ -583,18 +631,69 @@ message}` or null), `out` (null when it would have to build), `cached`, `workspa
 (`{pull|switch: {backend, ready, why}}`), `diff`, `boot`, `reboot_needed` (when `out`
 is known; a `full` /boot is reported, not refused), `warnings[]`.
 
+#### Another host: `apply --host H`
+
+When H is not this machine, `apply` does not switch anything here. It commits the
+workspace as above (but not `installer/history.jsonl`: that records this machine's
+generations and waits for the next local apply), pushes the branch to the hub, and runs
+the rest on H over one `ssh -t <ssh>` session (`hosts.toml`: `ssh`, `workspace`,
+`authoritative`; see [Invocation](#invocation)):
+
+1. **Commit** (here, as for a local apply).
+2. **Push**: `git push --porcelain <remote> HEAD:refs/heads/<branch>` (the branch's
+   upstream remote, else `origin`). `push-failed` when there is no such remote or the push
+   fails (`rejected: true` when the hub has commits the workspace lacks: `sync --pull`
+   first).
+3. **On H**, one POSIX `sh -c` script, so sudo asks at most once:
+   `git -C <workspace> pull --ff-only`, then `sudo git -C <authoritative> pull --ff-only
+   <workspace> <branch>`, then `sudo nixos-rebuild switch --flake <authoritative>#H`
+   (`--no-switch`: `boot`). Between them it checks that H's workspace is on `<branch>`
+   and that each tree ends at the pushed commit, so H switches to exactly what was
+   pushed. Its output streams to stderr as it comes (the sudo prompt included).
+
+Nothing is built here and no history line is written: no `diff`, `boot`, `cached`,
+`history` (null). The other fields are those of a local apply, from the remote end:
+`authoritative_head` (the pushed commit, checked there), `out` (H's `/run/current-system`
+after the switch; `--no-switch`: its profile), `generation`, `previous` and `running`
+(the same `running` block, read on H), `privileged_commands[]` (the sudo commands as
+typed there), `switch_log`. Also: `remote` = `{host, ssh, workspace, authoritative,
+config}` (`config`: the hosts.toml read, null for the defaults), `pushed` = `{remote,
+url, branch, flag, up_to_date, commits[]}`, `changed` (H's profile moved), `ssh` =
+`{argv, script}`, `backends` `ssh+sudo`, and `timings` = `prepare`, `commit`, `push`,
+`remote`, `total`.
+
+It needs a person at a terminal: `needs-tty` under `--json`, from a UI (a worker thread)
+and when stdin or stderr is not a terminal. `--dry-run` works everywhere and contacts
+nothing (no fetch, no push, no ssh, no nix build): `remote`, `commands[]` (local `commit`
+and `push`, the `ssh` command, then H's three steps with `where: "<H>"`), `script` (with
+`NEW_COMMIT` where the commit does not exist yet), `commit`, `push` (`{remote, url,
+branch, tracking, commits}`: the commits the last fetch says the hub lacks),
+`needs_tty: true`, `privilege` (`ssh+sudo`, `ready: false`: not probed), `out`, `diff`,
+`boot`, `running` null.
+
+Errors on H carry `step` (`workspace-pull`, `authoritative-pull`, `switch`), `committed`,
+`pushed`, `remote_steps_started[]` (`1/3`…) and `privileged_commands[]`:
+`git-failed` (H's workspace is on another branch, cannot fast-forward, or a tree is not
+at the pushed commit afterwards; root's pull failed, e.g. a wrong password. When H's own
+uncommitted `installer/history.jsonl` lines block the pull the message says how to set
+them aside), `authoritative-diverged` (root's pull cannot fast-forward), `switch-failed`
+(nixos-rebuild failed; both trees are at the pushed commit), `ssh-failed` (no `ssh`, no
+connection: exit 255, or the session ended otherwise). Before anything runs: `needs-tty`,
+`push-failed` (no remote), `invalid-hosts-config`. A dropped connection during the
+switch leaves the switch to nixos-rebuild on H.
+
 Errors (`ok: false`; fields after the first root step tell how far it got: `committed`,
 `out`, `authoritative_head`, `privileged_commands[]`): `usage`, `config-not-found`,
-`not-a-workspace`, `unknown-host`, `host-not-local` (apply switches *this* machine;
-`--host` names another), `authoritative-missing` (no git checkout at the authoritative
-path), `authoritative-dirty` (with `files[]`), `authoritative-diverged` (with
+`not-a-workspace`, `unknown-host`, `authoritative-missing` (no git checkout at the
+authoritative path), `authoritative-dirty` (with `files[]`), `authoritative-diverged` (with
 `authoritative_head` and `state`: `behind`, `diverged` or `unknown`; the message has
 the git commands that bring those commits into the workspace), `nothing-to-apply`,
 `eval-failed`, `eval-timeout`, `build-failed`, `needs-sudo` (with `commands[]`),
 `switch-failed` (nixos-rebuild's last lines; the pull has happened), `verify-failed`,
 `git-failed` (a git command failed, e.g. a commit hook or no identity), `busy` (another
 apply or rollback holds the lock), `boot-space` (with `boot_space`), `nix-missing`,
-`internal`.
+`internal`; for another host also `needs-tty`, `push-failed`, `ssh-failed`,
+`invalid-hosts-config` (above).
 
 Costs: git in the workspace (commit) and, read-only, in the authoritative tree; nix
 (plan's build unless cached); two root commands. `nixos-rebuild` evaluates the config
@@ -1042,6 +1141,7 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `where PACKAGE` | — | yes | cache | 12 s (packages + 2 prefix evals) | 0.6–1 s | 440 MiB |
 | `where OPTION` | — | yes | cache | 3.5–9 s | 0.6–1 s | 200–230 MiB |
 | `list` | — | yes (the package lists) | cache | 2.5 s (mbp13) / 3.2 s (19BK: system + brucking in one eval); quiet box (load 1.5), 2026-11-02 | 0.36–0.41 s | 340–450 MiB (cold), 42 MiB (warm) |
+| `list --diff A B` | — | yes (both hosts' package lists, one after the other) | cache | 4.9 s (19BK 2.7 s + mbp13 1.9 s; load 0.3, 2026-11-02) | 0.33 s | 452 MiB (cold), 42 MiB (warm) |
 | `add --dry-run --no-eval` | — | parse only | — | 0.8 s | — | 36 MiB |
 | `add --dry-run` | — | 1 small eval | — | 1.7 s | — | 200 MiB |
 | `add`, `rm` (NixOS) | — | 1–2 evals | workspace + git index | 5–7 s (2.4–3.3 s at load 2.6) | — | 350 MiB |
@@ -1050,6 +1150,8 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `plan` | — | nix eval + build | nix store, plan cache | **38 s** no-op tree (eval 32 s, build 5 s); **85 s** with cowsay (39 derivations: three `system-path`s, units, etc); 37 s for `configurationLimit` | 0.6–1.1 s (cached; also a tree that only adds `history.jsonl`) | — |
 | `apply` | — | git, nix (unless cached), sudo | workspace commit, authoritative tree, system profile, /boot | **30–31 s** after `plan` or for a tree plan's cache knows: build 0.4–0.9 s (cache), pull 0.05 s, `nixos-rebuild switch` 29–30 s (root's own eval + activation) | `nothing-to-apply` 0.2 s | — |
 | `apply --dry-run` | — | `nix flake metadata`, `sudo -n true` | — | 1.3 s | — | — |
+| `apply --host H` (another host) | yes: the push to the hub, ssh to H | git here; on H git, sudo, `nixos-rebuild` | workspace commit, the hub's branch, H's workspace, authoritative tree, system profile and /boot | not measured: H builds its own system (nixos-rebuild's time there), plus the push and the ssh setup | — | — |
+| `apply --host H --dry-run` | — | git (read only); no nix, no ssh, no sudo | — | 0.29 s (19BK from mbp13, 2026-11-02) | — | 36 MiB |
 | boot check (in `plan`, `apply`, `rollback`) | — | — (reads two toplevels, the profile's generations' kernel links, the installer scripts up to the builder, `statvfs /boot`) | — | under 0.1 s | — | — |
 | `history` | — | — | — | 0.2 s (35 generations) | — | — |
 | `rollback --dry-run` | — | `sudo -n true`, `nix store diff-closures` | — | 1.3 s | — | — |

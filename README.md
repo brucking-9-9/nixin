@@ -34,9 +34,10 @@ search box — it knows what would actually change.
 nixin [--json] [--host H] VERB [ARGS...]
 
 search info versions        discovery   what exists upstream, in which versions
-status where list           truth       what this config gives a host (evaluates the flake)
+status where list           truth       what this config gives a host (evaluates the flake); list --diff A B
 add rm set unset            writer      edit a user-owned workspace clone of the config
-plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch; hub sync
+plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch
+                                        (another host: push to the hub, pull and switch there over ssh); hub sync
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
@@ -47,7 +48,8 @@ With `--json` every invocation prints exactly one document on stdout, nothing on
 stderr: `{"ok": true, "verb": ..., "host": ..., ...}` or `{"ok": false, "verb": ...,
 "host": ..., "error": {"code": "...", "message": "..."}}`. Exit codes: 0 ok, 1 the verb
 failed, 2 usage. Nothing prompts; privileged steps will fail with `needs-sudo` and the
-command to run. **[docs/CONTRACT.md](docs/CONTRACT.md)** is the contract: every verb's
+command to run (the exception: `apply` on another host, over `ssh -t`, see below).
+**[docs/CONTRACT.md](docs/CONTRACT.md)** is the contract: every verb's
 arguments and result fields, every error code, exit codes, which verbs are slow (measured),
 which touch the network, run nix or write files, and the cache locations.
 
@@ -63,6 +65,9 @@ which touch the network, run nix or write files, and the cache locations.
   `list` shows the installed packages themselves (system and each Home Manager user;
   `--home USER`, `--scope`, `--filter TEXT`, `--programs`), sorted by name, each with the
   line that lists it where a text scan finds one; it shares `status`'s cached eval.
+  `list --diff A B` compares two hosts of the config: per scope (the system, each Home
+  Manager user by name) the packages only one of them has and the versions that differ
+  (rare, as they share the lock), from the same cached package lists.
 - **apply** builds the workspace host (`plan`: a git+file flake, i.e. what a commit would
   contain; the out path is cached by content, so `apply` right after does not rebuild)
   and diffs its closure against `/run/current-system`. `apply` commits the workspace,
@@ -84,6 +89,15 @@ which touch the network, run nix or write files, and the cache locations.
   from (history, plan's cache) it makes one revert commit in the workspace back to that
   tree and pulls it into `/etc/nixos`, so the next `apply` does not switch back; without
   such a commit it says so and leaves the config.
+  **Another host**: `apply --host H` for a host that is not this machine commits the
+  workspace, pushes its branch to the hub, and then over one `ssh -t` session on H runs
+  `git -C ~/nixos pull --ff-only`, `sudo git -C /etc/nixos pull --ff-only ~/nixos
+  <branch>` and `sudo nixos-rebuild switch --flake /etc/nixos#H`, checking between them
+  that both trees end at the pushed commit. The sudo there may ask for a password on
+  your terminal, so this needs one (`needs-tty` under `--json` or from a UI); `--dry-run`
+  prints every command and the script and contacts nothing. How to reach H:
+  `~/.config/nixin/hosts.toml`, e.g. `[mbp13]` `ssh = "mbp13"` `workspace =
+  "/home/master/nixos"` (defaults: the host name, `~/nixos`, `/etc/nixos`).
 - **outdated** answers "what needs updating" for a host. By default it evaluates the
   installed package lists (system and each Home Manager user) and the kernel twice: as
   locked, and with `--override-input nixpkgs` at the lock's own ref as it resolves now
