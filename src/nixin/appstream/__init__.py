@@ -24,7 +24,19 @@ import os
 from typing import Any
 
 from ..cache import Cache
-from . import curated, hint, installed, parse, store
+
+# The submodules load on first use (`appstream.hint`, `from . import hint`): the CLI imports
+# this package for `browse`'s parser on every start, and xml.etree with the parsers is ~8 ms.
+_SUBMODULES = frozenset({"browse", "curated", "hint", "images", "installed", "parse", "store"})
+
+
+def __getattr__(name: str) -> Any:
+    if name in _SUBMODULES:
+        import importlib
+
+        return importlib.import_module(f"{__name__}.{name}")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 MODES = ("local", "fetch", "hint", "off")
 DEFAULT_MODE = "local"
@@ -44,6 +56,8 @@ def _hints(rec: dict[str, Any]) -> tuple[str, ...]:
 def merge(found: dict[str, Any], base: dict[str, Any]) -> dict[str, Any]:
     """A store record over a hint: the store wins where it has a value; the hint adds the
     icon URL, search.nixos.org's screenshot copies, and what the files lack."""
+    from . import hint
+
     out = hint.empty()
     for k in ("id", "name", "summary", "description", "license", "launchable", "homepage"):
         out[k] = found.get(k) or base.get(k)
@@ -79,6 +93,8 @@ def for_package(
     """The `appstream` object for one package row of `info`. `base` is search.nixos.org's
     hint for it (None for `--nixpkgs` rows); `profiles` the installed store paths
     (installed.store_paths(), for tests)."""
+    from . import hint, installed, store
+
     attr = str(rec.get("name") or "")
     base = base if base is not None else hint.from_es({"package_attr_name": attr, **_es_like(rec)})
     if mode == "hint":
@@ -145,6 +161,8 @@ def _es_like(rec: dict[str, Any]) -> dict[str, Any]:
 def mark(rows: list[dict[str, Any]]) -> None:
     """`search --appstream`: every package row gets an `appstream` object; rows that came
     with search.nixos.org's hint keep it, the others (`--nixpkgs`) get the shipped list's."""
+    from . import hint
+
     for r in rows:
         if r.get("kind") == "pkg" and "appstream" not in r:
             r["appstream"] = hint.from_es({"package_attr_name": r.get("name"), **_es_like(r)})
@@ -153,16 +171,20 @@ def mark(rows: list[dict[str, Any]]) -> None:
 # --- the `browse` verb -------------------------------------------------------------------------
 
 
-def register(sub: argparse._SubParsersAction) -> set[str]:
+def _browse(ns: argparse.Namespace) -> dict[str, Any]:
     from . import browse
 
+    return browse.run(ns)
+
+
+def register(sub: argparse._SubParsersAction) -> set[str]:
     sp = sub.add_parser("browse", help=VERBS["browse"])
     sp.add_argument("category", nargs="?", help="a category (Game, Graphics, …); none: the list")
     sp.add_argument("--channel", metavar="C", help="unstable (default), stable, NN.MM")
     sp.add_argument("--limit", type=int, default=BROWSE_LIMIT, metavar="N")
     sp.add_argument("--no-cache", action="store_true", help="neither read nor write the cache")
     sp.add_argument("--refresh", action="store_true", help="ignore cached answers, fetch and store")
-    sp.set_defaults(run=browse.run)
+    sp.set_defaults(run=_browse)
     return set(VERBS)
 
 
