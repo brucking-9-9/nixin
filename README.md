@@ -39,6 +39,7 @@ add rm set unset            writer      edit a user-owned workspace clone of the
 plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch; hub sync
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
+try                         try         run a package from the locked nixpkgs without installing it (--shell: a shell with it)
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
@@ -97,6 +98,17 @@ which touch the network, run nix or write files, and the cache locations.
   --flake WORKSPACE`, or `nix flake lock --override-input nixpkgs REF` for `--to`) in the
   workspace only, and returns the input's commit before and after. It never builds or
   switches: `plan` and `apply` do that, as for any other change.
+- **try** runs a package without installing it (nix-software-center's "launch without
+  installing"): `nixin try cowsay -- moo`, `nixin try htop --shell`. PKG is an attribute
+  of the host's *locked* nixpkgs (the config's nixpkgs input as `flake.lock` pins it;
+  `--nixpkgs` picks another), so you try what `nixin add` would install. One probe eval
+  (meta, outputs), `nix build --no-link` (nix's progress on stderr; nothing is rooted, the
+  next garbage collection removes it), then nixin execs `nix run <flakeref>#PKG -- ARGS`,
+  or `nix shell` with `--shell`. It picks `meta.mainProgram`, else the only program, else
+  asks (`ambiguous-program`, `--program NAME`). Unfree packages need
+  `NIXPKGS_ALLOW_UNFREE=1 … --impure`, and the `unfree` error says so. `--json` only builds
+  and returns `out`, `programs`, `size`, `cached`, `command`, `gui`: what a UI needs to say
+  "ready, 12 MiB" and offer to launch.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
@@ -127,7 +139,10 @@ user, a filter and a for-whom toggle on the loaded rows; Enter opens the row in 
 for its user, with Remove) and, on its Updates tab, what a nixpkgs update would change
 (`outdated`, the lock's next commit or `--published`; the kernel line, the summary) with
 "Update nixpkgs lock": `update --dry-run` → confirm → `update` → Pending, where Plan and
-Apply take it as any other change. Error documents show as `code` + message.
+Apply take it as any other change. Try (Details, `t`) builds the package with nix's output
+streaming (nothing is installed), then starts a graphical app detached (`setsid`) or shows
+the exact `nix run` / `nix shell` lines to copy; several programs and no mainProgram: pick
+one. Error documents show as `code` + message.
 
 Keys: `/` search, `i` packages (`ctrl+4`), `p` pending, `s` status, `?` all keys, `ctrl+p`
 command palette, `esc` back, `q` quit (`ctrl+q` while typing or while something runs).
@@ -163,8 +178,12 @@ counts and caches. **Packages** has the installed list (`list`: a filter and a f
 combo; the selected row opens in the details pane for its user, with Remove) and Updates
 (`outdated` against the lock's next commit or search.nixos.org, the kernel line, the
 summary; "Update nixpkgs lock…" opens a dialog with `update --dry-run`, then `update`
-runs and the window goes to Pending). Error documents appear as a notice over the page
-(`code` + message, the candidates to pick for an ambiguous write, commands to copy).
+runs and the window goes to Pending). **Try** (next to Add) builds the package in a dialog
+with nix's output streaming, then launches a graphical app detached or opens a CLI program
+in your terminal (`$TERMINAL -e …`, else kitty, foot, …) running the `nix run` line; Shell
+in terminal, Copy command, and a program picker when there are several. Error documents
+appear as a notice over the page (`code` + message, the candidates to pick for an
+ambiguous write, commands to copy).
 
 Keys: `/` search, `Ctrl+1/2/3/4` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
 in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).
