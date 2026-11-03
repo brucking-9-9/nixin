@@ -24,6 +24,7 @@ nixin --version | --help | VERB --help
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
 | `plan`, `apply`, `sync` | apply | build + closure diff + boot check; commit, pull into the authoritative tree and switch (root); git sync with the hub |
 | `history`, `rollback` | apply | this machine's system generations with the commits nixin applied; switch back to one (root) and revert the config with it |
+| `generations`, `gc` | apply | the system generations with their closure sizes, boot entries and what `gc` would drop; delete old ones, rewrite the boot menu, collect the garbage (root) |
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 | `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
 
@@ -753,6 +754,117 @@ nix evaluation or build (GEN is in the store); three root commands. Writes: a co
 the workspace, the system profile, `/run/current-system`, `/boot` (the bootloader step),
 the authoritative tree, `installer/history.jsonl`, plan's cache.
 
+### `generations`
+
+```
+nixin generations [--keep N] [--older-than DAYS] [--config DIR] [--authoritative DIR]
+```
+
+This machine's system generations, newest first: `history`'s rows (the same reader),
+plus each one's closure size, whether the boot menu has an entry for it, and whether
+`nixin gc` with the same `--keep`/`--older-than` would delete it. Without either flag it
+shows `gc --keep 3`. The commits are joined from `installer/history.jsonl` of `--config`
+or `$NIXIN_CONFIG` (which must then exist: `config-not-found`), else of `/etc/nixos` when
+it is there; without a config the rows have no commits. No root, no network.
+
+The policy, shared with `gc`: `--keep N` keeps the newest N generations (by number);
+`--older-than DAYS` keeps every generation made (link mtime) in the last DAYS days and
+the newest one made before that, which was running at the cutoff (the rule of
+`nix-collect-garbage --delete-older-than`); with both, a generation is kept when either
+keeps it. The running generation (`current`), the booted one and the boot default are
+never dropped.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `generations[]` | `history`'s row (`generation`, `date`, `store_path`, `current`, `booted`, `default`, `kernel`, `nixos_version`, `commit`, `message`, `mode`, `applied`, `applied_host`, `match`, `match_generation`, `entries[]`), plus `closure_size` (bytes, `nix path-info -S`: the whole closure, so shared paths count in every row; null when nix could not say), `boot_entry` (bool; null when unknown), `drop` (the policy deletes it), `kept_by[]` (why it stays: `current`, `booted`, `default`, `newest`, `recent`, `cutoff`; empty when it drops) |
+| `total` | how many generations there are |
+| `current`, `booted`, `default` | as in `history` |
+| `policy` | `{keep, older_than_days}` as applied (`keep: 3` without flags) |
+| `drop[]` | the generation numbers the policy deletes, oldest first |
+| `boot` | `{source, limit, generations[]}`: which generations have a boot entry. `source` `entries` (systemd-boot's `loader/entries/nixos-generation-N[-specialisation-*].conf`, when /boot is readable), `configurationLimit` (the newest `limit` generations: the window the boot default's systemd-boot builder keeps, read as in [the boot block](#the-boot-block); a /boot mounted root-only, as on mbp13), or null (another bootloader: `generations` null) |
+| `sizes` | `{cached, measured, seconds, error}`: how many closure sizes came from the cache, how many nix measured now |
+| `history` | `{path, entries, unmatched}` as in `history`; null without a config |
+| `warnings[]` | the config is the authoritative tree; closure sizes unknown |
+
+Human output: `history`'s table with a closure column, `drop` in a `gc` column and an
+`e` flag for a boot entry; the first line says what the policy would delete
+(`nixin gc --keep 3 would delete 31 (87–117)`).
+
+Errors: `usage` (a positional argument, `--keep` below 1, `--older-than` below 0),
+`config-not-found`, `host-not-local`, `internal`.
+
+Costs: `history`'s reads, `/boot/loader/entries` (when readable), and one `nix path-info
+--closure-size` for the store paths it has not sized before. A closure never changes, so
+the sizes are cached by store path (see [Caches](#caches)).
+
+### `gc`
+
+```
+nixin gc [--keep N] [--older-than DAYS] [--dry-run]
+```
+
+Deletes the system generations `generations`' policy drops (same flags; never the
+running, the booted or the boot-default generation), rewrites the boot menu, and
+collects the garbage. Without `--keep` or `--older-than` no generation is deleted: it
+only collects what is garbage already (a warning says so). No `--config`: it acts on
+the system profile and the store. Shares apply's lock (`busy`).
+
+1. **Preview** (as you): the generations that go, and an estimate of what the store
+   frees: the closures of those generations minus everything the GC roots that remain
+   still reach (`nix-store --gc --print-roots` without their links, `nix-store -qR`);
+   with `--dry-run` also what is garbage already (`nix-store --gc --print-dead`, the
+   list `nix-collect-garbage --dry-run` prints, which cannot see what deleting
+   generations frees and prints no sizes); sized with `nix-store -q --size`. An
+   estimate: with `auto-optimise-store`, a file hard-linked into a live path frees
+   nothing; the derivations nix keeps for the deleted systems (`keep-derivations`) come
+   on top.
+2. **delete** (root): `nix-env --profile /nix/var/nix/profiles/system
+   --delete-generations N…` (only when the policy drops some).
+3. **bootloader** (root): `/nix/var/nix/profiles/system/bin/switch-to-configuration
+   boot`, the boot default's own bootloader step through the profile link (the default
+   entry stays what it was; `/run/current-system`'s would make the running system the
+   default after an `apply --no-switch`). The deleted generations' entries go, and the
+   kernels and initrds only they used leave /boot. Before the collection, so no entry
+   ever points at a collected system. Only after a delete.
+4. **collect** (root): `nix-collect-garbage`, plain: no `-d`, every other profile is
+   left alone. Its "N store paths deleted, X MiB freed" is parsed.
+
+The root commands go through apply's backend (`sudo -n`; `needs-sudo` with `commands[]`,
+nothing past that point ran; `nixin gc` again finishes: a generation already deleted is
+simply no longer on the list). `--dry-run` runs nothing as root: it lists, estimates,
+probes `sudo -n true` and prints the commands.
+
+Result:
+
+| field | meaning |
+|---|---|
+| `dry_run` | `--dry-run` was given |
+| `policy` | `{keep, older_than_days}` (both null without flags) |
+| `delete[]` | the generations that go (went), oldest first: `generation`, `date`, `store_path`, `kernel`, `nixos_version`, `commit`, `message`, `closure_size`, `boot_entry` |
+| `keep[]` | the generation numbers that stay |
+| `protected` | `{current, booted, default}` |
+| `estimate` | `{generations: {paths, bytes}, dead: {paths, bytes} \| null, total: {paths, bytes}, roots, seconds, note}`: what only the deleted generations reach, what is garbage already (`--dry-run` only: it scans the whole store), the sum, how many GC roots stay; null when nix could not be asked (then a warning) |
+| `store`, `boot` | `{path, total, free_before, free_after, freed}` of the store's filesystem and of /boot (`df`'s free space; `free_after`/`freed` null with `--dry-run`); `boot` also `entries_before[]`, `entries_after[]` and `entries_source` (as `generations`' `boot`) |
+| `commands[]`, `privilege`, `duration_s` | `--dry-run`: `{step, privileged, argv, command, backend, by_hand}` for `delete`, `bootloader`, `collect`; `{backend, ready, why}` |
+| `deleted[]` | the generation numbers deleted (verified: their links are gone) |
+| `freed` | `{paths, bytes, text}`: what nix-collect-garbage said it freed; null (and a warning) when it did not say |
+| `generations_left` | how many system generations remain |
+| `privileged_commands[]`, `backends` | the root commands as run; `{delete, bootloader, collect}` → `sudo` |
+| `timings` | seconds: `prepare` (listing, sizes, the estimate), `delete`, `bootloader`, `collect`, `total` |
+| `warnings[]` | no policy; no estimate; nothing said what was freed |
+
+Errors (`ok: false`; after a root step: `step`, `deleted[]`, `done[]`,
+`privileged_commands[]`): `usage` (a positional argument, `--keep` below 1,
+`--older-than` below 0), `host-not-local`, `needs-sudo` (with `commands[]`), `gc-failed`
+(a root step failed, or nix-env left a generation it was asked to delete; `step` says
+which), `busy`, `internal`.
+
+Costs: the preview runs `nix path-info` (cached), `nix-store --gc --print-roots`,
+`nix-store -qR` over every root and `-q --size`; `--dry-run` adds the whole-store dead
+scan. Root: the three steps. Writes: the system profile, /boot, the store.
+
 ### `outdated`
 
 ```
@@ -989,7 +1101,7 @@ mode, as under `tui`, so their logs stream into the window.
 | `invalid-state` | writer | `installer/state.json` is not valid JSON or has the wrong version |
 | `build-failed` | apply | `nix build` of the toplevel failed; the message is the failing builder's block with nix's log tail |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
-| `host-not-local` | apply | `apply`, `rollback`, `history` with `--host H` for a host that is not this machine |
+| `host-not-local` | apply | `apply`, `rollback`, `history`, `generations`, `gc` with `--host H` for a host that is not this machine |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
 | `authoritative-dirty` | apply | the authoritative tree has uncommitted changes (`files[]`); nixin only fast-forwards it |
 | `authoritative-diverged` | apply | root's `git pull --ff-only` could not take the workspace (`state`: `behind`, `diverged`, `unknown`); the message has the commands to fix it |
@@ -997,10 +1109,11 @@ mode, as under `tui`, so their logs stream into the window.
 | `verify-failed` | apply | after the switch the system is not the out path nixin built |
 | `git-failed` | apply | a git command failed (or git is not on PATH); the message has git's last lines |
 | `diverged` | apply (`sync`) | `--pull` cannot fast-forward, or `--push` was rejected |
-| `busy` | apply | another `nixin apply` or `rollback` holds the lock |
+| `busy` | apply | another `nixin apply`, `rollback` or `gc` holds the lock |
 | `boot-space` | apply | `apply`/`rollback`: the new system's kernels and initrds do not fit on /boot (`boot_space` has the numbers); nothing ran as root |
 | `unknown-generation` | apply | `rollback GEN`: no such system generation, or none before the running one |
 | `workspace-dirty` | apply | `rollback`: the workspace has uncommitted changes (`files[]`) or unapplied commits (`commits[]`) its revert would sweep in or drop |
+| `gc-failed` | apply | `gc`: nix-env `--delete-generations`, the bootloader step or nix-collect-garbage failed, or a generation was still there after the delete; `step` says which, `deleted[]`/`done[]` how far it got |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's
 `sources[...].error` while `ok` is true.
@@ -1080,7 +1193,8 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree, by `apply`, and by `rollback` for the authoritative HEAD it leaves); `status.pending`, `nothing-to-apply` and rollback's commit lookup read it without nix | last 40 per host |
-| `apply/apply.lock` | `flock` held while `apply` or `rollback` runs (`busy`) | — |
+| `apply/apply.lock` | `flock` held while `apply`, `rollback` or `gc` runs (`busy`) | — |
+| `apply/closure-sizes.json` | `generations`/`gc`: `{store path: closure size}` from `nix path-info -S` (a closure never changes) | pruned to the generations on disk at each write |
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh

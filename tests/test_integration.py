@@ -74,6 +74,7 @@ ERROR_CODES = {
     "boot-space",
     "unknown-generation",
     "workspace-dirty",
+    "gc-failed",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 
