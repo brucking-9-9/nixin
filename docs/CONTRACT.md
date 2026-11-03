@@ -8,7 +8,7 @@ in one of them. `tests/test_integration.py` checks the envelope rules and the er
 list against this file.
 
 Status: all four layers are implemented: discovery, truth, writer and apply (`plan`,
-`apply`, `sync`, `history`, `rollback`).
+`apply`, `sync`, `history`, `rollback`), and beside them `outdated`/`update` and `try`.
 
 ## Invocation
 
@@ -26,6 +26,7 @@ nixin --version | --help | VERB --help
 | `history`, `rollback` | apply | this machine's system generations with the commits nixin applied; switch back to one (root) and revert the config with it |
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 | `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
+| `try` | try | build a package from the host's locked nixpkgs into the store without installing it, then run it (`nix run`) or a shell with it (`nix shell`); `--json`: build and report only |
 
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
@@ -33,9 +34,10 @@ nixin --version | --help | VERB --help
   (`socket.gethostname()`), even when `--config` points at a config that has no such
   host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
   still echoes it in the envelope.
-- `--config DIR` (truth, writer, apply verbs, `outdated` and `update`; before or after the
+- `--config DIR` (truth, writer, apply verbs, `outdated`, `update` and `try`; before or after the
   verb, the verb's own wins; discovery ignores it) is the config flake: `--config`, else
-  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth and `outdated` only read it. The writer, apply
+  `$NIXIN_CONFIG`, else `/etc/nixos`. Truth, `outdated` and `try` only read it (`try`:
+  only its `flake.lock`). The writer, apply
   and `update` refuse `/etc/nixos` and any tree you cannot write (`not-a-workspace`). They work on a clone
   (`git clone /etc/nixos ~/nixos`, then `--config ~/nixos` or `NIXIN_CONFIG=~/nixos`).
 - `--authoritative DIR` (apply verbs) is the root-owned clone the system is switched
@@ -901,6 +903,112 @@ when `outdated` already fetched that commit. See [Costs](#costs-measured). The t
 `outdated` caches are keyed by the flake fingerprint, which includes the lock, so the next
 `status`, `list` or `outdated` evaluates the new lock.
 
+### `try`
+
+```
+nixin try PKG [-- ARGS...] [--program NAME] [--nixpkgs FLAKEREF|REV] [--impure] [--config DIR]
+nixin try PKG --shell [--nixpkgs FLAKEREF|REV] [--impure] [--config DIR]
+nixin try PKG --build-only …          (what --json always does)
+```
+
+Runs a package without installing it (nix-software-center's "launch without installing").
+PKG is an attribute path (`cowsay`, `python3Packages.httpie`) of the host's *locked*
+nixpkgs: the config flake's nixpkgs input as `flake.lock` pins it (found as `outdated`
+finds it), written `github:nixos/nixpkgs/<rev>`. So what you try is what `nixin add`
+would install. `--nixpkgs FLAKEREF` (or a bare commit of nixos/nixpkgs) uses another
+nixpkgs and needs no config. `--host` is not used: the lock is the flake's.
+
+Three steps. (1) A probe: one `nix eval` of `probe.nix` on
+`<flakeref>#legacyPackages.<system>` (meta, `meta.outputsToInstall` and their out paths;
+nothing built). (2) `nix build --no-link --json <flakeref>#PKG`: nix fetches the outputs
+from the binary cache or builds them. Nothing roots them (no profile, no GC root), so the
+next garbage collection removes them. In human mode nix's progress goes to stderr: on a
+terminal nix draws its own progress bar, otherwise (a pipe, the TUI/GUI log view) its lines
+are teed. (3) From the outputs: the programs in `bin/`, the desktop entries in
+`share/applications/`, and the closure size (`nix path-info --recursive --size`).
+
+Then, in human mode, nixin **gives the terminal away**. It is the one verb that does: it
+execs `nix run <flakeref>#PKG -- ARGS`, or `nix shell <flakeref>#PKG --command PROG ARGS`
+when PROG is not the program `nix run` would pick, or with `--shell` `nix shell
+<flakeref>#PKG`, which starts `$SHELL` with the package on PATH. The exit status is the
+program's. The environment is nixin's minus what its own wrapper added: leading
+`/nix/store` entries of `PATH`, the `/nix/store` entries of `QT_PLUGIN_PATH`,
+`NIXPKGS_QT6_QML_IMPORT_PATH` and `QML2_IMPORT_PATH`, and `PYTHONNOUSERSITE`. Without
+that, a Qt app built against another Qt would load nixin's Qt plugins. Under `--json`,
+and with `--build-only`, nixin stops after step 3 and returns the document.
+
+The program to run is `--program NAME`, else `meta.mainProgram`, else the only program in
+`bin/`, else the program of the one graphical desktop entry. If several are left that is
+`ambiguous-program`; if `bin/` is empty, `no-program` (except with `--shell`, which runs
+none of them).
+
+| argument | meaning |
+|---|---|
+| `PKG` | the attribute path; letters, digits, `_ ' + -`, dots between components |
+| `ARGS` | after `--`: given to the program (`nixin try cowsay -- moo`); `--json` after `--` is an ARG |
+| `--shell` | a shell with the package on PATH instead of running it; takes no ARGS, no `--program` |
+| `--program NAME` | which program of the package to run (one of `programs[]`) |
+| `--nixpkgs FLAKEREF\|REV` | build from this nixpkgs (`nixpkgs`, `github:nixos/nixpkgs/nixos-unstable`, a commit) instead of the lock's |
+| `--impure` | passes `--impure` to nix, so `NIXPKGS_ALLOW_UNFREE=1` (`_BROKEN`, `_INSECURE`) in the environment reaches nixpkgs |
+| `--build-only` | stop after the build and print the result (human text); `--json` implies it |
+
+Result (`--json`, `--build-only`):
+
+| field | meaning |
+|---|---|
+| `attr` | PKG as given |
+| `name`, `pname`, `version`, `description`, `license[]` | from the package (license: SPDX ids or nixpkgs short names) |
+| `unfree` | `meta.unfree` |
+| `nixpkgs` | `flakeref` (what every command uses), `from` (`lock` or `nixpkgs`), `rev`, `short_rev`, `date`, `input` (the input's name in flake.nix), `config` (the config path; null with `--nixpkgs`), `label` (one human line) |
+| `system` | the system it was built for (`x86_64-linux`) |
+| `mode` | `run` or `shell` |
+| `build_only` | true under `--json` and `--build-only` |
+| `impure` | `--impure` was given |
+| `outputs` | output name → out path, the outputs `nix run`/`nix shell` use (`meta.outputsToInstall`: `out`, often `man`) |
+| `out` | the `out` output's path (else the first) |
+| `programs[]` | the executables in the outputs' `bin/`, sorted |
+| `main_program` | `meta.mainProgram`, or null |
+| `program` | what runs (see above); null with `--shell` when nothing can be picked |
+| `desktop[]` | the desktop entries: `file`, `name`, `exec` (the `Exec=` line), `program` (its binary), `terminal` (`Terminal=true`), `hidden` (`NoDisplay`/`Hidden`) |
+| `gui` | some entry is neither `terminal` nor `hidden`: a graphical app (the UIs launch it detached; CLI programs get a terminal) |
+| `size` | bytes in the outputs' closure (each store path once), null if nix could not say |
+| `cached` | every output was in the store before this run: nothing was fetched or built |
+| `fetched` | what nix said it would do: `paths` fetched, `download` and `unpacked` bytes, `built` derivations (all 0 when cached); null when nix wrote to the terminal itself |
+| `command` | the command line that runs it, as a person would type it (`nix run github:nixos/nixpkgs/<rev>#cowsay -- moo`; prefixed with `NIXPKGS_ALLOW_UNFREE=1` etc. when it needs that) |
+| `argv` | the same as a list (what human mode execs; no environment prefix) |
+| `shell_command` | `nix shell <flakeref>#PKG` (with `--impure` and the prefix as needed) |
+| `exec` | the program's path in the store, then ARGS: what a UI can start directly (it is built); null without a program |
+| `timings` | seconds: `probe`, `build`, `size`, `total` |
+
+Without `--json`: with `--build-only`, `cowsay 3.8.4: <description>` and `from`, `out`,
+`size` (plus "already in the store" or what was fetched), `programs` (`(runs)` marks the
+one), `app` for a graphical one, `run`, `shell`. Otherwise one `nixin try: <command>` line
+on stderr (`nixin try: a shell with … on PATH` for `--shell`; `nixin try: fetching …`
+before a build that has work to do), then the program.
+
+Errors: `usage` (no PKG, not an attribute path, `--shell` with ARGS or `--program`),
+`config-not-found` (no `--nixpkgs` and no config flake), `not-found` (no such attribute:
+`error.suggestions[]` has up to 5 close names; a package set such as `python3Packages`; an
+alias nixpkgs removed or renamed, with its message; `--program` naming none of
+`programs[]`, then `error.programs[]`; no nixpkgs input in the lock; `--nixpkgs` without
+`legacyPackages`), `unfree` (nixpkgs refuses an unfree package. `error.commands[]` has
+`NIXPKGS_ALLOW_UNFREE=1 nixin try PKG --impure` and the `nix run --impure` equivalent; the
+message says which half is missing. The config's own `allowUnfree` does not apply: `try`
+uses nixpkgs' `legacyPackages`, which ignores it), `ambiguous-program` and `no-program`
+(after the build: `error.programs[]`, `out`, `size`, `cached`, `shell_command`; repeat
+with `--program NAME`, or `--shell`), `build-failed` (nix build failed: the failing
+builder's block with nix's log tail; in human mode on a terminal, where nix printed it
+already, "its log is above". Also a package nixpkgs refuses as broken or insecure:
+`error.commands[]` with `NIXPKGS_ALLOW_BROKEN=1`/`NIXPKGS_ALLOW_INSECURE=1`), `network`
+(nix could not fetch the nixpkgs source or a store path), `bad-channel` (`--nixpkgs` names
+a ref GitHub does not know), `eval-failed` (the probe failed otherwise; nix's message),
+`nix-missing`, `internal`.
+
+Costs: two to four nix calls (probe, build, path-info; nothing else). Writes the nix store
+only (and nix's own caches). Network: none for the lock's commit when its source and the
+package are in the store. Otherwise nix downloads what is missing, from the binary cache or
+by building it. See [Costs](#costs-measured).
+
 ### `tui`
 
 ```
@@ -967,17 +1075,17 @@ mode, as under `tui`, so their logs stream into the window.
 | `internal` | all | an unexpected exception (a bug, or a source that changed its response shape); the message names the exception and `file:line` |
 | `not-implemented` | cli | a verb without a handler (none today; kept for UIs built against the stubs) |
 | `needs-sudo` | apply | a root step and `sudo -n` cannot get root without a password; `message` and `commands[]` are what is left to run by hand |
-| `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON; `update`: nix could not fetch the new commit |
+| `network` | discovery, outdated, try | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON; `update`: nix could not fetch the new commit; `try`: nix could not fetch the nixpkgs source or a store path |
 | `http-<status>` | discovery, outdated | a 4xx the caller may act on (`http-400`, …) |
-| `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`, `update`: a target ref GitHub does not know |
-| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
+| `bad-channel` | discovery, outdated, try | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`, `update`, `try --nixpkgs`: a ref GitHub does not know |
+| `not-found` | discovery, truth, writer, outdated, try | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input`. `try`: no such attribute (`suggestions[]`), a package set, a removed alias, or `--program` not among `programs[]` |
 | `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
 | `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target; `update`: `nix flake update`/`lock` failed |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
-| `config-not-found` | truth, writer, outdated | no `flake.nix` in the config dir |
+| `config-not-found` | truth, writer, outdated, try | no `flake.nix` in the config dir (`try`: and no `--nixpkgs`) |
 | `not-a-flake` | truth, outdated | `nix flake metadata`/`nix flake archive` failed on the config |
 | `unknown-host` | truth, writer, outdated | `--host` is not in `nixosConfigurations` |
-| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it) |
+| `eval-failed` | truth, writer, outdated, try | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it); `try`: the probe of PKG failed |
 | `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
 | `not-a-workspace` | writer, apply, outdated (`update`) | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
 | `unknown-user` | truth, writer, outdated | `--home USER` is not an HM user of the host |
@@ -987,7 +1095,10 @@ mode, as under `tui`, so their logs stream into the window.
 | `import-site-missing` | writer | no module or no `imports = [ … ];` to import the generated file from; `line` to add |
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
 | `invalid-state` | writer | `installer/state.json` is not valid JSON or has the wrong version |
-| `build-failed` | apply | `nix build` of the toplevel failed; the message is the failing builder's block with nix's log tail |
+| `build-failed` | apply, try | `nix build` of the toplevel (`try`: of PKG) failed; the message is the failing builder's block with nix's log tail. `try`: also a package nixpkgs refuses as broken or insecure (`commands[]`) |
+| `unfree` | try | nixpkgs refuses PKG's unfree license; `commands[]`: `NIXPKGS_ALLOW_UNFREE=1 nixin try PKG --impure` and the `nix run` equivalent |
+| `ambiguous-program` | try | PKG has several programs and none is meta.mainProgram; `programs[]`, repeat with `--program NAME` (the build is done: `out`, `size`, `cached`, `shell_command`) |
+| `no-program` | try | PKG has nothing in `bin/` to run; `programs[]` is empty, `shell_command` puts it on PATH |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
 | `host-not-local` | apply | `apply`, `rollback`, `history` with `--host H` for a host that is not this machine |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
