@@ -994,7 +994,8 @@ at the pushed commit afterwards; root's pull failed, e.g. a wrong password. When
 uncommitted `installer/history.jsonl` lines block the pull the message says how to set
 them aside), `authoritative-diverged` (root's pull cannot fast-forward), `switch-failed`
 (nixos-rebuild failed; both trees are at the pushed commit), `ssh-failed` (no `ssh`, no
-connection: exit 255, or the session ended otherwise). Before anything runs: `needs-tty`,
+connection: exit 255, or the session ended otherwise; exit 255 after a step started says
+the connection dropped and which step, not "is H reachable"). Before anything runs: `needs-tty`,
 `push-failed` (no remote), `invalid-hosts-config`. A dropped connection during the
 switch leaves the switch to nixos-rebuild on H.
 
