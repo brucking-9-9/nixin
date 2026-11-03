@@ -36,6 +36,11 @@ conflict decision, the live smoke table.
 
 ## Layers
 
+- [doctor](docs/HANDOFF-doctor.md) — on `review/nixin` (2026-11-03, mbp13): `nixin doctor
+  [--full] [--json]`, one read-only health check of this machine (option indexes, the
+  timers and their state, workspace/authoritative/hub, hosts.toml over ssh, the
+  hand-installed secrets the host's `.nix` files name, /boot, failed units); and
+  `nixin-state … --help` prints the usage instead of running the job.
 - [discovery](docs/HANDOFF-discovery.md) — merged; verified live on 19BK and mbp13.
 - [truth](docs/HANDOFF-truth.md) — merged; verified end to end on mbp13. `list` (branch
   `list-verb`, merged): the installed packages with a best-effort `declared[]`; `list --diff
