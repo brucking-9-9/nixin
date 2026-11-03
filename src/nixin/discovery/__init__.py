@@ -88,6 +88,15 @@ def _cache_flags(sp: argparse.ArgumentParser) -> None:
     sp.add_argument("--refresh", action="store_true", help="ignore cached answers, fetch and store")
 
 
+def _index_flag(sp: argparse.ArgumentParser) -> None:
+    sp.add_argument(
+        "--no-index",
+        action="store_true",
+        help="options from upstream even when this machine has an option index "
+        "(nixin's modules; --channel and --nixpkgs imply it)",
+    )
+
+
 def _channel_flags(sp: argparse.ArgumentParser) -> None:
     sp.add_argument(
         "--channel",
@@ -109,6 +118,7 @@ def register(sub: argparse._SubParsersAction) -> set[str]:
     sp.add_argument("--kind", choices=KINDS, default="pkg")
     sp.add_argument("--limit", type=int, default=DEFAULT_LIMIT, metavar="N")
     _channel_flags(sp)
+    _index_flag(sp)
     _cache_flags(sp)
     sp.set_defaults(run=run_search)
 
@@ -116,6 +126,7 @@ def register(sub: argparse._SubParsersAction) -> set[str]:
     sp.add_argument("name")
     sp.add_argument("--kind", choices=INFO_KINDS, default="all")
     _channel_flags(sp)
+    _index_flag(sp)
     _cache_flags(sp)
     sp.set_defaults(run=run_info)
 
@@ -216,7 +227,8 @@ def _merge(ns: argparse.Namespace, parts: list[tuple[str, Part | None, dict | No
             answered[name] = entry
         entry["cached"] = entry["cached"] and part.cached
         entry["count"] += len(part.results)
-        entry.update(part.extra)
+        for k, v in part.extra.items():  # dicts merge: one source can answer several kinds
+            entry[k] = {**entry[k], **v} if isinstance(v, dict) and k in entry else v
         results.extend(part.results)
         notes.extend(n for n in part.notes if n not in notes)
     for name, entry in sources.items():
@@ -284,6 +296,42 @@ def _fan_out(
     return parts
 
 
+def _index_part(ns: argparse.Namespace, kind: str, pick: Callable) -> Part | None:
+    """This machine's option index answering for `opt` (the system's) or `hm` (this
+    user's): `pick(index)` -> its entries. None when it does not apply: another kind,
+    `--no-index`, `--channel` or `--nixpkgs` (a question about upstream), no index, or one
+    built for another host than `--host`."""
+    if kind not in ("opt", "hm") or getattr(ns, "no_index", False):
+        return None
+    if getattr(ns, "channel", None) or getattr(ns, "nixpkgs", None):
+        return None
+    from .. import optindex
+
+    host = getattr(ns, "host", None) or optindex.hostname()
+    if kind == "opt":
+        idx = optindex.usable("nixos", host)
+    else:
+        idx = optindex.usable("home", host, optindex.current_user())
+    if idx is None:
+        return None
+    results = [idx.record(o) for o in pick(idx)]
+    return Part(
+        optindex.SOURCE, None, idx.rev, True, results, extra={"indexes": {idx.scope: idx.doc()}}
+    )
+
+
+def _prefer_index(ns: argparse.Namespace, kind: str, pick: Callable, upstream: Callable) -> Part:
+    """The index's answer when it has one; else upstream's, with a note when the index
+    was asked and had nothing."""
+    part = _index_part(ns, kind, pick)
+    if part is not None and part.results:
+        return part
+    up = upstream(kind)
+    if part is not None:
+        up.notes.append(f"nothing in this machine's option index; asked {up.source}")
+    return up
+
+
 # --------------------------------------------------------------------------- verbs
 
 
@@ -296,7 +344,7 @@ def _search(ns: argparse.Namespace) -> dict[str, Any]:
     cache = _cache(ns)
     kinds = ALL_SEARCH_KINDS if ns.kind == "all" else (ns.kind,)
 
-    def one(kind: str) -> Part:
+    def upstream(kind: str) -> Part:
         if kind == "pkg" and ns.nixpkgs:
             from . import local
 
@@ -314,6 +362,9 @@ def _search(ns: argparse.Namespace) -> dict[str, Any]:
 
         return noogle.search(cache, query, ns.limit)
 
+    def one(kind: str) -> Part:
+        return _prefer_index(ns, kind, lambda idx: idx.search(query, ns.limit), upstream)
+
     doc = _merge(ns, _fan_out(ns, kinds, one))
     doc.update(query=query, kind=ns.kind, limit=ns.limit)
     return doc
@@ -326,7 +377,7 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
     cache = _cache(ns)
     kinds = ALL_INFO_KINDS if ns.kind == "all" else (ns.kind,)
 
-    def one(kind: str) -> Part:
+    def upstream(kind: str) -> Part:
         if kind == "pkg" and ns.nixpkgs:
             from . import local
 
@@ -347,6 +398,13 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
         from . import noogle
 
         return noogle.info(cache, name)
+
+    def exact(idx: Any) -> list[dict]:
+        hit = idx.lookup(name)
+        return [hit] if hit is not None else []
+
+    def one(kind: str) -> Part:
+        return _prefer_index(ns, kind, exact, upstream)
 
     parts = _fan_out(ns, kinds, one)
     doc = _merge(ns, parts)
