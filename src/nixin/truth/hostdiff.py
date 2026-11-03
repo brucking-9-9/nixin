@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ..configrepo import ConfigRepo, NixinError
+from ..configrepo import ConfigRepo, NixinError, unknown_host
 from . import packages as pkgs
 from .cache import TruthCache
 from .render import NAME_CAP, NAME_MIN, VERSION_CAP, cap, term_width
@@ -87,9 +87,7 @@ def collect(repo: ConfigRepo, ns: Any, hosts: list[str]) -> dict[str, Any]:
     a, b = pair(ns)
     for h in (a, b):
         if h not in hosts:
-            raise NixinError(
-                "unknown-host", f"{h!r} is not in nixosConfigurations ({', '.join(hosts)})"
-            )
+            raise unknown_host(h, hosts)
     if ns.home is not None and ns.scope == "system":
         raise NixinError("usage", "--home USER is a Home Manager user; not with --scope system")
     ca = TruthCache(repo, a, enabled=not ns.refresh)
