@@ -5,12 +5,19 @@ network)."""
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from conftest import fixture, has
 
-from nixin.appstream import parse
+from nixin import appstream
+from nixin.appstream import curated, hint, images, installed, parse, store
+from nixin.cache import Cache
+from nixin.cli import main
 
 FIX = Path(__file__).parent / "fixtures" / "appstream"
 
@@ -231,12 +238,6 @@ def test_resolve_icon_prefers_hicolor_then_size(tmp_path):
 
 # --- search.nixos.org's hint -------------------------------------------------------------------
 
-from conftest import fixture, has
-
-from nixin.appstream import curated, hint, images, installed, store
-from nixin.cache import Cache
-from nixin.cli import main
-
 
 def es_doc(name: str) -> dict:
     return fixture(f"appstream/es/info_{name}.json")["hits"]["hits"][0]["_source"]
@@ -331,9 +332,6 @@ def fake_store(tmp_path, monkeypatch):
 
     monkeypatch.setattr(installed, "profiles", lambda home=None: list(profiles.items()))
     return SimpleNamespace(path=path, link=link, root=root)
-
-
-from types import SimpleNamespace
 
 
 def test_parse_store_name():
@@ -486,8 +484,6 @@ def test_for_package_without_a_lock_or_nix(cache_dir, monkeypatch):
     assert a["notes"][0] == "the out paths: nix-missing: unit tests run no nix"
 
 
-from nixin import appstream
-
 # --- the verbs, on recorded search.nixos.org answers --------------------------------------------
 
 
@@ -551,7 +547,7 @@ def es_app(transport, cache_dir):
 def run(capsys, *argv) -> tuple[int, dict | str]:
     rc = main(list(argv))
     out = capsys.readouterr().out
-    return rc, (__import__("json").loads(out) if "--json" in argv else out)
+    return rc, (json.loads(out) if "--json" in argv else out)
 
 
 def test_info_has_appstream(es_app, capsys):
@@ -741,6 +737,6 @@ def test_image_prune_keeps_the_newest(tmp_path):
     for i in range(4):
         f = d / f"{i}.png"
         f.write_bytes(b"x" * 100)
-        __import__("os").utime(f, (1000 + i, 1000 + i))
+        os.utime(f, (1000 + i, 1000 + i))
     images.prune(tmp_path, total=250)
     assert sorted(f.name for f in d.iterdir()) == ["2.png", "3.png"]
