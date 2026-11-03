@@ -1,0 +1,84 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "kitty",
+     "package_categories_set": [
+      "System",
+      "TerminalEmulator"
+     ],
+     "package_component_ids": [],
+     "package_description": "Fast, feature-rich, GPU based terminal emulator",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "System",
+        "TerminalEmulator"
+       ],
+       "comment": "Open URLs with kitty",
+       "desktopName": "kitty URL Launcher",
+       "genericName": "Terminal emulator",
+       "icon": "kitty",
+       "keywords": [],
+       "mimeTypes": [
+        "image/*",
+        "application/x-sh"
+       ],
+       "noDisplay": true,
+       "type": "Application"
+      },
+      {
+       "categories": [
+        "System",
+        "TerminalEmulator"
+       ],
+       "comment": "Fast, feature-rich, GPU based terminal",
+       "desktopName": "kitty",
+       "genericName": "Terminal emulator",
+       "icon": "kitty",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kitty": "b937ae4fea91793b992a59ed39c1f472.svg"
+     },
+     "package_homepage": [
+      "https://github.com/kovidgoyal/kitty"
+     ],
+     "package_license_set": [
+      "GPL-3.0-only"
+     ],
+     "package_mainProgram": "kitty",
+     "package_outputs": [
+      "out",
+      "kitten",
+      "terminfo",
+      "shell_integration"
+     ],
+     "package_platforms": [
+      "armv7a-linux",
+      "riscv64-linux"
+     ],
+     "package_pname": "kitty",
+     "package_position": "pkgs/by-name/ki/kitty/package.nix:345",
+     "package_programs": [
+      "kitten",
+      "kitty"
+     ],
+     "package_pversion": "0.49.2",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 11.52513,
+  "total": {
+   "relation": "eq",
+   "value": 1
+  }
+ }
+}

@@ -1,0 +1,127 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "prismlauncher",
+     "package_categories_set": [
+      "ActionGame",
+      "AdventureGame",
+      "Game",
+      "PackageManager",
+      "Simulation"
+     ],
+     "package_component_ids": [
+      "org.prismlauncher.PrismLauncher"
+     ],
+     "package_description": "Free, open source launcher for Minecraft",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ActionGame",
+        "AdventureGame",
+        "Simulation",
+        "PackageManager"
+       ],
+       "comment": "Discover, manage, and play Minecraft instances",
+       "desktopName": "Prism Launcher",
+       "genericName": null,
+       "icon": "org.prismlauncher.PrismLauncher",
+       "keywords": [
+        "game",
+        "minecraft",
+        "mc"
+       ],
+       "mimeTypes": [
+        "application/zip",
+        "application/x-modrinth-modpack+zip"
+       ],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "org.prismlauncher.PrismLauncher": "2aa61eb4041e301366fad368b6d8507b.svg"
+     },
+     "package_homepage": [
+      "https://prismlauncher.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-only"
+     ],
+     "package_mainProgram": "prismlauncher",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "powerpc64-linux",
+      "riscv64-linux"
+     ],
+     "package_pname": "prismlauncher",
+     "package_position": "pkgs/by-name/pr/prismlauncher/package.nix:140",
+     "package_programs": [
+      "prismlauncher"
+     ],
+     "package_pversion": "11.1.1",
+     "package_screenshots": [
+      {
+       "caption": "The main Prism Launcher window",
+       "file": "0df8636836ad514ead4de81141f6272f.webp",
+       "largeFile": "438cc90ce0c9112e255eded6eeaba225.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherDark.png"
+      },
+      {
+       "caption": "Modpack installation",
+       "file": "e3c23d3dd3a8c01ddc6c196298bcc612.webp",
+       "largeFile": "672e4c6d0c9bcc79936c51ed85167255.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackInstallDark.png"
+      },
+      {
+       "caption": "Modpack updating",
+       "file": "397bf5cb095697c91278892127675ad5.webp",
+       "largeFile": "3942f926ed00581d34c6c9d2f8823dea.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackUpdateDark.png"
+      },
+      {
+       "caption": "Mod installation",
+       "file": "591354530713e5385f16e563425df8a5.webp",
+       "largeFile": "cad9e98a49b53e6443648165f64ccab8.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModInstallDark.png"
+      },
+      {
+       "caption": "Mod updating",
+       "file": "8085297181ce5ef5f71322eb02d7d112.webp",
+       "largeFile": "f8ebb45028cec5ef17c513cd9794c461.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModUpdateDark.png"
+      },
+      {
+       "caption": "Instance management",
+       "file": "eb0f2db2167fbce1c9c1ddc47194fd81.webp",
+       "largeFile": "2a76ecc3cacfbf8c78e0f35130d4968f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/PropertiesDark.png"
+      },
+      {
+       "caption": "Cat :3",
+       "file": "e71e193008e191c2e3b109113b36eead.webp",
+       "largeFile": "3f0c66797250cb72845627fdd3ffde4f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherCatDark.png"
+      },
+      {
+       "caption": "Customization",
+       "file": "e51e1a87faa6e7eaafccbc9025f632f8.webp",
+       "largeFile": "f92fdd2772aca65101c54d409e051c44.webp",
+       "url": "https://prismlauncher.org/img/screenshots/CustomizeDark.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 11.52513,
+  "total": {
+   "relation": "eq",
+   "value": 1
+  }
+ }
+}

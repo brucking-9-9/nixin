@@ -1,0 +1,49 @@
+{
+ "aggregations": {
+  "cats": {
+   "buckets": {
+    "AudioVideo": {
+     "doc_count": 451
+    },
+    "Development": {
+     "doc_count": 397
+    },
+    "Education": {
+     "doc_count": 153
+    },
+    "Game": {
+     "doc_count": 498
+    },
+    "Graphics": {
+     "doc_count": 266
+    },
+    "Network": {
+     "doc_count": 350
+    },
+    "Office": {
+     "doc_count": 221
+    },
+    "Science": {
+     "doc_count": 120
+    },
+    "Settings": {
+     "doc_count": 172
+    },
+    "System": {
+     "doc_count": 316
+    },
+    "Utility": {
+     "doc_count": 771
+    }
+   }
+  }
+ },
+ "hits": {
+  "hits": [],
+  "max_score": null,
+  "total": {
+   "relation": "gte",
+   "value": 10000
+  }
+ }
+}

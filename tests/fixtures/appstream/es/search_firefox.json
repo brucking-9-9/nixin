@@ -1,0 +1,143 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "firefox",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Web browser built from Firefox source tree",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "x86_64-cygwin",
+      "mips64el-linux"
+     ],
+     "package_pname": "firefox",
+     "package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "159.0",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "firefox-unwrapped",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Web browser built from Firefox source tree",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "out",
+      "debug",
+      "symbols"
+     ],
+     "package_platforms": [
+      "x86_64-solaris",
+      "riscv64-netbsd"
+     ],
+     "package_pname": "firefox-unwrapped",
+     "package_position": "pkgs/applications/networking/browsers/firefox/packages/firefox.nix:20",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "159.0",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "firefox-esr-153-unwrapped",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Web browser built from Firefox source tree",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox",
+     "package_outputs": [
+      "symbols",
+      "debug",
+      "out"
+     ],
+     "package_platforms": [
+      "s390-linux",
+      "aarch64-darwin"
+     ],
+     "package_pname": "firefox-unwrapped",
+     "package_position": "pkgs/applications/networking/browsers/firefox/packages/firefox-esr-153.nix:20",
+     "package_programs": [
+      "firefox"
+     ],
+     "package_pversion": "153.6.0esr",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "firefox-esr",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Web browser built from Firefox source tree",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://www.mozilla.com/en-US/firefox/"
+     ],
+     "package_license_set": [
+      "MPL-2.0"
+     ],
+     "package_mainProgram": "firefox-esr",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "x86_64-redox",
+      "aarch64-darwin"
+     ],
+     "package_pname": "firefox",
+     "package_position": "pkgs/applications/networking/browsers/firefox/wrapper.nix:238",
+     "package_programs": [
+      "firefox-esr"
+     ],
+     "package_pversion": "153.6.0esr",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 1257.3074,
+  "total": {
+   "relation": "eq",
+   "value": 63
+  }
+ }
+}
