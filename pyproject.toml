@@ -16,6 +16,7 @@ dependencies = ["requests", "textual", "pyside6"]
 nixin = "nixin.cli:main"
 nixin-tui = "nixin.tui:main"
 nixin-gui = "nixin.gui:main"
+nixin-state = "nixin.state:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

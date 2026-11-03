@@ -71,11 +71,27 @@ _HEADERS = {
 }
 
 
+def _index_tag(s: dict[str, Any]) -> str:
+    """This machine's option index: which generation answered (optindex)."""
+    gens = []
+    for scope, ix in (s.get("indexes") or {}).items():
+        g = ix.get("generation") or {}
+        n = g.get("number")
+        state = "" if g.get("fresh") else ", not running"
+        gens.append(f"{scope} generation {n if n is not None else '?'}{state}")
+    return "index (" + "; ".join(gens) + ")" if gens else "index"
+
+
 def _footer(doc: dict[str, Any]) -> str:
     bits = [f"{doc.get('count', len(doc.get('results', [])))} result(s)"]
     sources = doc.get("sources") or {}
-    if doc.get("source") == "all" or len(sources) > 1:
+    if doc.get("source") == "index" and len(sources) == 1:
+        bits.append(_index_tag(sources["index"]))
+    elif doc.get("source") == "all" or len(sources) > 1:
         for name, s in sources.items():
+            if name == "index" and not s.get("error"):
+                bits.append(_index_tag(s))
+                continue
             tag = f"{name}"
             if s.get("channel"):
                 tag += f" {s['channel']}"
@@ -154,6 +170,23 @@ def _value(v: Any) -> str:
     return str(v)
 
 
+def _locations(v: list[dict[str, Any]]) -> str:
+    return ", ".join(
+        f"{d.get('source')} {d.get('file')}" + (f":{d['line']}" if d.get("line") else "") for d in v
+    )
+
+
+def _generation(g: dict[str, Any]) -> str:
+    n = g.get("number")
+    when = f" ({g['date']})" if g.get("date") else ""
+    return f"{g.get('kind')} {n if n is not None else '?'}{when}" + (
+        ", running" if g.get("fresh") else ", not the running one"
+    )
+
+
+_RENDER = {"locations": _locations, "generation": _generation}  # the option index's fields
+
+
 def _block(rec: dict[str, Any]) -> str:
     lines = [f"{rec.get('kind', '')}: {rec.get('name', '')}"]
     for key in ("description", "default", "example"):
@@ -171,7 +204,7 @@ def _block(rec: dict[str, Any]) -> str:
     ]
     w = max((len(k) for k in keys), default=0)
     for k in keys:
-        lines.append(f"  {k.ljust(w)}  {_value(rec[k])}")
+        lines.append(f"  {k.ljust(w)}  {_RENDER.get(k, _value)(rec[k])}")
     return "\n".join(lines)
 
 

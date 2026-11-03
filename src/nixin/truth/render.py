@@ -128,6 +128,7 @@ def status(d: dict[str, Any], host: str) -> str:
                 + f"  · {sum(s['excluded'] for _, s in parts)} skipped",
             )
         )
+    lines.append(row("indexes", _indexes(d.get("indexes") or {})))
     misses = d["cache"]["misses"]
     lines.append(
         f"({d['timings']['total']} s; "
@@ -135,6 +136,22 @@ def status(d: dict[str, Any], host: str) -> str:
         + ")"
     )
     return "\n".join(lines)
+
+
+def _indexes(ix: dict[str, Any]) -> str:
+    """The option indexes nixin's modules write: per scope, its size and generation."""
+    parts = []
+    for scope in ("nixos", "home"):
+        e = ix.get(scope) or {}
+        if not e.get("present"):
+            continue
+        g = e.get("generation") or {}
+        gen = f"generation {g['number']}" if g.get("number") is not None else "a generation"
+        state = "running" if e.get("fresh") else "not the running one"
+        who = f" {e['user']}" if scope == "home" and e.get("user") else ""
+        tail = "" if e.get("applies", True) else ", built for another host"
+        parts.append(f"{scope}{who} {e.get('count')} options ({gen}, {state}{tail})")
+    return ", ".join(parts) or 'none (programs.nixin.optionIndex, README "Modules")'
 
 
 # --- where --------------------------------------------------------------------------------
@@ -183,6 +200,8 @@ def _where_option(d: dict[str, Any]) -> str:
                 lines += option_lines(o, tag)
         for name, msg in s["excluded"].items():
             lines.append(sub("skipped", f"{name}: {cap(msg.splitlines()[0], 80)}"))
+    for sk in d.get("skipped_scopes") or []:
+        lines.append(sub("not asked", f"{_tag(sk['scope'], sk['user'])}: {cap(sk['reason'], 80)}"))
     return "\n".join(lines)
 
 
@@ -210,9 +229,15 @@ def option_lines(o: dict[str, Any], tag: str) -> list[str]:
         if ti.get("description"):
             lines.append(sub("type", cap(ti["description"], 90)))
         lines.append(sub("inside", cap(f"{o['option']} ({o.get('type')})", 90)))
+    # The eval's default/example (exact for the locked nixpkgs), else this machine's option
+    # index's (`docs`, optindex), which describes the option itself and not a path inside it.
+    docs = o.get("docs") or {}
     for label in ("default", "example"):
-        if o.get(label) is not None:
-            lines.append(sub(label, cap(_one_line(o[label]), 90)))
+        text = o.get(label)
+        if text is None and o["option"] == o["name"]:
+            text = docs.get(label)
+        if text is not None:
+            lines.append(sub(label, cap(_one_line(str(text)), 90)))
     for dec in o["declarations"]:
         lines.append(sub("declared", place(dec)))
     many = len(o["definitions"]) > 1
@@ -223,9 +248,9 @@ def option_lines(o: dict[str, Any], tag: str) -> list[str]:
             lines.append(sub("", f"maybe {c['file']}:{c['line']}  {cap(c['text'], 50)}"))
     if not o["definitions"]:
         lines.append(sub("set in", "nothing (the default)"))
-    about = o.get("sub_description") or o.get("description")
+    about = o.get("sub_description") or docs.get("description") or o.get("description")
     if about:
-        lines.append(sub("about", cap(about.strip(), 90)))
+        lines.append(sub("about", cap(_one_line(about), 90)))
     return lines
 
 

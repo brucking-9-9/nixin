@@ -91,6 +91,21 @@ class FakeSession:
         return sum(1 for _m, u, _b in self.calls if url_fragment in u)
 
 
+@pytest.fixture(autouse=True)
+def no_local_index(tmp_path, monkeypatch):
+    """This machine's own option indexes (/etc/nixin, ~/.config/nixin) stay out of every
+    test: the paths point into the test's tmp dir. tests/test_optindex.py points them at
+    recorded indexes."""
+    from nixin import optindex
+
+    monkeypatch.setenv(optindex.ENV_NIXOS, str(tmp_path / "no-index" / "options-nixos.json"))
+    monkeypatch.setenv(optindex.ENV_HOME, str(tmp_path / "no-index" / "options-home.json"))
+    monkeypatch.delenv(optindex.ENV_OFF, raising=False)
+    optindex._LOADED.clear()
+    yield
+    optindex._LOADED.clear()
+
+
 @pytest.fixture
 def transport():
     s = FakeSession()

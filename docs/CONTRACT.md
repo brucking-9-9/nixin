@@ -39,8 +39,9 @@ nixin --version | --help | VERB --help
   nixin never picks one: the verb fails with `unknown-host`, whose message lists the
   hosts and says to pass `--host`. Finding the default costs a text scan of `flake.nix`,
   plus one `nix eval` of the host names when the scan does not find this machine.
-  Discovery ignores `--host` but still echoes it in the envelope (as this machine's
-  hostname, nothing read).
+  Discovery uses it only to decide whether this machine's [option index](#option-indexes)
+  answers (one built for another host does not), and echoes it in the envelope (as this
+  machine's hostname, nothing read).
 - `--config DIR` (truth, writer, apply verbs, `outdated` and `update`; before or after the
   verb, the verb's own wins; discovery ignores it) is the config flake: `--config`, else
   `$NIXIN_CONFIG`, else `/etc/nixos`. Truth and `outdated` only read it. The writer, apply
@@ -61,6 +62,9 @@ nixin --version | --help | VERB --help
   authoritative = "/etc/nixos"` (those are the defaults, with `ssh` = the host name). No
   file is needed. Only `apply` reads it.
 - `--help` and `--version` print text to stdout and exit 0, with or without `--json`.
+- `NIXIN_INDEX_NIXOS` / `NIXIN_INDEX_HOME` name other option index files than
+  `/etc/nixin/options-nixos.json` / `$XDG_CONFIG_HOME/nixin/options-home.json`;
+  `NIXIN_NO_INDEX=1` ignores both (see [Option indexes](#option-indexes)).
 
 ## Envelope
 
@@ -118,6 +122,57 @@ otherwise), says `nixos` nowhere (it builds the whole host), reports nix failure
 `eval-failed` / `eval-timeout` / `build-failed`, and keeps its own cache (plan's out
 paths, no flag).
 
+## Option indexes
+
+nixin's modules (`nixosModules.default`, `homeModules.default`; README, "Modules") write
+an index of every option of the system, and of each Home Manager user that imports the
+HM module, when the generation is built (`lib/options-index.nix`):
+
+| file | scope | written by |
+|---|---|---|
+| `/etc/nixin/options-nixos.json` | `nixos`: the system's options | `programs.nixin.optionIndex.enable` in the NixOS module (default on) |
+| `$XDG_CONFIG_HOME/nixin/options-home.json` | `home`: this user's Home Manager options | the same option in the HM module (`xdg.configFile`) |
+
+One JSON object (`builtins.toJSON`: compact, keys sorted): `format`
+(`"nixin-options/1"`), `scope`, `host` (`networking.hostName`; for HM the NixOS host when
+HM runs as a NixOS module, else null), `user` (HM: `home.username`; NixOS: null),
+`system`, `nixpkgs` = `{version, release, revision}`, `home_manager` = `{release,
+revision}` or null, `nixin` (the package version), `roots[]` = `{source, path}`, `count`,
+and `options[]`. Each option, from `lib.optionAttrSetToDocList` (so submodule options
+are templates: `users.users.<name>.home`, `swapDevices.*.size`; the submodules' own
+`_module.*` options are left out):
+
+| field | meaning |
+|---|---|
+| `name`, `loc[]` | the option path; for HM as a NixOS module without the `home-manager.users.<name>.` prefix |
+| `type` | the type's description (`boolean`, `list of package`, …) |
+| `description` | Markdown as the module wrote it, or null |
+| `default`, `example` | the literalExpression (or literalMD) text, or null |
+| `declarations[]` | `{source, file, line}`: `source` = `config` (the config's own files, relative to its root), `nixpkgs`, `home-manager`, `nixin`, or `other` (`file` is then the full path); `line` from the option's declaration position, null for templates and for helper-made options (aliases), which name the declaring module instead |
+| `readOnly`, `internal`, `visible` | as declared |
+| `errors[]` | only when a field threw while the index was built: those fields are null |
+
+The config's root is `programs.nixin.optionIndex.configRoot`, else the store path (a
+flake's source) or `/etc/nixos` of the file that sets `programs.nixin.enable`.
+
+**Which generation.** An index belongs to the generation it was built with. nixin finds
+it: the system generation whose `etc/nixin/options-nixos.json` is the same store file
+(the running one first: `fresh`), and for Home Manager the generation behind
+`$XDG_STATE_HOME/home-manager/gcroots/current-home` (`fresh` when its `home-files` link
+the same file; its number from `$XDG_STATE_HOME/nix/profiles/home-manager-N-link`). The
+`generation` block is `{kind: "system" | "home-manager", number, path, date, fresh}`
+(`fresh` null when Home Manager has no activation on record). An index is used only
+for the host it was built for (`--host`; a standalone HM index, which names no host, for
+this machine's hostname) and, for HM, for the user running nixin.
+
+**Who reads it.** `search --kind opt|hm` and `info` answer from the index ([`search`](#search));
+`where OPTION` takes each option's documentation from it and skips the scopes it rules
+out ([`where`](#where)); `status` reports both files ([`status`](#status)). Values never
+come from an index: `where` and `status --full` still evaluate the config for them (and
+the exclusion list stays theirs). `--no-index` (search, info) or `NIXIN_NO_INDEX=1`
+turns it off. Reading costs one JSON parse per process (0.16 s for mbp13's 13 MB); a
+header read (`status`) does not parse the list.
+
 ## Verbs
 
 Each verb lists its arguments, its result fields (besides `ok`/`verb`/`host`), its error
@@ -129,7 +184,7 @@ also make nix fetch flake inputs that are not in the store yet. Timings are in
 
 ```
 nixin search QUERY [--kind pkg|opt|hm|program|fn|all] [--channel C] [--limit N]
-                   [--nixpkgs FLAKEREF] [--refresh | --no-cache]
+                   [--nixpkgs FLAKEREF] [--no-index] [--refresh | --no-cache]
 ```
 
 | argument | meaning |
@@ -139,6 +194,15 @@ nixin search QUERY [--kind pkg|opt|hm|program|fn|all] [--channel C] [--limit N]
 | `--channel` | `unstable` (default), `stable` (newest release), `NN.MM`, a branch name (`nixos-25.11`) or a branch flakeref |
 | `--limit` | rows per kind, default 20, at least 1 |
 | `--nixpkgs` | packages come from `nix search --json` on that exact nixpkgs (the `local-nix` source), typically the host's locked rev. A branch-named ref also picks the channel for options; a bare rev does not (pass `--channel`, else options and HM fail with `bad-channel` while packages still answer) |
+| `--no-index` | options (`opt`, `hm`) from upstream even when this machine has an [option index](#option-indexes) for `--host`. `--channel` and `--nixpkgs` imply it |
+
+**The option index first.** When this machine has an index for `--host` (`opt`: the
+system's; `hm`: the user's), `opt` and `hm` are answered from it: source `index`,
+`channel` null, `rev` the generation's nixpkgs commit, `cached` true, no network. The
+index ranks like the Home Manager source (exact path, leading prefix, whole segments,
+substring, description), then shallower paths first, and leaves out internal and hidden
+options. An index with no hit falls through to upstream with a note ("nothing in this
+machine's option index; asked …").
 
 Result: `query`, `kind`, `limit`, `results[]`, `count`, `source`, `channel`, `rev`,
 `cached`, `sources`, and `notes[]` when there is something to say (e.g. "nix search on
@@ -152,7 +216,9 @@ this rev took 110s (first run builds nix's eval cache)").
   error}`. `error` is null or that source's first `{code, message}`. `ok` stays true as
   long as one source answered, so a source can carry an `error` and a non-zero `count`.
   Extras: `updated` (home-manager-options: when the index was generated), `system` and
-  `total` (local-nix: the system searched, the hit count before `--limit`).
+  `total` (local-nix: the system searched, the hit count before `--limit`), `indexes`
+  (`index`: `{nixos|home: {scope, path, store_path, count, host, user, nixpkgs,
+  home_manager, generation, fresh}}`, the files that answered).
 - `channel` is null for sources without channels (noogle, nixhub). For `local-nix` it is
   the flakeref as given.
 
@@ -165,22 +231,26 @@ Every row carries `kind`, `source`, `channel`, `rev`, plus:
 | `hm` | `name`, `type`, `default`, `example`, `description` (Markdown as published), `declarations[]` (`modules/…nix`), `declaration_urls[]`, `read_only` |
 | `program` | `name` (the binary), `package` (attribute), `pname`, `version`, `description`, `exact` (false for substring matches) |
 | `fn` | `name`, `aliases[]`, `signature`, `description` (first paragraph), `position`, `primop` |
+| `opt`, `hm` from `index` | the `opt`/`hm` fields (`declarations[]` relative to their source, `declaration_urls[]` on GitHub at the generation's revision with `#L<line>`, nothing for the config's own files; `description` as Markdown, `read_only` for both), plus `locations[]` (`{source, file, line}`), `in_config` (declared by the config itself), `scope`, `user`, `generation` |
 
 Errors: `usage`, `bad-channel`, `network`, `http-<status>`, `nix-missing`, `nix-failed`,
 `nix-timeout`, `internal`. No hits is `ok: true` with `count: 0`, not an error.
 
 Costs: network (search.nixos.org, the HM option JSON, noogle) except `--kind pkg
---nixpkgs`, which runs nix only (`nix flake metadata`, `nix search`). Writes cache files
-only.
+--nixpkgs`, which runs nix only (`nix flake metadata`, `nix search`), and options the
+option index answers (no network, no nix). Writes cache files only.
 
 ### `info`
 
 ```
-nixin info NAME [--kind pkg|opt|hm|fn|all] [--channel C] [--nixpkgs FLAKEREF] [--refresh | --no-cache]
+nixin info NAME [--kind pkg|opt|hm|fn|all] [--channel C] [--nixpkgs FLAKEREF] [--no-index]
+                [--refresh | --no-cache]
 ```
 
 Exact-name lookup. `--kind` defaults to `all` = pkg + opt + hm (no `program`; `fn` only
-when asked). `--channel` and `--nixpkgs` work as for `search`. With `--nixpkgs`, the
+when asked). `--channel`, `--nixpkgs` and `--no-index` work as for `search`: options come
+from this machine's option index when it has NAME (hidden and internal options too),
+else from upstream. With `--nixpkgs`, the
 package comes from `nix eval` on that rev (about 0.5 s once the rev is in the store) and
 gains `broken`, and `unfree` becomes a bool.
 
@@ -240,6 +310,7 @@ Result:
 | `packages` | counts: `system`, `home.<user>` |
 | `programs` | names with `programs.<x>.enable = true`: `system[]`, `home.<user>[]` |
 | `options` | per scope (`nixos`, `home.<user>`): `total`, `defined` (set beyond the option's own default), `in_config` (defined in a file of the config tree), `excluded`, `definitions_error`, `seconds`. Without `--full`: the cached counts of an earlier `--full`, else `{}` |
+| `indexes` | this machine's [option indexes](#option-indexes), no nix: `nixos`, `home`, each `{path, present}` and, when present, `scope`, `store_path`, `count`, `host`, `user`, `nixpkgs`, `home_manager`, `generation`, `fresh` (it is the running generation's), `applies` (built for `--host`, and for HM for the user running nixin); `home.user` always; `disabled: true` under `NIXIN_NO_INDEX` |
 | `cache` | `dir`, `enabled` (false with `--refresh`), `hits[]`, `misses[]` |
 | `timings` | seconds per eval (`toplevel`, `packages`) and `total` |
 | `pending` | from the apply layer, no nix: `workspace` (the `--config` path, null when that is the authoritative tree itself), `authoritative` = `{path, head}`, `commits[]` (`{commit, subject}`: workspace commits the authoritative tree lacks; null when unknown), `dirty[]`, `untracked[]`, `built` (the authoritative HEAD's out path if plan's cache has it, else null), `running_matches` (bool: `/run/current-system` is that build; null when unknown or `--host` is another machine). On a git problem: `{error: {code, message}}` instead; `status` itself still succeeds |
@@ -291,6 +362,19 @@ definition has the same location fields, `value` (what that file contributes), a
 config files `line`, `line_heuristic: true` and `text` (from a text scan). `inline`
 definitions (attrsets written inside the `nixosSystem` call) get `candidates[]` instead.
 
+With an [option index](#option-indexes) for the scope (this machine, `--host` it was built
+for; HM: the user running nixin), each option also has `docs` = `{source: "index", type,
+description (whole, Markdown), default, example, read_only, declarations[] ({source,
+file, line, url}), in_config}`, and the document has `index[]` (the indexes used, as in
+`status.indexes`). `skipped_scopes[]` = `{scope, user, reason}`: scopes not evaluated
+because the running generation's index of that scope has no option at, above or under
+NAME while another scope's index has it (only fresh indexes count; a scope without one
+is always evaluated). Both are empty lists without an index. `docs` describes the real
+option (`option`), not a path inside it; next to the eval's `default`/`example` above it
+is the same text from the generation the index was built with. The human output shows
+the eval's `default`/`example` and falls back to `docs`' only for the option itself, and
+prefers `docs.description` (whole) to the eval's first paragraph.
+
 For a package: `installed[]` (`scope` `system`|`home`, `user`, `name` (derivation name),
 `pname`, `version`), `programs[]` (the `programs.NAME.enable` options that are true,
 shaped like option entries plus `scope`/`user`), `declared[]` (files whose
@@ -305,8 +389,9 @@ Errors: `usage` (no NAME, or more than one), `not-found` (an option NAME that no
 `internal`.
 
 Costs: runs nix: one package-list eval per tree change, then one small eval per prefix
-(an option) or per list option plus each matching `programs.x.enable` (a package). Reads
-the config (and greps it), writes cache files. A few seconds cold, under a second warm.
+(an option; none for a skipped scope) or per list option plus each matching
+`programs.x.enable` (a package). Reads the config (and greps it) and the option indexes,
+writes cache files. A few seconds cold, under a second warm.
 
 ### `list`
 
@@ -1307,6 +1392,31 @@ Status is opened or the Home Manager users are needed, `list` when Packages is o
 and selected. `plan` and `apply` run in human mode, as under `tui`, so their logs stream
 into the window.
 
+## `nixin-state`
+
+A second program in the package, for the modules' timers (`programs.nixin.outdated`,
+`programs.nixin.pending`) and for anything that shows nixin's numbers without running
+nixin itself (a bar, a dashboard). It runs the verbs in-process and keeps their documents
+in `$NIXIN_STATE_DIR`, else `$XDG_STATE_HOME/nixin` (`~/.local/state/nixin`):
+
+```
+nixin-state outdated [--timeout MS] [--quiet-hours H-H] [--no-notify]
+nixin-state status [--force]
+nixin-state summary
+nixin-state report LOCK.json PUBLISHED.json
+```
+
+| file | written by | what |
+|---|---|---|
+| `outdated-lock.json`, `outdated-published.json` | `outdated` | the `outdated` and `outdated --published` documents for the authoritative tree (`$NIXIN_AUTHORITATIVE`, else `/etc/nixos`) |
+| `status.json` | `status` | the `status` document for the workspace (`$NIXIN_CONFIG`, else `~/nixos` when it is a git checkout, else the authoritative tree); skipped while neither tree's HEAD, the workspace's files nor `/run/current-system` changed and the last run is under an hour old |
+| `summary.json` | both, under an `flock` (`.summary.lock`) | `outdated` = `{count, source (lock\|published), total, kernel {from, to} \| null, days_newer, at}` (lock mode when it worked); `lock`, `published` (the same per document); `pending` = `{count, commits, dirty, untracked, apply, workspace, at}` (`count` = commits + changed files, `installer/history.jsonl` aside; `apply`: the running system is not the authoritative HEAD's build); `errors` = `{lock\|published\|status: {code, message, at}}` (the last failure, dropped on the next success); `notified` = `{count, at}`; `at`, `host` |
+
+`count` is packages whose version goes up. A failed verb keeps the last good numbers and
+still exits 0. `outdated` sends `notify-send -a nixin` when that count changed since the
+last notification (`--no-notify`: never; `--quiet-hours 23-8`: not between those hours,
+the next run outside them does). `report` prints Markdown of two outdated documents.
+
 ## Error codes
 
 | code | from | when |
@@ -1386,6 +1496,7 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | verb | network | runs nix | writes | cold | warm (nixin cache) | peak RSS |
 |---|---|---|---|---|---|---|
 | `search` (pkg, opt, all) | yes | — | cache | 0.9–1.2 s | 0.4 s | 40–50 MiB |
+| `search --kind opt`, `info --kind opt` from the option index | — | — | — | 0.43–0.49 s (one 13 MB parse: 0.16 s) | — | 100 MiB |
 | `search --kind hm` | yes (HM option JSON, cached 1 d) | — | cache | 1.3 s | 0.4 s | 66 MiB |
 | `search --kind fn` | yes (noogle data, cached 1 d) | — | cache | 5.1 s | 0.4 s | 71 MiB |
 | `search --nixpkgs REV` | — | `nix search` | cache | **204 s** (first search on a rev builds nix's eval cache; 46 s on a quiet box) | a few s for another query, 0.2 s cached | **4.6 GiB** |
@@ -1396,6 +1507,8 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `status --full` | — | yes | cache | **92 s** more (NixOS index 61 s, HM 29 s) | 1.1 s | 1.7 GiB |
 | `where PACKAGE` | — | yes | cache | 12 s (packages + 2 prefix evals) | 0.6–1 s | 440 MiB |
 | `where OPTION` | — | yes | cache | 3.5–9 s | 0.6–1 s | 200–230 MiB |
+| `where OPTION` with the option index (mbp13, no HM users: nothing to skip) | — | yes | cache | 3.3 s (3.0 s without) | 0.59 s (0.36 s without) | 340 MiB cold, 100 MiB warm (+58 MiB: the index) |
+| `status` reading the indexes' headers | — | — | — | — | 0.32 s | 43 MiB |
 | `list` | — | yes (the package lists) | cache | 2.5 s (mbp13) / 3.2 s (19BK: system + brucking in one eval); quiet box (load 1.5), 2026-11-02 | 0.36–0.41 s; 0.23 s after the start-up work | 340–450 MiB (cold), 42 MiB (warm) |
 | `list --diff A B` | — | yes (both hosts' package lists, one after the other) | cache | 4.9 s (19BK 2.7 s + mbp13 1.9 s; load 0.3, 2026-11-02) | 0.33 s | 452 MiB (cold), 42 MiB (warm) |
 | `add --dry-run --no-eval` | — | parse only | — | 0.8 s | — | 36 MiB |
@@ -1418,6 +1531,10 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
 | `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals (side by side since `gc-generations-speed`: **2.3 s** on mbp13) + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked; 2.3 s with the evals side by side) | 410 MiB mbp13, 540 MiB 19BK |
 | `outdated --published` | yes (search.nixos.org: 3–6 queries) | the lock-side eval only (shared with lock mode) | cache | 1.1–1.2 s with the eval cached, 1–3 s for the queries; + 2–3 s for a cold eval | 0.33 s | 43 MiB (+ the eval's) |
+
+The option index rows are from 2026-11-03 on mbp13 (load 1.4), generation 125 (the
+NixOS module from branch `modules-optindex`, `/etc/nixin/options-nixos.json`: 28 042
+options, 13 MB). What the index costs the build itself is in README, "Modules".
 
 nixin streams no progress under `--json` (in human mode `plan`/`apply` tee nix's build
 output and nixos-rebuild's log to stderr). A UI should run the slow verbs (`search
