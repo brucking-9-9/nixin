@@ -223,6 +223,7 @@ KEYS = [
     ("c", "channel (unstable / stable)"),
     ("details", ""),
     ("a / r", "add / remove the package"),
+    ("t", "try it: build into the store, launch (GUI) or the command to copy"),
     ("e / u", "set / unset the option"),
     ("h", "Home Manager user (packages: off / user)"),
     ("w", "where again (re-evaluate)"),
@@ -240,6 +241,10 @@ KEYS = [
     ("r", "refresh status"),
     ("status", ""),
     ("r / f", "refresh / --full (slow)"),
+    ("try", ""),
+    ("l", "launch the graphical app again"),
+    ("c", "copy the nix run command"),
+    ("enter", "the program to run (several, no mainProgram)"),
 ]
 
 

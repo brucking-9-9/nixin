@@ -1,0 +1,65 @@
+{
+  "argv": [
+    "nix",
+    "run",
+    "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#cowsay"
+  ],
+  "attr": "cowsay",
+  "build_only": true,
+  "cached": true,
+  "command": "nix run github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#cowsay",
+  "description": "Program which generates ASCII pictures of a cow with a message",
+  "desktop": [],
+  "exec": [
+    "/nix/store/4lbicqd70qlfdw2l5wbq23c9qj1m5nww-cowsay-3.8.4/bin/cowsay"
+  ],
+  "fetched": {
+    "built": 0,
+    "download": 0,
+    "paths": 0,
+    "unpacked": 0
+  },
+  "gui": false,
+  "host": "mbp13",
+  "impure": false,
+  "license": [
+    "GPL-3.0-only"
+  ],
+  "main_program": "cowsay",
+  "mode": "run",
+  "name": "cowsay-3.8.4",
+  "nixpkgs": {
+    "config": "/home/master/nixos",
+    "date": "2026-10-23",
+    "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "from": "lock",
+    "input": "nixpkgs",
+    "label": "nixpkgs 3ec6363 (the lock of /home/master/nixos)",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "short_rev": "3ec6363"
+  },
+  "ok": true,
+  "out": "/nix/store/4lbicqd70qlfdw2l5wbq23c9qj1m5nww-cowsay-3.8.4",
+  "outputs": {
+    "man": "/nix/store/d2hrfpljkkv5djz1kdwp9i0srlq14sks-cowsay-3.8.4-man",
+    "out": "/nix/store/4lbicqd70qlfdw2l5wbq23c9qj1m5nww-cowsay-3.8.4"
+  },
+  "pname": "cowsay",
+  "program": "cowsay",
+  "programs": [
+    "cowsay",
+    "cowthink"
+  ],
+  "shell_command": "nix shell github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#cowsay",
+  "size": 112102992,
+  "system": "x86_64-linux",
+  "timings": {
+    "build": 0.09,
+    "probe": 0.59,
+    "size": 0.03,
+    "total": 0.71
+  },
+  "unfree": false,
+  "verb": "try",
+  "version": "3.8.4"
+}

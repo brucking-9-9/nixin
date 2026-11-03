@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "unfree",
+    "commands": [
+      "NIXPKGS_ALLOW_UNFREE=1 nixin try steam --impure",
+      "NIXPKGS_ALLOW_UNFREE=1 nix run --impure github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#steam"
+    ],
+    "message": "steam is unfree (unfreeRedistributable): nixpkgs refuses it unless NIXPKGS_ALLOW_UNFREE=1 reaches it, which takes --impure (try uses nixpkgs as published: your config's allowUnfree does not apply). Run:\n  NIXPKGS_ALLOW_UNFREE=1 nixin try steam --impure"
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "try"
+}

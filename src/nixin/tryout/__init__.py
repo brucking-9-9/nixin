@@ -243,7 +243,7 @@ def _refused(ns: argparse.Namespace, attr: str, info: dict[str, Any], installabl
         note = " (try uses nixpkgs as published: your config's allowUnfree does not apply)"
     raise TryError(
         "unfree" if flag == "unfree" else "build-failed",
-        f"{what}: {reason}{note}. Run: {commands[0]}",
+        f"{what}: {reason}{note}. Run:\n  {commands[0]}",
         commands=commands,
     )
 

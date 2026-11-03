@@ -1,0 +1,73 @@
+{
+  "argv": [
+    "nix",
+    "run",
+    "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#gnome-calculator"
+  ],
+  "attr": "gnome-calculator",
+  "build_only": true,
+  "cached": false,
+  "command": "nix run github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#gnome-calculator",
+  "description": "Application that solves mathematical equations and is suitable as a default application in a Desktop environment",
+  "desktop": [
+    {
+      "exec": "gnome-calculator",
+      "file": "org.gnome.Calculator.desktop",
+      "hidden": false,
+      "name": "Calculator",
+      "program": "gnome-calculator",
+      "terminal": false
+    }
+  ],
+  "exec": [
+    "/nix/store/0wzx59q463byhgj9y56jklygdbgdcfph-gnome-calculator-50.0/bin/gnome-calculator"
+  ],
+  "fetched": {
+    "built": 0,
+    "download": 2411725,
+    "paths": 3,
+    "unpacked": 11114906
+  },
+  "gui": true,
+  "host": "mbp13",
+  "impure": false,
+  "license": [
+    "GPL-3.0-or-later"
+  ],
+  "main_program": "gnome-calculator",
+  "mode": "run",
+  "name": "gnome-calculator-50.0",
+  "nixpkgs": {
+    "config": "/home/master/nixos",
+    "date": "2026-10-23",
+    "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "from": "lock",
+    "input": "nixpkgs",
+    "label": "nixpkgs 3ec6363 (the lock of /home/master/nixos)",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "short_rev": "3ec6363"
+  },
+  "ok": true,
+  "out": "/nix/store/0wzx59q463byhgj9y56jklygdbgdcfph-gnome-calculator-50.0",
+  "outputs": {
+    "out": "/nix/store/0wzx59q463byhgj9y56jklygdbgdcfph-gnome-calculator-50.0"
+  },
+  "pname": "gnome-calculator",
+  "program": "gnome-calculator",
+  "programs": [
+    "gcalccmd",
+    "gnome-calculator"
+  ],
+  "shell_command": "nix shell github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#gnome-calculator",
+  "size": 948219832,
+  "system": "x86_64-linux",
+  "timings": {
+    "build": 0.36,
+    "probe": 2.83,
+    "size": 0.06,
+    "total": 3.24
+  },
+  "unfree": false,
+  "verb": "try",
+  "version": "50.0"
+}

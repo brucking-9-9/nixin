@@ -1,0 +1,36 @@
+{
+  "error": {
+    "cached": true,
+    "code": "ambiguous-program",
+    "message": "coreutils has 108 programs and no meta.mainProgram: pick one with --program NAME ([, arch, b2sum, base32, base64, basename, basenc, cat, chcon, chgrp, chmod, chown, chroot, cksum, comm, coreutils, cp, csplit, cut, date, \u2026 88 more)",
+    "out": "/nix/store/cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12",
+    "programs": [
+      "[",
+      "b2sum",
+      "basename",
+      "cat",
+      "chmod",
+      "cp",
+      "cut",
+      "date",
+      "dd",
+      "df",
+      "du",
+      "echo",
+      "env",
+      "head",
+      "ls",
+      "mkdir",
+      "mv",
+      "rm",
+      "sort",
+      "tail",
+      "wc"
+    ],
+    "shell_command": "nix shell github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#coreutils",
+    "size": 52019016
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "try"
+}

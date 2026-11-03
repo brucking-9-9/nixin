@@ -1,0 +1,85 @@
+{
+  "argv": [
+    "nix",
+    "shell",
+    "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#coreutils",
+    "--command",
+    "ls"
+  ],
+  "attr": "coreutils",
+  "build_only": true,
+  "cached": true,
+  "command": "nix shell github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#coreutils --command ls",
+  "description": "GNU Core Utilities",
+  "desktop": [],
+  "exec": [
+    "/nix/store/cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12/bin/ls"
+  ],
+  "fetched": {
+    "built": 0,
+    "download": 0,
+    "paths": 0,
+    "unpacked": 0
+  },
+  "gui": false,
+  "host": "mbp13",
+  "impure": false,
+  "license": [
+    "GPL-3.0-or-later"
+  ],
+  "main_program": null,
+  "mode": "run",
+  "name": "coreutils-9.12",
+  "nixpkgs": {
+    "config": "/home/master/nixos",
+    "date": "2026-10-23",
+    "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "from": "lock",
+    "input": "nixpkgs",
+    "label": "nixpkgs 3ec6363 (the lock of /home/master/nixos)",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "short_rev": "3ec6363"
+  },
+  "ok": true,
+  "out": "/nix/store/cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12",
+  "outputs": {
+    "out": "/nix/store/cb987zkxvsv0490753ilrvn5yk7ylgxi-coreutils-9.12"
+  },
+  "pname": "coreutils",
+  "program": "ls",
+  "programs": [
+    "[",
+    "b2sum",
+    "basename",
+    "cat",
+    "chmod",
+    "cp",
+    "cut",
+    "date",
+    "dd",
+    "df",
+    "du",
+    "echo",
+    "env",
+    "head",
+    "ls",
+    "mkdir",
+    "mv",
+    "rm",
+    "sort",
+    "tail",
+    "wc"
+  ],
+  "shell_command": "nix shell github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504#coreutils",
+  "size": 52019016,
+  "system": "x86_64-linux",
+  "timings": {
+    "build": 0.08,
+    "probe": 0.46,
+    "size": 0.03,
+    "total": 0.57
+  },
+  "unfree": false,
+  "verb": "try",
+  "version": "9.12"
+}

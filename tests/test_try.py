@@ -506,7 +506,7 @@ def test_build_only_human(nix, config, execs, capsys):
     assert "garbage collection" in out
 
 
-def test_human_error_is_one_line(nix, config, execs, capsys):
+def test_human_error_goes_to_stderr(nix, config, execs, capsys):
     rc = cli.main(["try", "steam", "--config", str(config)])
     out, err = capsys.readouterr()
     assert rc == 1 and out == "" and execs == []
