@@ -1,11 +1,177 @@
-# HANDOFF: apply layer (branch `apply`)
+# HANDOFF: apply layer (branch `apply`; then `core-history-safety`)
+
+## `core-history-safety`: history, rollback, plan safety (2026-11-02)
+
+Written on mbp13, headless, as `master`, with the TEMP 24 h sudo ticket armed. Branch
+`core-history-safety`, cut from `origin/main` @ 824425c. Nothing pushed. An earlier run
+of this job was cut off by a usage limit before its first commit; this one started from
+a clean fast-forward. It switched mbp13 twice (gen 121 by `apply`, back to gen 120 by
+`rollback`) and was the only session on the machine while it did.
+
+### State
+
+Done; nothing half-done.
+
+- `nixin history [--limit N]`: every `/nix/var/nix/profiles/system-N-link`, newest
+  first: date (link mtime), store path, `current`/`booted`/`default`, kernel release
+  (`kernel-modules/lib/modules/<r>`), `nixos-version`, joined with
+  `installer/history.jsonl` by out path (a line for the same generation first, else a
+  line for another generation with the same path: `match: "out"`). Human: aligned table,
+  `*` running, `b` booted, `d` boot default (when it is not `*`). Reads `--config`
+  (also `/etc/nixos`, with a "lags by one apply" warning). No nix, no root, 0.2 s.
+- `nixin rollback [GEN] [--dry-run]` (default: the generation before the running one):
+  config first, in the workspace: the commit that builds GEN (history lines, then plan's
+  commit cache over 200 first-parent ancestors), and when the tree differs, ONE new
+  commit with that commit's tree (`git restore --source=C -SW -- . ':(exclude)installer/history.jsonl'`;
+  `Revert "<subject>"` for one, `nixin: rollback to generation N: revert K commits` for
+  more). Then root, through the existing `Backend` (`sudo -n`, `needs-sudo` with every
+  remaining command): `nix-env --profile … --switch-generation GEN`, GEN's
+  `bin/switch-to-configuration switch`, `git -C /etc/nixos pull --ff-only`. Verifies
+  `/run/current-system`, the profile, the authoritative HEAD; appends a `mode: "rollback"`
+  line; writes the commit map (authoritative HEAD → GEN's out) so `apply` says
+  `nothing-to-apply` and `status.pending.running_matches` is true. No known commit:
+  system rolls back, `config.state: "untouched"` (`why`: `no-mapping` /
+  `not-in-workspace`) and a warning that the next apply would switch back. A retry with
+  the same GEN skips what is done (needs-sudo, a failed activation). Shares apply's lock.
+- Plan safety (`safety.py`): `plan`, `apply` (and `--dry-run`) and `rollback` carry a
+  `boot` block and `reboot_needed`: kernel/initrd/`kernel-modules` links, kernel params,
+  `boot.json` keys, every `specialisation/*`'s kernel/initrd/modules, `pending_reboot`
+  (running ≠ booted), and `boot_space`: new distinct kernel/initrd store files vs `df
+  /boot`, warn above 80 %, `full` → `apply`/`rollback` refuse with `boot-space` (before
+  the commit when plan's cache knows the out path, else after the build and before any
+  root step). Human: `reboot    needs a reboot: kernel 7.2.12 → 7.3.0, initrd,
+  kernel-modules` and `/boot     +54.7 MiB of 80.4 MiB free (68 %)`; the boot warnings
+  are not printed twice.
+- `cli.py`: two `VERBS` lines (history, rollback): the stubs' generic `args` is GEN.
+- New error codes: `boot-space`, `unknown-generation`, `workspace-dirty` (CONTRACT
+  table, `tests/test_integration.py`'s list).
+
+Gates at 3659daf (the last commit before this note): `nix build` 599 passed, 25 skipped
+(live) in the sandbox; `nix develop -c pytest` the same; `ruff check`, `ruff format
+--check`, `nix fmt -- --check` clean.
+
+### Files
+
+| file | what |
+|---|---|
+| `src/nixin/apply/safety.py` | the boot block: `compare(old, new, generation=)`, `boot_space`, `boot_window` (the builder's limit), warnings and the human pieces |
+| `apply/history.py` | `history` verb, `generation_rows` (the join), `config_commit` (rollback's "which commit builds GEN"), its table |
+| `apply/rollback.py` | `rollback` verb: target pick, config half, root steps, verify, history line, dry run |
+| `apply/system.py` | `BOOTED`, `link`, `link_time`, `pick_generation` (shared paths), `kernel_version`, `nixos_version`, `read_history` |
+| `apply/privilege.py` | `profile_step`, `activate_step` |
+| `apply/git.py` | `same_tree`, `restore` |
+| `apply/__init__.py` | `register` adds the two verbs; `run_privileged` (apply's needs-sudo runner, shared); `_boot_check`; boot block in plan/apply/dry-run |
+| `apply/render.py` | `boot_lines`, rollback and its dry run |
+| `cli.py` | the two `VERBS` lines |
+| `tests/test_apply.py` | the `Machine` fake grows toplevels with kernels/initrds/modules/specialisation/bootspec and an installer with `CONFIGURATION_LIMIT`, `nix-env` and `switch-to-configuration`, /boot's free space; 18 new tests |
+| `tests/test_integration.py` | three codes in the contract list |
+| `docs/CONTRACT.md`, `README.md` | `history`, `rollback`, the boot block, the codes, costs |
+
+### Live run on mbp13 (`~/nixos` = `/etc/nixos` = origin/main = e089d27 before)
+
+Built binary `/nix/store/c3s9vvm6…-nixin-0.1.0`. Outputs in `/tmp/nixin-core-live/`.
+
+| step | result | wall |
+|---|---|---|
+| `history --limit 14` | 34 generations; 110–115 joined to their commits; 109 `(= gen 111)` by path; `*` 120, `b` 118 | 0.2 s |
+| `plan` (clean tree, cold) | out = running gen 120 (`5i7wg6fl…`), `reboot_needed: false`, no warnings, `boot_space`: limit 2, window [119, 120], needed 0, 80.4 MiB free; it cached commit e089d27 → gen 120's out | 35.7 s (eval 32.5 s) |
+| `rollback --dry-run` (→ 119) | config `untouched`: 119 was switched outside nixin, no commit known (warning says the next apply would switch back) | 1.3 s |
+| `rollback 112 --dry-run` | revert 24 commits back to 7da2b4c (history.jsonl), reboot needed (7.2.12 → 7.3.0, gaming too), and the warning that 112 is outside the bootloader's 2-generation window (no boot entry) | — |
+| `add cowsay`, `apply -m "test: cowsay"` | commit **ae4264a**, gen **121** `36n2f5pv…`, boot check ok (same kernel, needed 0), cowsay on PATH | 101.5 s (build 71.7, switch 29.5) |
+| `rollback` | 121 → **120**: config from plan's cache (e089d27), revert commit **a198757** `Revert "test: cowsay"`, pulled; `nix-env --switch-generation 120`, `switch-to-configuration switch`; loader.conf default = the Generation 120 entry | **2.9 s** (switch 1.7 s) |
+| checks | `/run/current-system` = gen 120, profile → `system-120-link`, no `cowsay` (not in `sw/bin`, not on a login shell's PATH); `~/nixos` = `/etc/nixos` = a198757, its tree = e089d27's (history.jsonl aside); 0 failed units (system and user) | — |
+| `apply` / `plan` after | `nothing-to-apply` (generation 120), 0.23 s / `cached`, up to date, 0.68 s | — |
+| `history` after | 121 `ae4264a test: cowsay`, `*` 120 `a198757 Revert "test: cowsay" [rollback]` | — |
+
+Left: running gen 120; gen 121 (cowsay) stays as a non-default generation in the boot
+menu (window 120, 121). `~/nixos` `main` is 2 ahead of `origin/main` (ae4264a,
+a198757; they cancel out apart from `history.jsonl`; squash before pushing if you
+like); `installer/history.jsonl` has the rollback line uncommitted (by design, as
+apply's). Scratch: `/tmp/nixin-core-live/`, `/tmp/nixin-core-scratch/` (`rm -rf` is
+denied to these runs).
+
+### Judgement calls
+
+1. **`reboot_needed` is a top-level field, `warnings[]` stays a list of strings.** The
+   brief said "warnings with a `reboot_needed: true` field"; turning warnings into objects
+   would break every UI that renders them. The details are in `boot`.
+2. **`boot_space` models systemd-boot's window, not just "new vs running".** The brief's
+   estimate (new files vs `df` free) refuses a rollback to the previous kernel after a
+   kernel upgrade: its files are still on /boot, yet "new" compared with the running
+   system. nixin reads `CONFIGURATION_LIMIT` from the built system (`bin/switch-to-
+   configuration` → `install-systemd-boot.sh` → the builder; ≤24 files, the "boot" names
+   only) and computes now/after over the generations (the builder deletes first, then
+   copies), so `freed` counts as room. With no limit found it falls back to the brief's
+   estimate. /boot itself is unreadable for a user, so "now" assumes the last install
+   ran after the newest generation was made.
+3. **Kernel params count as a reboot reason** (`kernel_params`), beside kernel, initrd
+   and modules: a new command line also only takes effect at boot.
+4. **`plan` reports a full /boot, `apply`/`rollback` refuse.** plan's job is the report;
+   `--dry-run` reports too.
+5. **Rollback reverts by tree, not by `git revert` of a range.** The range since the
+   target has merges (the hub's PR merges), which `git revert` cannot take without `-m`;
+   restoring the target's tree is exact, and `history.jsonl` keeps its lines. One commit,
+   on top, workspace identity and hooks; never a reset.
+6. **Plan's commit cache is a second source for "which commit builds GEN".** mbp13's
+   gens 116–120 were switched outside nixin (no history lines), so a history-only lookup
+   would leave the config untouched for the very first rollback. A clean-tree `plan`
+   caches HEAD → out; rollback looks through the workspace's first-parent ancestry. The
+   cache keeps 40 commits per host, so it reaches back only that far.
+7. **Order: revert commit, then system, then pull.** Matches apply (user-side work first,
+   so `needs-sudo`'s commands finish everything). System before pull: the machine is back
+   as early as possible; if the pull fails, the error says GEN runs and how to retry.
+8. **Refusals before anything runs:** `workspace-dirty` for uncommitted changes (the
+   restore would clobber them) and for unapplied commits a revert would drop; the
+   authoritative checks as in apply. Only when a commit for GEN is known: without one the
+   config is not touched, so they do not matter.
+9. **`switch-to-configuration` from GEN's store path**, not `system-GEN-link`, and plain
+   (no `systemd-run` wrapper as nixos-rebuild-ng uses): exact and what the brief named.
+10. **`current` vs `booted` when generations share a path:** `current` is the profile's
+    generation when it points there; `booted` the newest generation made before
+    `/run/booted-system`'s link (mtimes). The JSON also has `default`.
+11. **`history` refuses `--host` other than this machine** (`host-not-local`): the
+    generations on disk are this machine's.
+
+### Gaps / next
+
+- A rollback to a generation outside `configurationLimit` only warns (`boot_entry:
+  false`): the system runs it until the next boot, which starts the newest generation.
+  An option would be to make it a new generation instead (`nix-env --set <out>`), which
+  always lands in the window; not done (the brief named `--switch-generation`).
+- `apply` does not record the commit of the system it replaces, so a rollback to a
+  generation switched outside nixin finds its commit only through plan's cache. Cheap
+  fix: let `apply` record `{from: {generation, out}}` and put the authoritative HEAD
+  before the pull into the commit map when it is known to build the running system.
+- The UIs do not show `history`, `rollback` or the boot block yet (the UI session's
+  part): `reboot_needed` and `boot.boot_space.state` are the two fields to surface.
+- Not verified on 19BK (no NOPASSWD there: `rollback` answers `needs-sudo` with the
+  three commands; the `nixos-switch` helper does not cover these steps).
+
+### How to test
+
+```
+nix develop -c pytest -q tests/test_apply.py    # 46 offline: boot checks, history, rollback on the Machine fake
+nix develop -c pytest -q                         # 599 + 25 live skipped
+nix build
+B=$(nix build --no-link --print-out-paths .)/bin/nixin
+$B --config ~/nixos history                      # read only
+$B --config ~/nixos plan                         # look for the reboot / /boot lines
+$B --config ~/nixos rollback --dry-run           # and rollback GEN --dry-run
+# the round trip (sudo ticket needed; leaves two commits in ~/nixos):
+$B --config ~/nixos add cowsay && $B --config ~/nixos apply -m "test: cowsay"
+$B --config ~/nixos rollback && $B --config ~/nixos history --limit 3
+```
+
+---
+
+## `apply` (2026-11-01)
 
 Written 2026-11-01 (evening) on mbp13, headless, as `master`, with a sudo ticket. The branch
 was cut from `main` @ f03f4e7 (discovery + truth + writer + integrate). Nothing is pushed.
 This session switched mbp13 four times (gens 110–112 plus a no-op preflight switch). It was
 the only session switching the machine during the run.
 
-## State
+### State
 
 `plan`, `apply` and `sync` work. They ran for real on mbp13 against the real workspace
 (`~/nixos`) and the root-owned authoritative clone (`/etc/nixos`). Every item on the
@@ -21,7 +187,7 @@ Gates at HEAD:
   or writes the workspace).
 - `ruff check`, `ruff format --check`, `nix fmt -- --check`: clean.
 
-## Files
+### Files
 
 | file | what |
 |---|---|
@@ -42,9 +208,9 @@ Gates at HEAD:
 | `package.nix` | `git` in `nativeCheckInputs` |
 | `docs/CONTRACT.md`, `README.md` | the three verbs, `status.pending`, 11 new error codes, measured costs, plan's cache |
 
-## Live run on mbp13
+### Live run on mbp13
 
-### Preflight (addendum)
+#### Preflight (addendum)
 
 - `~/nixos`: `fetch origin`, `checkout main`, `pull --ff-only origin main` → **849cfc3**.
   `git diff --stat mbp13-3ec6363 main` was empty.
@@ -53,7 +219,7 @@ Gates at HEAD:
 - `sudo -n nixos-rebuild switch --flake /etc/nixos#mbp13`: exit 0, 35 s. Same
   `/run/current-system` (`4ja0awg7…`), still **gen 109**, no new generation.
 
-### Acceptance
+#### Acceptance
 
 All with the built binary (`nix build` of the branch), real workspace, real sudo:
 
@@ -81,7 +247,7 @@ Afterwards I removed the `test` remote from `~/nixos` again (`git remote` = `ori
 only). The bare repo `~/nixin-test-remote` stays; it is harmless, delete it when you like.
 Nothing was pushed to GitHub.
 
-### Freeing /boot (final acceptance)
+#### Freeing /boot (final acceptance)
 
 | step | result | wall |
 |---|---|---|
@@ -107,7 +273,7 @@ set drops the old one first, and only with `configurationLimit` low enough that 
 generation still references it. The lasting lever is filtering the Intel microcode
 bundle to this CPU (06-46-01): about 15 MB per initrd, 30 MB per generation. Not done.
 
-### Final state
+#### Final state
 
 - Running: **generation 112**, `/nix/store/zknqa0x828qvan1f12iwwra35dpn4hap-nixos-system-mbp13-26.11.20261023.3ec6363`
   (kernel 7.3.0 booted; the generation was activated by `switch`, no reboot needed).
@@ -126,7 +292,7 @@ bundle to this CPU (06-46-01): about 15 MB per initrd, 30 MB per generation. Not
   The cowsay pair cancel out except for history.jsonl; squash them before pushing if you
   prefer.
 
-## Judgement calls (decided here; revisit if you disagree)
+### Judgement calls (decided here; revisit if you disagree)
 
 1. **git+file, not `path:`.** The brief said `nix build path:<workspace>#…`. I measured
    on `~/nixos`: `path:` copies `.git` and untracked files into the store (23 MB against
@@ -177,7 +343,7 @@ bundle to this CPU (06-46-01): about 15 MB per initrd, 30 MB per generation. Not
 8. **`history.jsonl`** gets `mode` in addition to the brief's fields. It is appended after the
    verify step, so a failed switch leaves no line.
 
-## Open items (not done)
+### Open items (not done)
 
 1. **Plain `nixin status` (truth's default `--config /etc/nixos`) fails as `master` now.**
    nix's libgit2 refuses the root-owned repo ("repository path '/etc/nixos' is not owned by
@@ -204,7 +370,7 @@ bundle to this CPU (06-46-01): about 15 MB per initrd, 30 MB per generation. Not
 7. Integrate's judgement call 9 ("the writer's eval does not prove the host builds") now
    has an answer: `plan` is that proof. A UI should offer `plan` after writer verbs.
 
-## How to test
+### How to test
 
 ```
 nix develop -c pytest -q tests/test_apply.py     # 28 offline tests, real git on temp repos

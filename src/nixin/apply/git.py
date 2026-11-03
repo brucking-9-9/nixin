@@ -102,6 +102,10 @@ class Git:
         p = self.run("show", f"{rev}:{rel}")
         return p.out if p.ok else None
 
+    def same_tree(self, a: str, b: str, exclude: str) -> bool:
+        """a and b have the same files and contents, `exclude` aside."""
+        return self.run("diff", "--quiet", a, b, "--", ".", f":(exclude){exclude}").ok
+
     def rev(self, ref: str) -> str | None:
         p = self.run("rev-parse", "--verify", "-q", f"{ref}^{{commit}}")
         return (p.out.strip() or None) if p.ok else None
@@ -122,6 +126,20 @@ class Git:
         return (p.out.strip() or None) if p.ok else None
 
     # --- writing (workspace only) -----------------------------------------------------
+
+    def restore(self, rev: str, exclude: str) -> None:
+        """Index and working tree to rev's files (deleting what rev does not have),
+        `exclude` aside; the caller commits."""
+        self.check(
+            "restore",
+            f"--source={rev}",
+            "--staged",
+            "--worktree",
+            "--",
+            ".",
+            f":(exclude){exclude}",
+            what=f"git restore --source={rev[:12]}",
+        )
 
     def commit(self, message: str, also: list[str]) -> str:
         """Stage every tracked change (intent-to-add files included) plus `also`, commit

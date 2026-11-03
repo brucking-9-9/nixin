@@ -4,10 +4,19 @@
 authoritative tree, a bare repo as the hub, and fakes for everything else behind
 `proc.RUN`: nix (flake metadata, the hosts eval, the toplevel drvPath eval, build,
 diff-closures), sudo (strips `-n`, or refuses), nixos-rebuild (builds the authoritative
-tree the same fake way and moves the profile links), systemctl. The toplevel's out path
-is a hash of the tracked tree minus installer/history.jsonl, so "same content, same out
-path" holds as with real nix, and root's build of the pulled commit has to land on the
-out path the workspace build produced.
+tree the same fake way and moves the profile links), nix-env --switch-generation and
+switch-to-configuration (rollback), systemctl. The toplevel's out path is a hash of the
+tracked tree minus installer/history.jsonl, so "same content, same out path" holds as
+with real nix, and root's build of the pulled commit has to land on the out path the
+workspace build produced.
+
+Each toplevel is a directory like a real one, as far as nixin reads it: `kernel`,
+`initrd` and `kernel-modules` links into the fake store (the kernel release comes from a
+tracked `KERNEL` file, default 7.2.12; a specialisation `nvidia` runs `SPEC_KERNEL`,
+default 6.12.114), `kernel-params`, `nixos-version`, `boot.json`, and a
+`bin/switch-to-configuration` that names an installer script with the systemd-boot
+builder's `CONFIGURATION_LIMIT` (`self.boot_limit`). /boot's free space is
+`self.boot_free`.
 
 Needs git (package.nix has it in nativeCheckInputs); skipped without it.
 """
@@ -25,7 +34,7 @@ import pytest
 from conftest import FIXTURES
 
 from nixin import apply as ap
-from nixin.apply import build, closure, commitmsg, privilege, proc, system
+from nixin.apply import build, closure, commitmsg, privilege, proc, safety, system
 from nixin.apply.git import Git
 from nixin.cli import main
 from nixin.configrepo import ConfigRepo
@@ -55,7 +64,11 @@ class Machine:
         self.rebuild_rc = 0
         self.rebuild_salt = ""  # root's build lands elsewhere (verify-failed)
         self.fail_build = False
+        self.activate_rc = 0
+        self.boot_limit: int | None = 2
+        self.boot_free = 10**9
         self.closures: dict[str, set[str]] = {}
+        self.meta: dict[str, dict[str, str]] = {}
         # the workspace: a flake with one host
         (self.ws / "hosts" / HOST).mkdir(parents=True)
         (self.ws / "flake.nix").write_text("{ outputs = _: { }; }\n")
@@ -72,8 +85,10 @@ class Machine:
         self.profiles = tmp / "profiles"
         self.profiles.mkdir()
         self.current = tmp / "current-system"
+        self.booted = tmp / "booted-system"
         out = self.realise(self.out_of(self.auth))
         self.set_generation(out, switch=True)
+        self.booted.symlink_to(out)
 
     # --- the fake nix -----------------------------------------------------------------
 
@@ -102,10 +117,55 @@ class Machine:
         pkgs = set(((state.get("nixos") or {}).get(HOST) or {}).get("packages") or [])
         out = str(self.store / f"{h}-nixos-system-{HOST}")
         self.closures[out] = pkgs
+        text = {k: v.decode().strip() for k, v in files.items() if k in ("KERNEL", "SPEC_KERNEL")}
+        self.meta[out] = {
+            "kernel": text.get("KERNEL", "7.2.12"),
+            "spec_kernel": text.get("SPEC_KERNEL", "6.12.114"),
+        }
         return out
 
+    def _store_file(self, name: str, rel: str, size: int) -> Path:
+        h = hashlib.sha256(name.encode()).hexdigest()[:32]
+        f = self.store / f"{h}-{name}" / rel
+        if not f.exists():
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(b"x" * size)
+        return f
+
+    def kernel_files(self, ver: str) -> tuple[Path, Path]:
+        """The fake kernel (1000 B per major version digit) and initrd (3000 B) of a release."""
+        k = self._store_file(f"linux-{ver}", "bzImage", 1000 * int(ver.split(".")[0]))
+        i = self._store_file(f"initrd-linux-{ver}", "initrd", 3000)
+        return k, i
+
+    def _boot_entry(self, top: Path, ver: str) -> None:
+        k, i = self.kernel_files(ver)
+        (top / "kernel").symlink_to(k)
+        (top / "initrd").symlink_to(i)
+        mods = self.store / (hashlib.sha256(ver.encode()).hexdigest()[:32] + f"-linux-{ver}-mod")
+        (mods / "lib" / "modules" / ver).mkdir(parents=True, exist_ok=True)
+        (top / "kernel-modules").symlink_to(mods)
+        (top / "kernel-params").write_text("loglevel=4")
+        (top / "nixos-version").write_text("26.11.20261023.3ec6363")
+        spec = {"kernel": str(k), "initrd": str(i), "init": f"{top}/init", "toplevel": str(top)}
+        (top / "boot.json").write_text(json.dumps({"org.nixos.bootspec.v1": spec}))
+
     def realise(self, out: str) -> str:
-        os.makedirs(out, exist_ok=True)
+        top = Path(out)
+        if top.exists():
+            return out
+        meta = self.meta[out]
+        top.mkdir(parents=True)
+        self._boot_entry(top, meta["kernel"])
+        spec = top / "specialisation" / "nvidia"
+        spec.mkdir(parents=True)
+        self._boot_entry(spec, meta["spec_kernel"])
+        limit = "" if self.boot_limit is None else f'CONFIGURATION_LIMIT = int("{self.boot_limit}")'
+        h = hashlib.sha256(limit.encode()).hexdigest()[:32]
+        installer = self.store / f"{h}-install-systemd-boot.sh"
+        installer.write_text(f"#!/bin/sh\n# systemd-boot builder\n{limit}\n")
+        (top / "bin").mkdir()
+        (top / "bin" / "switch-to-configuration").write_text(f"exec {installer} $@\n")
         return out
 
     def count(self, *prefix: str) -> int:
@@ -166,6 +226,26 @@ class Machine:
             os.replace(tmp, self.current)
         return n
 
+    def switch_generation(self, argv: list[str]) -> proc.Proc:
+        assert argv[1:3] == ["--profile", str(self.profiles / "system")], argv
+        n = int(argv[4])
+        if not (self.profiles / f"system-{n}-link").exists():
+            return proc.Proc(argv, 1, "", f"error: generation {n} does not exist\n")
+        tmp = self.profiles / "system.tmp"
+        tmp.symlink_to(f"system-{n}-link")
+        os.replace(tmp, self.profiles / "system")
+        return proc.Proc(argv, 0, "", f"switching profile from version ? to {n}\n")
+
+    def activate(self, argv: list[str]) -> proc.Proc:
+        out = str(Path(argv[0]).parent.parent)
+        assert argv[1] == "switch" and os.path.isdir(out)
+        tmp = self.tmp / "current.tmp"
+        tmp.symlink_to(out)
+        os.replace(tmp, self.current)
+        if self.activate_rc:
+            return proc.Proc(argv, self.activate_rc, "", "warning: the following units failed\n")
+        return proc.Proc(argv, 0, "", "activating the configuration...\n")
+
     def rebuild(self, argv: list[str]) -> proc.Proc:
         mode, flake = argv[1], argv[3]
         repo, host = flake.split("#")
@@ -191,6 +271,10 @@ class Machine:
             return self.nix(argv)
         if argv[0] == "nixos-rebuild":
             return self.rebuild(argv)
+        if argv[0] == "nix-env":
+            return self.switch_generation(argv)
+        if argv[0].endswith("/bin/switch-to-configuration"):
+            return self.activate(argv)
         if argv[0] == "systemctl":
             return proc.Proc(argv, 3, "inactive\n", "")
         if argv == ["true"]:  # sudo -n true, --dry-run's probe
@@ -220,7 +304,10 @@ def m(tmp_path, monkeypatch, cache_dir):
     machine = Machine(tmp_path)
     monkeypatch.setattr(proc, "RUN", machine)
     monkeypatch.setattr(system, "CURRENT", str(machine.current))
+    monkeypatch.setattr(system, "BOOTED", str(machine.booted))
     monkeypatch.setattr(system, "PROFILE", str(machine.profiles / "system"))
+    monkeypatch.setattr(safety, "STORE", str(machine.store))
+    monkeypatch.setattr(safety, "disk_free", lambda path: (machine.boot_free, 10**10))
     monkeypatch.setattr(ap, "local_hostname", lambda: HOST)
     monkeypatch.setattr(privilege, "helper_installed", lambda: False)  # no nixos-switch
     monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(machine.auth))
@@ -831,3 +918,416 @@ def test_system_generations(tmp_path, monkeypatch):
     r = system.running()
     assert r["generation"] == 9 and r["profile_generation"] == 9 and r["store_path"] == str(a)
     assert system.generation_of(str(b)) == 8 and system.generation_of("/nope") is None
+
+
+# --- plan/apply: what the new system does to boot -----------------------------------------
+
+
+def set_kernel(m: Machine, ver: str, name: str = "KERNEL") -> None:
+    (m.ws / name).write_text(ver + "\n")
+    git(m.ws, "add", "--intent-to-add", name)
+
+
+def test_plan_same_kernel_needs_no_reboot(m, capsys):
+    m.add_cowsay()
+    d = run(capsys, m, "plan")
+    b = d["boot"]
+    assert d["reboot_needed"] is False and b["reasons"] == [] and b["pending_reboot"] is False
+    assert b["kernel"] == {
+        "changed": False,
+        "from": "7.2.12",
+        "to": "7.2.12",
+        "from_path": b["kernel"]["from_path"],
+        "to_path": b["kernel"]["from_path"],
+    }
+    assert b["boot_space"]["needed"] == 0 and b["boot_space"]["state"] == "ok"
+    assert b["boot_space"]["limit"] == 2 and b["boot_space"]["window"] == [1]
+    assert [s["state"] for s in b["specialisations"]] == ["same"]
+    assert d["warnings"] == []
+    text = run(capsys, m, "plan", json_=False)
+    assert "reboot" not in text and "/boot" not in text
+
+
+def test_plan_new_kernel_needs_a_reboot_and_room_on_boot(m, capsys):
+    set_kernel(m, "7.3.0")
+    m.boot_free = 20000
+    d = run(capsys, m, "plan")
+    b = d["boot"]
+    assert d["reboot_needed"] is True and b["reasons"] == ["kernel", "initrd", "modules"]
+    assert (b["kernel"]["from"], b["kernel"]["to"]) == ("7.2.12", "7.3.0")
+    s = b["boot_space"]
+    k, i = m.kernel_files("7.3.0")
+    assert [f["path"] for f in s["files"]] == sorted([str(k), str(i)])
+    assert s["needed"] == 7000 + 3000 and s["free"] == 20000 and s["freed"] == 0
+    assert s["state"] == "ok" and s["ratio"] == 0.5
+    assert any(
+        w.startswith("needs a reboot to take effect: kernel 7.2.12 → 7.3.0") for w in d["warnings"]
+    )
+    text = run(capsys, m, "plan", json_=False)
+    assert "reboot    needs a reboot: kernel 7.2.12 → 7.3.0, initrd, kernel-modules" in text
+    assert "/boot     +0.0 MiB of 0.0 MiB free (50 %)" in text
+    assert "warning   needs a reboot" not in text  # shown once, as the reboot line
+    m.boot_free = 12000  # 10000 of 12000: over 80 %
+    d = run(capsys, m, "plan")
+    assert d["boot"]["boot_space"]["state"] == "warn"
+    assert any("/boot is tight" in w for w in d["warnings"])
+    m.boot_free = 9000
+    d = run(capsys, m, "plan")
+    assert d["ok"] and d["boot"]["boot_space"]["state"] == "full"  # plan reports, apply refuses
+    assert any("/boot is too small" in w for w in d["warnings"])
+
+
+def test_boot_space_counts_what_the_bootloader_deletes_first(m, capsys):
+    """limit 2: gen 1 (7.2.12) and gen 2 (7.3.0) on /boot; a gen 3 on 8.0.0 keeps 2 and 3,
+    so gen 1's files go first and count as room."""
+    set_kernel(m, "7.3.0")
+    assert run(capsys, m, "apply")["ok"]
+    set_kernel(m, "8.0.0")
+    m.boot_free = 3000
+    d = run(capsys, m, "plan")
+    s = d["boot"]["boot_space"]
+    assert s["window"] == [1, 2]
+    assert s["needed"] == 8000 + 3000 and s["freed"] == 7000 + 3000  # 7.2.12's pair
+    assert s["state"] == "warn" and s["ratio"] == round(11000 / 13000, 3)
+    m.boot_limit = 0  # no limit: nothing is deleted
+    set_kernel(m, "8.0.1")
+    d = run(capsys, m, "plan")
+    assert d["boot"]["boot_space"]["freed"] == 0 and d["boot"]["boot_space"]["state"] == "full"
+
+
+def test_apply_refuses_when_the_kernels_do_not_fit(m, capsys):
+    set_kernel(m, "7.3.0")
+    m.boot_free = 5000
+    run(capsys, m, "plan")
+    head = git(m.ws, "rev-parse", "HEAD")
+    d = run(capsys, m, "apply")
+    e = d["error"]
+    assert e["code"] == "boot-space" and e["boot_space"]["needed"] == 10000
+    assert "configurationLimit" in e["message"] and "linux-7.3.0" in e["message"]
+    # plan's cache knew the out path: refused before the commit, nothing ran as root
+    assert git(m.ws, "rev-parse", "HEAD") == head and m.count("sudo") == 0
+    # without plan's cache it commits and builds first, then refuses before the pull
+    (m.ws / "flake.nix").write_text("{ outputs = _: { other = 1; }; }\n")
+    d = run(capsys, m, "apply")
+    e = d["error"]
+    assert e["code"] == "boot-space" and e["committed"] == git(m.ws, "rev-parse", "HEAD")
+    assert m.count("sudo") == 0 and m.generation() == 1
+    m.boot_free = 10**9
+    d = run(capsys, m, "apply")
+    assert d["ok"] and d["reboot_needed"] is True and d["boot"]["reasons"][0] == "kernel"
+
+
+def test_apply_dry_run_reports_the_boot_check(m, capsys):
+    set_kernel(m, "7.3.0")
+    m.boot_free = 5000
+    run(capsys, m, "plan")
+    d = run(capsys, m, "apply", "--dry-run")
+    assert d["ok"] and d["reboot_needed"] is True
+    assert d["boot"]["boot_space"]["state"] == "full"
+    text = run(capsys, m, "apply", "--dry-run", json_=False)
+    assert "(does not fit: refused)" in text
+
+
+def test_specialisation_kernel_and_pending_reboot(m, capsys):
+    set_kernel(m, "6.12.115", "SPEC_KERNEL")
+    d = run(capsys, m, "plan")
+    b = d["boot"]
+    assert d["reboot_needed"] is False  # the default entry is unchanged
+    assert b["specialisations"] == [
+        {
+            "name": "nvidia",
+            "state": "changed",
+            "changed": ["kernel", "initrd", "modules"],
+            "kernel": {"from": "6.12.114", "to": "6.12.115"},
+        }
+    ]
+    assert b["boot_space"]["needed"] == 6000 + 3000
+    assert b["bootloader"]["changed"] is False  # boot.json covers the default entry only here
+    text = run(capsys, m, "plan", json_=False)
+    assert "specialisation nvidia: kernel 6.12.114 → 6.12.115" in text
+    # running something that was not booted
+    set_kernel(m, "7.3.0")
+    assert run(capsys, m, "apply")["ok"]
+    (m.ws / "flake.nix").write_text("{ outputs = _: { z = 1; }; }\n")
+    d = run(capsys, m, "plan")
+    assert d["boot"]["pending_reboot"] is True and d["reboot_needed"] is False
+    assert "pending already" in run(capsys, m, "plan", json_=False)
+
+
+def test_plan_for_another_host_has_no_boot_check(m, capsys):
+    d = run(capsys, m, "plan", host="other")
+    assert d["boot"] is None and d["reboot_needed"] is None
+
+
+def test_boot_window_parsing(tmp_path, monkeypatch):
+    store = tmp_path / "nix" / "store"
+    monkeypatch.setattr(safety, "STORE", str(store))
+    h = "a" * 32
+    builder = store / f"{h}-systemd-boot" / "bin" / "systemd-boot"
+    builder.parent.mkdir(parents=True)
+    builder.write_text('#!/usr/bin/python\nCONFIGURATION_LIMIT = int("5")\n')
+    wrapper = store / f"{'b' * 32}-install-systemd-boot.sh"
+    wrapper.write_text(f'#!/bin/sh\n{store}/{h}-systemd-boot/bin/systemd-boot "$@"\n')
+    top = tmp_path / "top"
+    (top / "bin").mkdir(parents=True)
+    stc = top / "bin" / "switch-to-configuration"
+    stc.write_bytes(b"\x7fELF\x00junk\x00" + str(wrapper).encode() + b"\x00more")
+    assert safety.boot_window(str(top)) == 5
+    builder.write_text("configurationLimit = 0\n")  # the older builder; 0 is "no limit"
+    assert safety.boot_window(str(top)) == 0
+    builder.write_text("no limit here\n")
+    assert safety.boot_window(str(top)) is None
+    assert safety.boot_window(str(tmp_path / "nope")) is None
+
+
+# --- history ------------------------------------------------------------------------------
+
+
+def test_history_joins_generations_with_the_apply_lines(m, capsys, monkeypatch):
+    monkeypatch.setenv("NIXIN_WIDTH", "200")
+    gen1 = os.path.realpath(m.current)
+    m.add_cowsay()
+    a = run(capsys, m, "apply", "-m", "test: cowsay")
+    m.rm_cowsay()
+    b = run(capsys, m, "apply")
+    d = run(capsys, m, "history")
+    assert d["ok"] and d["total"] == 3 and (d["current"], d["booted"], d["default"]) == (3, 1, 3)
+    rows = d["generations"]
+    assert [r["generation"] for r in rows] == [3, 2, 1]
+    r3, r2, r1 = rows
+    assert r3["current"] and r3["default"] and not r3["booted"] and r1["booted"]
+    assert r3["store_path"] == gen1 == r1["store_path"]  # rm brought the same tree back
+    assert (r3["commit"], r3["message"], r3["mode"], r3["match"]) == (
+        b["committed"],
+        f"nixin: {HOST}: -cowsay",
+        "switch",
+        "generation",
+    )
+    assert r2["commit"] == a["committed"] and r2["message"] == "test: cowsay"
+    assert r2["applied_host"] == HOST and len(r2["entries"]) == 1
+    assert r1["match"] == "out" and r1["match_generation"] == 3 and r1["entries"] == []
+    assert r1["kernel"] == "7.2.12" and r1["nixos_version"] == "26.11.20261023.3ec6363"
+    assert r1["date"].endswith("Z")
+    assert d["history"] == {"path": str(m.ws / HISTORY), "entries": 2, "unmatched": 0}
+    d = run(capsys, m, "history", "--limit", "1")
+    assert [r["generation"] for r in d["generations"]] == [3] and d["total"] == 3
+    text = run(capsys, m, "history", json_=False)
+    lines = text.splitlines()
+    assert lines[0] == f"history {HOST}: 3 generations"
+    assert lines[2].startswith("*") and f"{b['committed'][:7]}  nixin: {HOST}: -cowsay" in lines[2]
+    assert lines[4].startswith(" b ") and lines[4].endswith(f"nixin: {HOST}: -cowsay (= gen 3)")
+    assert run(capsys, m, "history", "--limit", "-1")["error"]["code"] == "usage"
+    assert run(capsys, m, "history", "x")["error"]["code"] == "usage"
+    assert run(capsys, m, "history", host="other")["error"]["code"] == "host-not-local"
+
+
+def test_history_from_the_authoritative_tree_warns(m, capsys):
+    rc = main(["--json", "--host", HOST, "history", "--config", str(m.auth)])
+    d = json.loads(capsys.readouterr().out)
+    assert rc == 0 and d["generations"][0]["commit"] is None
+    assert any("lags" in w for w in d["warnings"]) and any(
+        "no installer" in w for w in d["warnings"]
+    )
+
+
+# --- rollback -----------------------------------------------------------------------------
+
+
+def test_rollback_round_trip(m, capsys):
+    """plan on the clean tree (caches its commit), apply cowsay, roll back: the system is
+    generation 1 again and the config is the initial tree again, by a revert commit."""
+    first = git(m.ws, "rev-parse", "HEAD")
+    gen1 = run(capsys, m, "plan")["out"]
+    m.add_cowsay()
+    a = run(capsys, m, "apply", "-m", "test: cowsay")
+    assert a["ok"] and m.generation() == 2
+    d = run(capsys, m, "rollback")
+    assert d["ok"], d
+    assert (d["generation"], d["from_generation"], d["out"], d["switched"]) == (1, 2, gen1, True)
+    assert os.path.realpath(m.current) == gen1 and m.generation() == 1
+    c = d["config"]
+    assert c["state"] == "reverted" and c["commit"] == first and c["source"] == "plan-cache"
+    assert [x["subject"] for x in c["reverted"]] == ["test: cowsay"]
+    head = git(m.ws, "rev-parse", "HEAD")
+    assert c["revert_commit"] == head == c["authoritative_head"] == git(m.auth, "rev-parse", "HEAD")
+    assert git(m.ws, "log", "-1", "--format=%s") == 'Revert "test: cowsay"'
+    assert git(m.ws, "log", "-1", "--format=%an") == "Test Person"
+    assert "This reverts:" in git(m.ws, "log", "-1", "--format=%b")
+    # the tree is the first commit's again, history.jsonl aside (it went in with the apply line)
+    assert git(m.ws, "diff", "--stat", first, "HEAD", "--", ".", f":(exclude){HISTORY}") == ""
+    assert not (m.ws / "installer" / "state.json").exists()
+    assert len(git(m.ws, "show", f"HEAD:{HISTORY}").splitlines()) == 1
+    assert Git(m.ws).status().dirty == [HISTORY]
+    assert d["privileged_commands"] == [
+        f"sudo -n nix-env --profile {m.profiles / 'system'} --switch-generation 1",
+        f"sudo -n {gen1}/bin/switch-to-configuration switch",
+        f"sudo -n git -C {m.auth} pull --ff-only {m.ws} main",
+    ]
+    assert d["backends"] == {"profile": "sudo", "activate": "sudo", "pull": "sudo"}
+    assert [r["name"] for r in d["diff"]["removed"]] == ["cowsay"]
+    line = json.loads((m.ws / HISTORY).read_text().splitlines()[-1])
+    assert {k: line[k] for k in ("generation", "out", "commit", "mode", "from_generation")} == {
+        "generation": 1,
+        "out": gen1,
+        "commit": head,
+        "mode": "rollback",
+        "from_generation": 2,
+    }
+    assert line["config"] == "reverted" and line["message"] == 'Revert "test: cowsay"'
+    # authoritative == running: apply has nothing to do, and status agrees, without nix
+    evals = m.toplevel_evals()
+    assert run(capsys, m, "apply")["error"]["code"] == "nothing-to-apply"
+    assert m.toplevel_evals() == evals
+    assert ap.pending(ConfigRepo(m.ws), HOST)["running_matches"] is True
+    # history shows both
+    h = run(capsys, m, "history")
+    r2, r1 = h["generations"]
+    assert (r2["commit"], r2["mode"]) == (a["committed"], "switch")
+    assert (r1["commit"], r1["mode"], r1["current"]) == (head, "rollback", True)
+    # again: generation 1 runs and the config builds it
+    assert run(capsys, m, "rollback", "1")["error"]["code"] == "nothing-to-apply"
+
+
+def test_rollback_and_forward_by_history_lines(m, capsys):
+    m.add_cowsay()
+    a = run(capsys, m, "apply", "-m", "test: cowsay")
+    m.rm_cowsay()
+    run(capsys, m, "apply", "-m", "test: no cowsay")
+    d = run(capsys, m, "rollback")  # 3 -> 2: cowsay back
+    assert d["ok"] and d["generation"] == 2
+    c = d["config"]
+    assert (c["commit"], c["source"], c["state"]) == (a["committed"], "history", "reverted")
+    assert git(m.ws, "log", "-1", "--format=%s") == 'Revert "test: no cowsay"'
+    assert (m.ws / "installer" / "state.json").exists()
+    assert os.path.realpath(m.current) == a["out"]
+    d = run(capsys, m, "rollback", "3")  # and forward again: the -cowsay commit's tree
+    assert d["ok"] and d["generation"] == 3 and m.generation() == 3
+    assert [x["subject"] for x in d["config"]["reverted"]] == ['Revert "test: no cowsay"']
+    assert not (m.ws / "installer" / "state.json").exists()
+    assert git(m.ws, "rev-parse", "HEAD") == git(m.auth, "rev-parse", "HEAD")
+
+
+def test_rollback_without_a_commit_leaves_the_config(m, capsys):
+    m.add_cowsay()
+    run(capsys, m, "apply")
+    head = git(m.ws, "rev-parse", "HEAD")
+    d = run(capsys, m, "rollback")
+    assert d["ok"] and m.generation() == 1
+    c = d["config"]
+    assert (c["state"], c["why"], c["commit"], c["revert_commit"]) == (
+        "untouched",
+        "no-mapping",
+        None,
+        None,
+    )
+    assert git(m.ws, "rev-parse", "HEAD") == head == git(m.auth, "rev-parse", "HEAD")
+    assert any("the config stays as it is" in w for w in d["warnings"])
+    assert len(d["privileged_commands"]) == 2  # no pull
+    line = json.loads((m.ws / HISTORY).read_text().splitlines()[-1])
+    assert line["commit"] is None and line["config"] == "untouched"
+    text = run(capsys, m, "rollback", "2", json_=False)  # back to 2: its apply line names HEAD
+    assert "in sync: the authoritative tree already builds it" in text
+    assert "generation 1 → 2" in text
+
+
+def test_rollback_dry_run_runs_nothing(m, capsys):
+    run(capsys, m, "plan")
+    m.add_cowsay()
+    run(capsys, m, "apply")
+    head, calls = git(m.ws, "rev-parse", "HEAD"), len(m.calls)
+    d = run(capsys, m, "rollback", "--dry-run")
+    assert d["ok"] and d["dry_run"] and (d["generation"], d["from_generation"]) == (1, 2)
+    steps = [(c["step"], c["privileged"]) for c in d["commands"]]
+    assert steps == [
+        ("revert", False),  # restore
+        ("revert", False),  # add -u
+        ("revert", False),  # add history.jsonl, untracked until now
+        ("revert", False),  # commit
+        ("profile", True),
+        ("activate", True),
+        ("pull", True),
+    ]
+    assert d["commands"][4]["by_hand"].startswith("sudo nix-env --profile")
+    assert d["commit"]["message"].startswith('Revert "nixin: testhost: +cowsay"')
+    assert d["config"]["state"] == "reverted" and d["privilege"]["activate"]["ready"] is True
+    assert git(m.ws, "rev-parse", "HEAD") == head and m.generation() == 2
+    assert not any(
+        c[0] in ("nix-env", "sudo") for c in m.calls[calls:] if c != ["sudo", "-n", "true"]
+    )
+    text = run(capsys, m, "rollback", "--dry-run", json_=False)
+    assert "[user]" in text and "[root]" in text and "nothing was run" in text
+
+
+def test_rollback_needs_sudo_then_finishes(m, capsys):
+    run(capsys, m, "plan")
+    m.add_cowsay()
+    run(capsys, m, "apply")
+    gen1 = os.path.realpath(m.profiles / "system-1-link")
+    m.sudo_ok = False
+    e = run(capsys, m, "rollback")["error"]
+    assert e["code"] == "needs-sudo"
+    assert e["commands"] == [
+        f"sudo nix-env --profile {m.profiles / 'system'} --switch-generation 1",
+        f"sudo {gen1}/bin/switch-to-configuration switch",
+        f"sudo git -C {m.auth} pull --ff-only {m.ws} main",
+    ]
+    assert e["committed"] == git(m.ws, "rev-parse", "HEAD") and m.generation() == 2
+    assert "nixin rollback again" in e["message"]
+    m.sudo_ok = True
+    d = run(capsys, m, "rollback", "1")  # the revert exists: no second commit, just root's part
+    assert d["ok"] and d["config"]["revert_commit"] is None and d["config"]["state"] == "reverted"
+    assert git(m.auth, "rev-parse", "HEAD") == e["committed"] and m.generation() == 1
+
+
+def test_rollback_switch_failure_then_config_only(m, capsys):
+    run(capsys, m, "plan")
+    m.add_cowsay()
+    run(capsys, m, "apply")
+    m.activate_rc = 4
+    e = run(capsys, m, "rollback")["error"]
+    assert e["code"] == "switch-failed" and "nixin rollback 1" in e["message"]
+    assert "already runs it" in e["message"]
+    m.activate_rc = 0
+    d = run(capsys, m, "rollback", "1")  # the system is there: only the pull is left
+    assert d["ok"] and d["switched"] is False and len(d["privileged_commands"]) == 1
+    assert git(m.auth, "rev-parse", "HEAD") == git(m.ws, "rev-parse", "HEAD")
+
+
+def test_rollback_refusals(m, capsys):
+    assert run(capsys, m, "rollback")["error"]["code"] == "unknown-generation"  # only gen 1
+    assert run(capsys, m, "rollback", "99")["error"]["code"] == "unknown-generation"
+    assert run(capsys, m, "rollback", "abc")["error"]["code"] == "usage"
+    assert run(capsys, m, "rollback", "1", "2")["error"]["code"] == "usage"
+    assert run(capsys, m, "rollback", "1")["error"]["code"] == "nothing-to-apply"
+    assert run(capsys, m, "rollback", "1", host="other")["error"]["code"] == "host-not-local"
+    run(capsys, m, "plan")
+    m.add_cowsay()
+    run(capsys, m, "apply")
+    (m.ws / "flake.nix").write_text("{ outputs = _: { wip = 1; }; }\n")
+    e = run(capsys, m, "rollback")["error"]
+    assert e["code"] == "workspace-dirty" and e["files"] == ["flake.nix"]
+    git(m.ws, "commit", "-qam", "not applied")
+    e = run(capsys, m, "rollback")["error"]
+    assert e["code"] == "workspace-dirty" and [c["subject"] for c in e["commits"]] == [
+        "not applied"
+    ]
+    git(m.ws, "reset", "-q", "--hard", "HEAD~1")
+    (m.auth / "flake.nix").write_text("{ outputs = _: { root = 1; }; }\n")
+    assert run(capsys, m, "rollback")["error"]["code"] == "authoritative-dirty"
+    git(m.auth, "checkout", "-q", "--", ".")
+    assert m.generation() == 2 and m.count("nix-env") == 0
+
+
+def test_rollback_outside_the_boot_window_warns(m, capsys):
+    """configurationLimit 1 (the target's own builder decides): gen 2 has no entry once
+    gen 3 exists, so a reboot after rolling back to it would start gen 3."""
+    m.boot_limit = 1
+    set_kernel(m, "7.3.0")
+    run(capsys, m, "apply")
+    set_kernel(m, "7.3.1")
+    run(capsys, m, "apply")
+    d = run(capsys, m, "rollback")
+    assert d["ok"] and d["generation"] == 2
+    assert d["boot"]["boot_entry"] is False and d["reboot_needed"] is True
+    assert d["boot"]["boot_space"]["window"] == [3]
+    assert any("gets no boot entry" in w for w in d["warnings"])

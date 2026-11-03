@@ -18,6 +18,11 @@ on merge it moves here.
   `docs/CONTRACT.md`, integration tests, open judgement calls.
 - [apply](docs/HANDOFF-apply.md) — branch `apply`: `plan`, `apply`, `sync`, `status.pending`;
   mbp13 switched for real from its workspace (gens 110–112), `/boot` freed to 81M.
+  Branch `core-history-safety`: `nixin history` (generations joined with
+  `history.jsonl`), `nixin rollback [GEN]` (system back + one revert commit pulled into
+  `/etc/nixos`), and the boot block in `plan`/`apply` (`reboot_needed`, `boot_space` from
+  systemd-boot's window; `boot-space` refuses). Round trip run for real on mbp13: gen 121
+  (cowsay) → rollback to 120 in 2.9 s, trees in sync. First section of HANDOFF-apply.
 - [tui](docs/HANDOFF-tui.md) — branch `tui`: `nixin tui` / `nixin-tui` (Textual) over the same
   documents, `view.py` as the view-model for the GUI; the cowsay round trip ran from a
   50×25 terminal on mbp13 (gens 113–114).

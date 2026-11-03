@@ -71,6 +71,9 @@ ERROR_CODES = {
     "git-failed",
     "diverged",
     "busy",
+    "boot-space",
+    "unknown-generation",
+    "workspace-dirty",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 

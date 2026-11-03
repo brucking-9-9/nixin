@@ -5,6 +5,11 @@ apply has exactly two root steps, each a plain command:
     pull    git -C <authoritative> pull --ff-only <workspace> <branch>
     switch  nixos-rebuild switch|boot --flake <authoritative>#<host>
 
+rollback has two more (and the same pull):
+
+    profile   nix-env --profile /nix/var/nix/profiles/system --switch-generation <N>
+    activate  <generation N's store path>/bin/switch-to-configuration switch
+
 A `Backend` turns a step into what nixin runs and into what a person would type.
 `Sudo` (the default) prefixes `sudo -n`: it never prompts; without a cached ticket or a
 NOPASSWD rule it fails at once, and apply answers `needs-sudo` with the commands.
@@ -36,7 +41,7 @@ HELPER_WAIT = 4 * 3600.0  # the helper waits for a person at the desktop, then b
 
 @dataclass
 class Step:
-    name: str  # "pull" | "switch"
+    name: str  # "pull" | "switch" | "profile" | "activate"
     argv: list[str]  # the command root runs, without any sudo
     mode: str = ""  # switch: "switch" | "boot"
 
@@ -49,6 +54,16 @@ def pull_step(authoritative: Path, workspace: Path, branch: str) -> Step:
 
 def switch_step(authoritative: Path, host: str, mode: str = "switch") -> Step:
     return Step("switch", ["nixos-rebuild", mode, "--flake", f"{authoritative}#{host}"], mode=mode)
+
+
+def profile_step(profile: str, generation: int) -> Step:
+    return Step(
+        "profile", ["nix-env", "--profile", profile, "--switch-generation", str(generation)]
+    )
+
+
+def activate_step(out: str) -> Step:
+    return Step("activate", [f"{out}/bin/switch-to-configuration", "switch"], mode="switch")
 
 
 class Backend:

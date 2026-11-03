@@ -42,6 +42,8 @@ VERBS: dict[str, tuple[str, str]] = {
     "plan": ("apply", "build the pending config and show the closure diff"),
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
+    "history": ("apply", "this machine's system generations, with the commits nixin applied"),
+    "rollback": ("apply", "switch back to an earlier generation, revert the config with it"),
     "outdated": ("outdated", outdated.HELP),
     "update": ("outdated", outdated.update.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
