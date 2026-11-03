@@ -417,11 +417,19 @@ def _hub(ctx: Ctx, ws: str, ws_head: str) -> dict[str, Any]:
         return check(
             "tree.hub", None, f"workspace is ahead of {up} ({hub[:7]})", "nixin sync --push"
         )
+    if rc != 1:  # the hub's commit was never fetched: how far apart is unknown
+        return check("tree.hub", None, f"{up} @ {hub[:7]}: not fetched", f"git -C {ws} fetch")
+    _, behind = _git(ctx, ws, "rev-list", "--count", f"{ws_head}..{hub}")
+    _, ahead = _git(ctx, ws, "rev-list", "--count", f"{hub}..{ws_head}")
+    if ahead.isdigit() and int(ahead) > 0:
+        return check(
+            "tree.hub",
+            False,
+            f"diverged from {up} @ {hub[:7]}: {behind} behind, {ahead} ahead",
+            f"git -C {ws} pull --rebase",
+        )
     return check(
-        "tree.hub",
-        False if rc == 1 else None,
-        f"{up} @ {hub[:7]} has commits the workspace lacks",
-        "nixin sync --pull",
+        "tree.hub", False, f"{behind} commit(s) behind {up} @ {hub[:7]}", "nixin sync --pull"
     )
 
 
@@ -579,7 +587,7 @@ def check_boot(ctx: Ctx) -> list[dict[str, Any]]:
                 False,
                 f"{free[0] // mib} MiB free, generation {which}'s kernel+initrd need "
                 f"{biggest // mib} MiB: a kernel change that size would not fit",
-                f"nixin gc --keep {limit}" if limit and len(gens) > limit else None,
+                None,  # gc cannot help: the builder keeps only `limit` on /boot already
             )
         )
     else:

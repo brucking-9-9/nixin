@@ -250,8 +250,16 @@ def test_hub_with_full_equal_offline_and_behind(ctx):
     row = trees(ctx)["tree.hub"]  # ls-remote fails: offline
     assert row["ok"] is None and "unknown" in row["detail"]
     ctx.run.rules.clear()
+    row = trees(ctx, hub=REV_B, ancestor=1)["tree.hub"]  # rev-list says 2 both ways
+    assert row["ok"] is False and "2 behind, 2 ahead" in row["detail"]
+    ctx.run.rules.clear()
+    ctx.run.on(f"{REV_B}..{REV_A}", out="0\n")
     row = trees(ctx, hub=REV_B, ancestor=1)["tree.hub"]
     assert row["ok"] is False and row["fix"] == "nixin sync --pull"
+    assert row["detail"] == f"2 commit(s) behind origin/main @ {REV_B[:7]}"
+    ctx.run.rules.clear()
+    row = trees(ctx, hub=REV_B, ancestor=128)["tree.hub"]
+    assert row["ok"] is None and "not fetched" in row["detail"]
     ls = next(c for c in ctx.run.calls if "ls-remote" in c)
     assert any("BatchMode=yes" in a for a in ls)  # never a password prompt
 
@@ -409,6 +417,7 @@ def test_boot_space_and_generations(ctx, boot):
     boot.free, boot.limit = (40 << 20, 200 << 20), 5
     rows = by_name(doctor.check_boot(ctx))
     assert rows["boot.space"]["ok"] is False and "would not fit" in rows["boot.space"]["detail"]
+    assert rows["boot.space"]["fix"] is None
     assert rows["boot.generations"]["ok"] is True
 
 
