@@ -1,4 +1,146 @@
-# HANDOFF: apply layer (branch `apply`; then `core-history-safety`)
+# HANDOFF: apply layer (branch `apply`; then `core-history-safety`, `hosts-remote-diff`)
+
+## `hosts-remote-diff`: apply on another host over ssh (2026-11-02)
+
+Written on mbp13, headless, as `master`, without sudo. Branch `hosts-remote-diff`, cut
+from `origin/main` @ 318e6cc. Nothing pushed, nothing switched, no sudo run (not even
+`sudo -n true`: the local dry run below ran with sudo off PATH). The same branch has
+`list --diff` (truth layer: the "`list --diff`" section of HANDOFF-truth.md).
+
+### State
+
+Done, tested offline; the live part is the dry runs (19BK is not reachable from mbp13
+for a shell, so the real remote run has not happened). Nothing half-done.
+
+- `nixin apply --host H` for H ≠ this machine (it used to answer `host-not-local`):
+  1. commit the workspace as a local apply does, **except `installer/history.jsonl`**
+     (judgement call 4);
+  2. push: `git push --porcelain <remote> HEAD:refs/heads/<branch>` (the branch's
+     upstream remote, else `origin`), `push-failed` (no remote; `rejected: true` when the
+     hub has commits the workspace lacks);
+  3. one `ssh -t <ssh> 'sh -c …'` session on H running `git -C <ws> pull --ff-only`,
+     `sudo git -C <auth> pull --ff-only <ws> <branch>`, `sudo nixos-rebuild switch|boot
+     --flake <auth>#H`, with checks between (H's workspace is on `<branch>`; after each
+     pull the tree is at the pushed commit) and `[nixin] before|after current=…
+     profile=… profile_target=…` lines that become `previous`/`running`/`out`/
+     `generation`. Output streams to stderr as it comes (chunks, not lines, so the sudo
+     prompt shows).
+  Exit statuses 20–25 of the script map to `git-failed` / `authoritative-diverged` /
+  `switch-failed` with `step` (`workspace-pull`, `authoritative-pull`, `switch`), 255 to
+  `ssh-failed`; every error carries `committed`, `pushed`, `remote_steps_started[]`,
+  `privileged_commands[]`.
+- `--dry-run` prints every command (local commit and push, the ssh command, H's three
+  steps) and the whole script (`NEW_COMMIT` where the commit does not exist yet). It
+  contacts nothing: no fetch, push, ssh, sudo or nix build (strace of the live run:
+  12 read-only git calls, nothing else).
+- `needs-tty`: a real remote run under `--json`, from a UI (any non-main thread) or when
+  stdin/stderr is not a terminal.
+- `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/hosts.toml`): `[H] ssh =
+  "…"  workspace = "…"  authoritative = "…"`; defaults: the host name, `~/nixos`,
+  `/etc/nixos`; no file needed. `invalid-hosts-config` for bad TOML, wrong types, an ssh
+  destination starting with `-` or containing spaces, a relative workspace or
+  authoritative path; unknown keys are a warning.
+- New error codes: `needs-tty`, `push-failed`, `ssh-failed`, `invalid-hosts-config`
+  (CONTRACT table, `tests/test_integration.py`'s list). `host-not-local` stays for
+  `history`/`rollback`.
+
+Gates at 9f96f10: `nix build` 636 passed, 25 skipped (live) in the sandbox; `nix develop
+-c pytest` the same; `ruff check`, `ruff format --check`, `nix fmt -- --check` clean.
+
+### Files
+
+| file | what |
+|---|---|
+| `src/nixin/apply/remote.py` | the remote apply: `apply(ctx)`, `script()`, `ssh_argv()`, `remote_steps()`, `rpath()` (a leading `~`/`~user` stays bare), `parse_state()`, `reached()`, the exit-status table `FAILS`, `has_tty()`, the dry run, both renderings |
+| `apply/hosts.py` | hosts.toml: `config_path()`, `load()`, `remote(host) -> Remote` |
+| `apply/proc.py` | `run_process(…, tty=True)`: stdin inherited, output merged and teed in chunks, CRLF kept for the terminal and folded in the captured text |
+| `apply/git.py` | `commit(…, exclude=)` (`git add -u -- . ':(exclude)…'`) |
+| `apply/__init__.py` | `_apply`: `if not ctx.local: return remote.apply(ctx)` instead of `host-not-local` |
+| `tests/test_remote.py` | 26 tests. `Other`: the other host as directories (its home with a workspace cloned from a bare hub, its `retc`, profile, `current`), and a fake `ssh` that runs the generated script for real with `sh` as that host's user, with a `sudo` that runs the command (or refuses) and a `nixos-rebuild` that makes a generation from the authoritative HEAD. Round trip, `--no-switch`, a workspace path with a space, dry run, every refusal and remote failure, the history hint, hosts.toml, the pieces, the tty runner |
+| `tests/test_apply.py` | `apply --host other` under `--json` is `needs-tty` now (one assertion) |
+| `tests/test_integration.py` | the four codes |
+| `docs/CONTRACT.md`, `README.md` | "Another host" under `apply`, hosts.toml in Invocation, the codes, costs |
+
+### Live on mbp13 (`~/nixos` main @ a198757, `installer/history.jsonl` dirty by design; read only)
+
+Outputs in `/tmp/nixin-hosts-live/`. Box quiet (load 0.3), the only session.
+
+| run | result | wall |
+|---|---|---|
+| `nixin --host 19BK apply --dry-run --config ~/nixos` (dev shell, then the built binary) | the push to `origin` (git@github-nixos-config:brucking-9-9/nixos-config, "2 commit(s) not on origin/main"), `ssh -t 19BK sh -c SCRIPT`, the three commands on 19BK, the script; no hosts.toml here, so the defaults (`19BK`, `~/nixos`, `/etc/nixos`). Under strace: no ssh, sudo or nix exec, 12 read-only git calls; `~/nixos` unchanged | 0.29 s, 36 MiB |
+| the same before the history fix | committed `installer/history.jsonl` as "nixin: apply history": that is what led to judgement call 4 | — |
+| `nixin --json --host 19BK apply` | `needs-tty` | — |
+| `nixin --host mbp13 apply --dry-run` (sudo off PATH) | the local path: `nothing-to-apply` (a198757 is in /etc/nixos and gen 120 is its build); no ssh | — |
+
+Not run: a real remote apply (19BK is not reachable from mbp13 for a shell, and there is
+no other host). **Note:** a real `apply --host 19BK` from mbp13 now would push
+`~/nixos`'s two unpushed commits (ae4264a `test: cowsay`, a198757 its revert) to the
+GitHub hub; squash them first if you want.
+
+### Judgement calls
+
+1. **One ssh session, one script.** Three `ssh -t` calls would allocate three ptys, and
+   sudo's per-tty ticket would ask up to twice. One script also lets nixin check between
+   the steps. The script is POSIX sh without backslashes, sent as `sh -c '<quoted>'`, so
+   zsh, bash or fish as H's login shell all hand it to sh unchanged (fish treats `\`
+   inside single quotes differently).
+2. **Checks the brief did not ask for**: H's workspace must be on the pushed branch
+   (otherwise `git pull --ff-only` pulls whatever it tracks and root's pull of
+   `<branch>` deploys a stale tree), and both trees must end at the pushed commit. Then
+   H switches to exactly what was pushed. That stands in for the out-path verification
+   of a local apply, since nothing is built here.
+3. **No local build, diff or boot check for H.** Building 19BK's toplevel on mbp13 would
+   cost minutes and the result is not used (no store copy to H). `plan --host H` still
+   builds it locally if you want the closure (no diff: no running H to compare with).
+4. **`installer/history.jsonl` is neither committed nor written by a remote apply.** It
+   is joined with *this* machine's generations. Committing mbp13's pending line and
+   pushing it would block H's `git pull --ff-only` whenever H has an uncommitted line of
+   its own from a local apply there (seen in the dry run). The line waits for the next
+   local apply, as before. When H's pull still fails that way (commits from local
+   applies here that changed the file), the error says how to stash it there.
+5. **`needs-tty` is broader than `--json`.** The UIs call apply in human mode from worker
+   threads with stderr captured; `ssh -t` would put their terminal in raw mode. So: main
+   thread, stdin and stderr on a tty.
+6. **`push-failed`, not sync's `diverged`/`git-failed`**, as the brief named it; `rejected`
+   tells the hub-has-new-commits case apart.
+7. **`--authoritative` is this machine's tree**; for H it is ignored with a warning, and
+   hosts.toml's `authoritative` applies.
+8. **No `nothing-to-apply` for H.** Knowing that would cost an ssh round trip before the
+   run; nixin pushes and lets H's `nixos-rebuild` find nothing to do (`changed: false`,
+   "(unchanged: it already was)").
+9. **The lock** (`busy`) covers remote applies too: one apply per user at a time here.
+
+### Gaps / next
+
+- Run it for real: from 19BK, `nixin --host mbp13 apply` (if 19BK reaches mbp13 over
+  ssh) with `~/.config/nixin/hosts.toml` `[mbp13] ssh = "mbp13"  workspace =
+  "/home/master/nixos"`; check `/run/current-system` on mbp13 afterwards. Mind other
+  sessions on mbp13 (memory: check `ps` and `git status` there first).
+- H's `nixin history` will not know the commit of a remotely applied generation (no line
+  on H). The script could append one on H after the switch; that needs the JSON built in
+  sh, or nixin installed on H.
+- A connection drop during `nixos-rebuild` sends SIGHUP to it on H. Running it under
+  `systemd-run` (or `nohup` and polling) would make the switch survive; not done.
+- The UIs: `apply --dry-run` for a remote host renders, but the view-model says "build: not
+  built yet" (it reads `out: null`); they should show `remote`, `needs_tty`, and offer
+  the CLI command to copy, since a real run refuses from a UI.
+- 19BK's `nixos-switch` helper is not used remotely: over ssh it is plain sudo on the tty.
+
+### How to test
+
+```
+nix develop -c pytest -q tests/test_remote.py    # 26 offline: the fake ssh runs the real script
+nix develop -c pytest -q                          # 636 + 25 live skipped
+nix build
+B=$(nix build --no-link --print-out-paths .)/bin/nixin
+$B --host 19BK apply --dry-run --config ~/nixos   # every command + the script; contacts nothing
+$B --json --host 19BK apply --config ~/nixos      # needs-tty
+# for real, in a terminal, with the other host reachable:
+#   printf '[mbp13]\nssh = "mbp13"\nworkspace = "/home/master/nixos"\n' > ~/.config/nixin/hosts.toml
+#   nixin --host mbp13 apply --config ~/nixos
+```
+
+---
 
 ## `core-history-safety`: history, rollback, plan safety (2026-11-02)
 

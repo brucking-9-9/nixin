@@ -3,6 +3,55 @@
 Started on 19BK, continued on mbp13 on 2026-11-01 (headless, as `master`). Everything below
 "verified" was run on mbp13 against the workspace config `~/nixos` (read only) unless marked.
 
+## `list --diff` (branch `hosts-remote-diff`, mbp13, 2026-11-02)
+
+`nixin list --diff HOST_A HOST_B` (or `--diff HOST_B` against `--host`) compares two
+hosts of the same config: per scope, the packages only one of them has and the
+versions that differ. Contract: `docs/CONTRACT.md`, "`list --diff`". The same branch has
+the remote apply (HANDOFF-apply.md, first section).
+
+- **Code.** `truth/hostdiff.py` (`pair`, `index`, `compare`, `collect`, `render`); in
+  `truth/__init__.py` the `--diff` argument on `list` and a branch at the top of `_list`.
+  No new verb, so no `cli.py` change (the brief allowed `diff-hosts A B` as well; one
+  spelling is enough).
+- **Rules.** Scopes: the system with the system, each HM user with the same user name
+  on the other host; a user only one host has is all `only_*` (`scopes[].on` says which
+  side has it). Key: `pname`, else the derivation name (scripts and `nixos-version`
+  have none). Versions are compared as sets per key, so two pythons on one side and one
+  on the other is `differ`. Repeats fold as in `list`. `--scope`, `--home` (a user of
+  either host), `--filter`, `--programs` (the `programs.<x>.enable` only one host has),
+  `--refresh` (both evals). No `declared[]`.
+- **Data.** `packages.collect()` per host: the same `packages` cache entry as `list`,
+  `status` and `where`. Verified live: after the cold run both hosts were `hits:
+  [packages]`.
+- **Human.** `scope  name  <A version>  <B version>  (user)` grouped by scope, `-`
+  absent, `yes` for a package without a version; one summary line per scope; a user only
+  one host has is one line ("only 19BK has this user (190 packages, none on mbp13;
+  --home brucking lists them)") unless `--home` names it; its programs are left out of
+  the `--programs` block the same way. Width rules as `list` (`NIXIN_WIDTH`; the name
+  column gives way down to 16).
+- **Fixtures.** The brief said both hosts' recorded package lists existed from the
+  truth/outdated branches; only 19BK's did (`outdated/19BK-lock.json`, an outdated.nix
+  shape, and `tui/list_19BK.json`, a `list` document). So `tests/fixtures/hosts/
+  {19BK,mbp13}-packages.json` are new: packages.nix's raw output for both, evaluated from
+  `~/nixos` at a198757 (read only; 19BK 2.6 s, mbp13 1.8 s).
+
+Live on mbp13 against `~/nixos` (a198757, `installer/history.jsonl` dirty by design),
+load 0.3, outputs in `/tmp/nixin-hosts-live/`:
+
+| run | result | wall | peak RSS |
+|---|---|---|---|
+| `--json list --diff 19BK mbp13 --refresh` (both evals cold) | system: 21 only on 19BK, 223 only on mbp13, 0 differ, 114 the same; brucking: 190 only on 19BK | 4.86 s (19BK 2.65 + mbp13 1.85) | 452 MiB |
+| `list --diff 19BK mbp13` (human), warm | `19BK cached · mbp13 cached` | 0.33 s | 42 MiB |
+| `--diff 19BK mbp13 --programs` | 9 system programs on one side (mbp13: gamemode, gamescope, git, hyprland, hyprlock, kde-pim, starship, zoxide; 19BK: nm-applet), brucking's 25 | — | — |
+| `NIXIN_WIDTH=50 … --filter fd`, `NIXIN_WIDTH=60 --host 19BK --diff mbp13 --home brucking --filter zo --programs` | as expected; `kitty` is in mbp13's system list and in brucking's home list on 19BK (two rows) | — | — |
+
+No version differs on the real config (one lock); the tests bump one to cover `differ`.
+
+Not done / next: `declared[]` per host (listing.declared for each); a "same" listing
+(`--same`) if someone wants the shared packages; the UIs do not show the diff yet (a
+Packages-page toggle "compare with HOST" would fit the existing table).
+
 ## `list` (branch `list-verb`, mbp13, 2026-11-02)
 
 The gap: `status` gave counts only and `where NAME` one package at a time, so there was
