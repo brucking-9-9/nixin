@@ -207,7 +207,7 @@ def _category(ns: argparse.Namespace, cache: Cache, cat: curated.Category) -> di
     try:
         ch = es.resolve_channel(cache, ns.channel or "unstable")
         names = {
-            "size": len(shipped) + 5 * len(by_pname),
+            "size": len(shipped) + 5 * len(_pnames(by_pname)),  # variants share a pname
             "_source": _fields(),
             "query": {
                 "bool": {
@@ -223,7 +223,8 @@ def _category(ns: argparse.Namespace, cache: Cache, cat: curated.Category) -> di
         data, cached1 = _post(cache, ch, names)
         named = _hits(data)
         query = {
-            "size": ns.limit * 2,  # variants share a pname and fold into one row
+            # variants and the shipped apps fold into rows already listed
+            "size": min(ns.limit * 2 + len(shipped), es.MAX_SIZE),
             "_source": _fields(),
             "query": {
                 "bool": {
