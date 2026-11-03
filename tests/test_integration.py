@@ -16,6 +16,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -770,3 +771,60 @@ def test_no_error_code_escapes_the_contract():
     raised |= set(re.findall(r'"code": "([a-z][a-z0-9-]*)"', src))
     raised |= set(re.findall(r'code="([a-z][a-z0-9-]*)"', src))
     assert raised and raised <= ERROR_CODES, raised - ERROR_CODES
+
+
+# --- the --host default ------------------------------------------------------------------
+
+
+def _attr_names_calls(world: World) -> int:
+    return sum(" ".join(c).endswith("--apply builtins.attrNames") for c in world.calls)
+
+
+def test_host_default_is_this_machine_when_the_config_has_it(world, capsys, monkeypatch):
+    monkeypatch.setattr("nixin.configrepo.local_hostname", lambda: "mbp13")
+    rc = main(["--json", "where", X11, "--config", str(world.root)])
+    doc = envelope(*capsys.readouterr(), rc, "where")
+    assert doc["ok"] and doc["host"] == "mbp13"
+    # flake.nix names mbp13, so the default costs no eval of the host names (truth's own
+    # host check is the one attrNames call)
+    assert _attr_names_calls(world) == 1
+
+
+def test_host_default_never_picks_one_of_several(world, capsys, monkeypatch):
+    monkeypatch.setattr("nixin.configrepo.local_hostname", lambda: "laptop")
+    for argv in (["where", X11], ["set", X11, "true"], ["list"]):
+        rc = main(["--json", *argv, "--config", str(world.root)])
+        doc = envelope(*capsys.readouterr(), rc, argv[0])
+        assert doc["host"] == "laptop" and doc["error"]["code"] == "unknown-host", argv
+        msg = doc["error"]["message"]
+        assert "19BK, bare, mbp13" in msg and "--host" in msg, msg
+
+
+def test_host_default_is_the_only_host(world, capsys, monkeypatch):
+    flake = world.root / "flake.nix"
+    text = flake.read_text()
+    start = text.index('      nixosConfigurations."19BK"')
+    end = text.index("      nixosConfigurations.mbp13")
+    text = text[:start] + text[end:]
+    flake.write_text(text.replace("      nixosConfigurations.bare = ", "      bare = "))
+    monkeypatch.setattr("nixin.configrepo.local_hostname", lambda: "laptop")
+    monkeypatch.setattr(sys.modules[__name__], "HM_USERS", {"mbp13": []})  # nix's attrNames
+    rc = main(["--json", "set", X11, "true", "--config", str(world.root)])
+    doc = envelope(*capsys.readouterr(), rc, "set")
+    assert doc["ok"] and doc["host"] == "mbp13", doc
+    assert "installer/mbp13.nix" in [c["file"] for c in doc["changes"]]
+    # an explicit --host is never second-guessed
+    rc = main(["--json", "--host", "laptop", "where", X11, "--config", str(world.root)])
+    doc = envelope(*capsys.readouterr(), rc, "where")
+    assert doc["error"]["code"] == "unknown-host"
+    assert "'laptop' is not in nixosConfigurations (mbp13)" in doc["error"]["message"]
+
+
+def test_host_default_without_a_config_is_the_hostname(world, capsys, monkeypatch):
+    monkeypatch.setattr("nixin.configrepo.local_hostname", lambda: "laptop")
+    rc = main(["--json", "search", "cowsay"])  # discovery takes no --config: nothing read
+    doc = envelope(*capsys.readouterr(), rc, "search")
+    assert doc["host"] == "laptop" and world.calls == []
+    rc = main(["--json", "where", X11, "--config", "/nonexistent/nixin"])
+    doc = envelope(*capsys.readouterr(), rc, "where")
+    assert doc["host"] == "laptop" and doc["error"]["code"] == "config-not-found"

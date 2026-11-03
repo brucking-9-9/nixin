@@ -26,6 +26,7 @@ import sys
 import traceback
 
 from . import __version__, apply, discovery, gui, outdated, truth, tui, writer
+from .configrepo import default_host
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
@@ -70,8 +71,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument(
         "--host",
-        default=socket.gethostname(),
-        help="nixosConfigurations.<host> to act on (default: this machine)",
+        help="nixosConfigurations.<host> to act on (default: this machine; when the config "
+        "has no such host but only one host, that one)",
     )
     p.add_argument(  # a verb's own --config wins; verbs without one ignore it
         "--config",
@@ -165,6 +166,8 @@ def document(ns: argparse.Namespace) -> dict:
     nix's output to stderr)."""
     if hasattr(ns, "config") and ns.config is None:
         ns.config = ns.config_before_verb
+    if getattr(ns, "host", None) is None:  # no --host given
+        ns.host = default_host(ns)
     run = getattr(ns, "run", None)  # set by a layer's register(); stubs have none
     if run is not None:
         try:

@@ -15,7 +15,7 @@ import argparse
 import time
 from typing import Any
 
-from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system
+from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system, unknown_host
 from . import listing, render, scan
 from . import options as opts
 from . import packages as pkgs
@@ -78,9 +78,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     src, lock, run = repo.source(), repo.lock(), running_system()
     timings: dict[str, float] = {}
@@ -164,9 +162,7 @@ def _list(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     doc = listing.collect(repo, host, cache, ns)
     doc["cache"] = cache.doc()
@@ -190,9 +186,7 @@ def _where(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     pk = pkgs.collect(repo, host, cache)
     kind = ns.kind or ("option" if "." in name else "package")

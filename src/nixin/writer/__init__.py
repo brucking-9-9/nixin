@@ -20,7 +20,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..configrepo import NixinError, NixRunner, nix_attr, nix_value, run_nix
+from ..configrepo import NixinError, NixRunner, nix_attr, nix_value, run_nix, unknown_host
 from ..truth import scan
 from . import edits
 from .edits import Edit
@@ -161,9 +161,7 @@ def _scope(ws: Workspace, host: str, user: str | None, *, use_eval: bool) -> Sco
         if use_eval and not known:
             known = ws.repo.hosts()  # flake.nix built in a way the scanner cannot read
         if host not in known:
-            raise NixinError(
-                "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(known)})"
-            )
+            raise unknown_host(host, known)
     if roots is None:  # helper function, flake-parts, …: fall back to the usual layout
         roots = [
             ModRef(f)

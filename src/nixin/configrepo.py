@@ -385,6 +385,24 @@ class ConfigRepo:
     def hosts(self) -> list[str]:
         return list(self.eval_json("nixosConfigurations", apply="builtins.attrNames"))
 
+    def static_hosts(self) -> list[str]:
+        """The `nixosConfigurations.<host>` names flake.nix spells out (text only, no eval;
+        [] when it builds them some way the scanner cannot read)."""
+        from .writer.nixtext import NixFile, NixSyntaxError  # a pure-text scanner
+
+        try:
+            nf = NixFile((self.path / "flake.nix").read_text())
+            names = []
+            for d in nf.walk(nf.module_shapes()):
+                if d.path != ("outputs",):
+                    continue
+                for od in nf.walk(nf.module_shapes(d.binding.val_lo, d.binding.val_hi)):
+                    if len(od.path) == 2 and od.path[0] == "nixosConfigurations" and od.path[1]:
+                        names.append(od.path[1])
+        except (OSError, NixSyntaxError):
+            return []
+        return list(dict.fromkeys(names))
+
     def hm_users(self, host: str) -> list[str]:
         """Home Manager users of a host; [] when the host has no HM module."""
         return list(
@@ -423,3 +441,36 @@ def running_system(root: str = RUNNING_SYSTEM) -> dict[str, Any]:
 
 def local_hostname() -> str:
     return socket.gethostname()
+
+
+def default_host(ns: Any) -> str:
+    """The host a verb acts on when `--host` is not given (`ns` is the parsed command line).
+
+    This machine's hostname, unless the config (`ns.config`, else $NIXIN_CONFIG, else
+    /etc/nixos) has no such host and exactly one host: then that one. With several hosts
+    and none of them this machine it stays the hostname, and the verb's own host check
+    fails with `unknown-host` listing them: nixin never picks one of several. Verbs that
+    take no config (discovery) get the hostname without anything being read. Costs a text
+    scan of flake.nix, and one `nix eval` of the host names only when the hostname is not
+    among the names the scan finds. Anything that goes wrong here (no config, an eval
+    error) leaves the hostname, so the verb reports its own error."""
+    host = local_hostname()
+    if not hasattr(ns, "config"):
+        return host
+    try:
+        repo = ConfigRepo.locate(ns.config)
+        if host in repo.static_hosts():
+            return host
+        hosts = repo.hosts()
+    except (NixinError, OSError, ValueError):
+        return host
+    return hosts[0] if host not in hosts and len(hosts) == 1 else host
+
+
+def unknown_host(host: str, hosts: list[str]) -> NixinError:
+    """The `unknown-host` error; when `host` is this machine's name it was probably the
+    default, so the message says to pass --host."""
+    msg = f"{host!r} is not in nixosConfigurations ({', '.join(hosts) or 'none'})"
+    if host == local_hostname():
+        msg += "; that is this machine's hostname, the default: name one with --host"
+    return NixinError("unknown-host", msg)
