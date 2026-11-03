@@ -1,0 +1,2152 @@
+{
+ "home": {},
+ "system": {
+  "packages": [
+   {
+    "name": "mc-start",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "mc-stop",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "mc-status",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "mc-cmd",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "claude-code-2.1.308",
+    "pname": "claude-code",
+    "version": "2.1.308"
+   },
+   {
+    "name": "tmux-3.8",
+    "pname": "tmux",
+    "version": "3.8"
+   },
+   {
+    "name": "agent-status",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "agent-board-collect",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "agent-board-hook",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "agent-run",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "agents-board",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-picker",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-music",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-work",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-gaming",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-agents",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-build",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-build-watch",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-reactor-sound",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-music-player",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-spotify-out",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-music",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-agents-tmux",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-agents",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-agents-notify",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "spotify-player-0.25.1",
+    "pname": "spotify-player",
+    "version": "0.25.1"
+   },
+   {
+    "name": "cava-1.0.0",
+    "pname": "cava",
+    "version": "1.0.0"
+   },
+   {
+    "name": "obsidian-1.14.5",
+    "pname": "obsidian",
+    "version": "1.14.5"
+   },
+   {
+    "name": "tmux-3.8",
+    "pname": "tmux",
+    "version": "3.8"
+   },
+   {
+    "name": "btop-1.4.7",
+    "pname": "btop",
+    "version": "1.4.7"
+   },
+   {
+    "name": "nix-output-monitor-2.2.0",
+    "pname": "nix-output-monitor",
+    "version": "2.2.0"
+   },
+   {
+    "name": "nh-4.4.2",
+    "pname": "nh",
+    "version": "4.4.2"
+   },
+   {
+    "name": "jq-1.8.2",
+    "pname": "jq",
+    "version": "1.8.2"
+   },
+   {
+    "name": "playerctl-2.4.1",
+    "pname": "playerctl",
+    "version": "2.4.1"
+   },
+   {
+    "name": "kiosk",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-companion",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kiosk-mode-desktop",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "hypr-shot",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "hypr-caffeine",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "hypr-keys",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "hypridle-0.1.8",
+    "pname": "hypridle",
+    "version": "0.1.8"
+   },
+   {
+    "name": "zellij-0.45.1",
+    "pname": "zellij",
+    "version": "0.45.1"
+   },
+   {
+    "name": "wlogout-1.2.2",
+    "pname": "wlogout",
+    "version": "1.2.2"
+   },
+   {
+    "name": "quickshell-0.3.2",
+    "pname": "quickshell",
+    "version": "0.3.2"
+   },
+   {
+    "name": "jq-1.8.2",
+    "pname": "jq",
+    "version": "1.8.2"
+   },
+   {
+    "name": "companion-kiosk",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "zoxide-0.10.0",
+    "pname": "zoxide",
+    "version": "0.10.0"
+   },
+   {
+    "name": "yazi-26.9.1",
+    "pname": "yazi",
+    "version": "26.9.1"
+   },
+   {
+    "name": "ripgrep-15.2.0",
+    "pname": "ripgrep",
+    "version": "15.2.0"
+   },
+   {
+    "name": "nixd-2.9.3",
+    "pname": "nixd",
+    "version": "2.9.3"
+   },
+   {
+    "name": "nixfmt-1.5.0",
+    "pname": "nixfmt",
+    "version": "1.5.0"
+   },
+   {
+    "name": "git-lfs-3.8.0",
+    "pname": "git-lfs",
+    "version": "3.8.0"
+   },
+   {
+    "name": "dgpu-clock",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "reboot-gaming",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "screen-grab",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "companion",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "companion-ingest",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "companion-ctl",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "companion-local",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "companion-dpms",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "mbp-gpu",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "overskride-0.6.6",
+    "pname": "overskride",
+    "version": "0.6.6"
+   },
+   {
+    "name": "bluetui-0.8.2",
+    "pname": "bluetui",
+    "version": "0.8.2"
+   },
+   {
+    "name": "bt-power-toggle",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "xwayland-satellite-0.8.3",
+    "pname": "xwayland-satellite",
+    "version": "0.8.3"
+   },
+   {
+    "name": "waybar-0.15.0",
+    "pname": "waybar",
+    "version": "0.15.0"
+   },
+   {
+    "name": "fuzzel-1.15.0",
+    "pname": "fuzzel",
+    "version": "1.15.0"
+   },
+   {
+    "name": "mako-1.11.0",
+    "pname": "mako",
+    "version": "1.11.0"
+   },
+   {
+    "name": "libnotify-0.8.8",
+    "pname": "libnotify",
+    "version": "0.8.8"
+   },
+   {
+    "name": "swaylock-1.8.6",
+    "pname": "swaylock",
+    "version": "1.8.6"
+   },
+   {
+    "name": "swaybg-1.2.2",
+    "pname": "swaybg",
+    "version": "1.2.2"
+   },
+   {
+    "name": "brightnessctl-0.5.1",
+    "pname": "brightnessctl",
+    "version": "0.5.1"
+   },
+   {
+    "name": "playerctl-2.4.1",
+    "pname": "playerctl",
+    "version": "2.4.1"
+   },
+   {
+    "name": "pavucontrol-6.2",
+    "pname": "pavucontrol",
+    "version": "6.2"
+   },
+   {
+    "name": "network-manager-applet-1.36.0",
+    "pname": "network-manager-applet",
+    "version": "1.36.0"
+   },
+   {
+    "name": "polkit-gnome-0.105",
+    "pname": "polkit-gnome",
+    "version": "0.105"
+   },
+   {
+    "name": "wl-clipboard-2.3.0",
+    "pname": "wl-clipboard",
+    "version": "2.3.0"
+   },
+   {
+    "name": "grim-1.5.0",
+    "pname": "grim",
+    "version": "1.5.0"
+   },
+   {
+    "name": "slurp-1.5.0",
+    "pname": "slurp",
+    "version": "1.5.0"
+   },
+   {
+    "name": "nautilus-50.2.2",
+    "pname": "nautilus",
+    "version": "50.2.2"
+   },
+   {
+    "name": "mesa-demos-9.0.0",
+    "pname": "mesa-demos",
+    "version": "9.0.0"
+   },
+   {
+    "name": "vulkan-tools-1.4.363.0",
+    "pname": "vulkan-tools",
+    "version": "1.4.363.0"
+   },
+   {
+    "name": "libva-utils-2.24.0",
+    "pname": "libva-utils",
+    "version": "2.24.0"
+   },
+   {
+    "name": "usbutils-019",
+    "pname": "usbutils",
+    "version": "019"
+   },
+   {
+    "name": "pciutils-3.15.0",
+    "pname": "pciutils",
+    "version": "3.15.0"
+   },
+   {
+    "name": "helix-25.07.1",
+    "pname": "helix",
+    "version": "25.07.1"
+   },
+   {
+    "name": "btop-1.4.7",
+    "pname": "btop",
+    "version": "1.4.7"
+   },
+   {
+    "name": "nano-9.3",
+    "pname": "nano",
+    "version": "9.3"
+   },
+   {
+    "name": "lshw-02.20",
+    "pname": "lshw",
+    "version": "02.20"
+   },
+   {
+    "name": "mangohud-0.8.4",
+    "pname": "mangohud",
+    "version": "0.8.4"
+   },
+   {
+    "name": "git-2.56.0",
+    "pname": "git",
+    "version": "2.56.0"
+   },
+   {
+    "name": "python3-3.14.8",
+    "pname": "python3",
+    "version": "3.14.8"
+   },
+   {
+    "name": "pfetch-1.11.0",
+    "pname": "pfetch",
+    "version": "1.11.0"
+   },
+   {
+    "name": "kitty-0.49.2",
+    "pname": "kitty",
+    "version": "0.49.2"
+   },
+   {
+    "name": "wine-wow64-11.0",
+    "pname": "wine-wow64",
+    "version": "11.0"
+   },
+   {
+    "name": "winetricks-20260125",
+    "pname": "winetricks",
+    "version": "20260125"
+   },
+   {
+    "name": "imagemagick-7.1.2-34",
+    "pname": "imagemagick",
+    "version": "7.1.2-34"
+   },
+   {
+    "name": "nixin-0.1.0",
+    "pname": "nixin",
+    "version": "0.1.0"
+   },
+   {
+    "name": "qtwayland-6.12.0",
+    "pname": "qtwayland",
+    "version": "6.12.0"
+   },
+   {
+    "name": "qtsvg-6.12.0",
+    "pname": "qtsvg",
+    "version": "6.12.0"
+   },
+   {
+    "name": "frameworkintegration-6.31.0",
+    "pname": "frameworkintegration",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kauth-6.31.0",
+    "pname": "kauth",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kcoreaddons-6.31.0",
+    "pname": "kcoreaddons",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kded-6.31.0",
+    "pname": "kded",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kfilemetadata-6.31.0",
+    "pname": "kfilemetadata",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kguiaddons-6.31.0",
+    "pname": "kguiaddons",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kiconthemes-6.31.0",
+    "pname": "kiconthemes",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kimageformats-6.31.0",
+    "pname": "kimageformats",
+    "version": "6.31.0"
+   },
+   {
+    "name": "qtimageformats-6.12.0",
+    "pname": "qtimageformats",
+    "version": "6.12.0"
+   },
+   {
+    "name": "kio-6.31.0",
+    "pname": "kio",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kio-admin-26.08.2",
+    "pname": "kio-admin",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kio-extras-26.08.2",
+    "pname": "kio-extras",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kio-fuse-5.1.1",
+    "pname": "kio-fuse",
+    "version": "5.1.1"
+   },
+   {
+    "name": "knighttime-6.8.1",
+    "pname": "knighttime",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kpackage-6.31.0",
+    "pname": "kpackage",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kservice-6.31.0",
+    "pname": "kservice",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kunifiedpush-26.08.2",
+    "pname": "kunifiedpush",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kwallet-6.31.0",
+    "pname": "kwallet",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kwallet-pam-6.8.1",
+    "pname": "kwallet-pam",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kwalletmanager-26.08.2",
+    "pname": "kwalletmanager",
+    "version": "26.08.2"
+   },
+   {
+    "name": "plasma-activities-6.8.1",
+    "pname": "plasma-activities",
+    "version": "6.8.1"
+   },
+   {
+    "name": "solid-6.31.0",
+    "pname": "solid",
+    "version": "6.31.0"
+   },
+   {
+    "name": "phonon-vlc-0.12.0",
+    "pname": "phonon-vlc",
+    "version": "0.12.0"
+   },
+   {
+    "name": "kwin-6.8.1",
+    "pname": "kwin",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kscreen-6.8.1",
+    "pname": "kscreen",
+    "version": "6.8.1"
+   },
+   {
+    "name": "libkscreen-6.8.1",
+    "pname": "libkscreen",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kscreenlocker-6.8.1",
+    "pname": "kscreenlocker",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kactivitymanagerd-6.8.1",
+    "pname": "kactivitymanagerd",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kde-cli-tools-6.8.1",
+    "pname": "kde-cli-tools",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kglobalacceld-6.8.1",
+    "pname": "kglobalacceld",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kwrited-6.8.1",
+    "pname": "kwrited",
+    "version": "6.8.1"
+   },
+   {
+    "name": "baloo-6.31.0",
+    "pname": "baloo",
+    "version": "6.31.0"
+   },
+   {
+    "name": "milou-6.8.1",
+    "pname": "milou",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kdegraphics-thumbnailers-26.08.2",
+    "pname": "kdegraphics-thumbnailers",
+    "version": "26.08.2"
+   },
+   {
+    "name": "polkit-kde-agent-1-6.8.1",
+    "pname": "polkit-kde-agent-1",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-desktop-6.8.1",
+    "pname": "plasma-desktop",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-workspace-6.8.1",
+    "pname": "plasma-workspace",
+    "version": "6.8.1"
+   },
+   {
+    "name": "drkonqi-6.8.1",
+    "pname": "drkonqi",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kde-inotify-survey-26.08.2",
+    "pname": "kde-inotify-survey",
+    "version": "26.08.2"
+   },
+   {
+    "name": "libplasma-6.8.1",
+    "pname": "libplasma",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-integration-6.8.1",
+    "pname": "plasma-integration",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kde-gtk-config-6.8.1",
+    "pname": "kde-gtk-config",
+    "version": "6.8.1"
+   },
+   {
+    "name": "breeze-6.8.1",
+    "pname": "breeze",
+    "version": "6.8.1"
+   },
+   {
+    "name": "breeze-icons-6.31.0",
+    "pname": "breeze-icons",
+    "version": "6.31.0"
+   },
+   {
+    "name": "breeze-gtk-6.8.1",
+    "pname": "breeze-gtk",
+    "version": "6.8.1"
+   },
+   {
+    "name": "ocean-sound-theme-6.8.1",
+    "pname": "ocean-sound-theme",
+    "version": "6.8.1"
+   },
+   {
+    "name": "hicolor-icon-theme-0.18",
+    "pname": "hicolor-icon-theme",
+    "version": "0.18"
+   },
+   {
+    "name": "qqc2-breeze-style-6.8.1",
+    "pname": "qqc2-breeze-style",
+    "version": "6.8.1"
+   },
+   {
+    "name": "qqc2-desktop-style-6.31.0",
+    "pname": "qqc2-desktop-style",
+    "version": "6.31.0"
+   },
+   {
+    "name": "kdeplasma-addons-6.8.1",
+    "pname": "kdeplasma-addons",
+    "version": "6.8.1"
+   },
+   {
+    "name": "xdg-user-dirs-0.20",
+    "pname": "xdg-user-dirs",
+    "version": "0.20"
+   },
+   {
+    "name": "kmenuedit-6.8.1",
+    "pname": "kmenuedit",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kinfocenter-6.8.1",
+    "pname": "kinfocenter",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-systemmonitor-6.8.1",
+    "pname": "plasma-systemmonitor",
+    "version": "6.8.1"
+   },
+   {
+    "name": "ksystemstats-6.8.1",
+    "pname": "ksystemstats",
+    "version": "6.8.1"
+   },
+   {
+    "name": "libksysguard-6.8.1",
+    "pname": "libksysguard",
+    "version": "6.8.1"
+   },
+   {
+    "name": "systemsettings-6.8.1",
+    "pname": "systemsettings",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kcmutils-6.31.0",
+    "pname": "kcmutils",
+    "version": "6.31.0"
+   },
+   {
+    "name": "aurorae-6.8.1",
+    "pname": "aurorae",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-browser-integration-6.8.1",
+    "pname": "plasma-browser-integration",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-workspace-wallpapers-6.8.1",
+    "pname": "plasma-workspace-wallpapers",
+    "version": "6.8.1"
+   },
+   {
+    "name": "konsole-26.08.2",
+    "pname": "konsole",
+    "version": "26.08.2"
+   },
+   {
+    "name": "qttools-6.12.0",
+    "pname": "qttools",
+    "version": "6.12.0"
+   },
+   {
+    "name": "ark-26.08.2",
+    "pname": "ark",
+    "version": "26.08.2"
+   },
+   {
+    "name": "elisa-26.08.2",
+    "pname": "elisa",
+    "version": "26.08.2"
+   },
+   {
+    "name": "gwenview-26.08.2",
+    "pname": "gwenview",
+    "version": "26.08.2"
+   },
+   {
+    "name": "okular-26.08.2",
+    "pname": "okular",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kate-26.08.2",
+    "pname": "kate",
+    "version": "26.08.2"
+   },
+   {
+    "name": "ktexteditor-6.31.0",
+    "pname": "ktexteditor",
+    "version": "6.31.0"
+   },
+   {
+    "name": "khelpcenter-26.08.2",
+    "pname": "khelpcenter",
+    "version": "26.08.2"
+   },
+   {
+    "name": "dolphin-26.08.2",
+    "pname": "dolphin",
+    "version": "26.08.2"
+   },
+   {
+    "name": "baloo-widgets-26.08.2",
+    "pname": "baloo-widgets",
+    "version": "26.08.2"
+   },
+   {
+    "name": "dolphin-plugins-26.08.2",
+    "pname": "dolphin-plugins",
+    "version": "26.08.2"
+   },
+   {
+    "name": "spectacle-6.8.1",
+    "pname": "spectacle",
+    "version": "6.8.1"
+   },
+   {
+    "name": "ffmpegthumbs-26.08.2",
+    "pname": "ffmpegthumbs",
+    "version": "26.08.2"
+   },
+   {
+    "name": "krdp-6.8.1",
+    "pname": "krdp",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kconfig-6.31.0",
+    "pname": "kconfig",
+    "version": "6.31.0"
+   },
+   {
+    "name": "qtbase-6.12.0",
+    "pname": "qtbase",
+    "version": "6.12.0"
+   },
+   {
+    "name": "plasma-keyboard-6.8.1",
+    "pname": "plasma-keyboard",
+    "version": "6.8.1"
+   },
+   {
+    "name": "qtvirtualkeyboard-6.12.0",
+    "pname": "qtvirtualkeyboard",
+    "version": "6.12.0"
+   },
+   {
+    "name": "union-6.8.1",
+    "pname": "union",
+    "version": "6.8.1"
+   },
+   {
+    "name": "qrca-26.08.2",
+    "pname": "qrca",
+    "version": "26.08.2"
+   },
+   {
+    "name": "discover-6.8.1",
+    "pname": "discover",
+    "version": "6.8.1"
+   },
+   {
+    "name": "breeze-6.8.1",
+    "pname": "breeze",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-integration-6.8.1",
+    "pname": "plasma-integration",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kwayland-integration-6.8.1",
+    "pname": "kwayland-integration",
+    "version": "6.8.1"
+   },
+   {
+    "name": "kio5-plugins-only",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "kio-extras-kf5-24.02.2",
+    "pname": "kio-extras-kf5",
+    "version": "24.02.2"
+   },
+   {
+    "name": "bluedevil-6.8.1",
+    "pname": "bluedevil",
+    "version": "6.8.1"
+   },
+   {
+    "name": "bluez-qt-6.31.0",
+    "pname": "bluez-qt",
+    "version": "6.31.0"
+   },
+   {
+    "name": "openobex-1.7.2",
+    "pname": "openobex",
+    "version": "1.7.2"
+   },
+   {
+    "name": "obexftp-0.24.2",
+    "pname": "obexftp",
+    "version": "0.24.2"
+   },
+   {
+    "name": "plasma-nm-6.8.1",
+    "pname": "plasma-nm",
+    "version": "6.8.1"
+   },
+   {
+    "name": "plasma-pa-6.8.1",
+    "pname": "plasma-pa",
+    "version": "6.8.1"
+   },
+   {
+    "name": "powerdevil-6.8.1",
+    "pname": "powerdevil",
+    "version": "6.8.1"
+   },
+   {
+    "name": "print-manager-6.8.1",
+    "pname": "print-manager",
+    "version": "6.8.1"
+   },
+   {
+    "name": "flatpak-kcm-6.8.1",
+    "pname": "flatpak-kcm",
+    "version": "6.8.1"
+   },
+   {
+    "name": "nixos-version",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-rebuild-ng-26.11",
+    "pname": "nixos-rebuild-ng",
+    "version": "26.11"
+   },
+   {
+    "name": "nixos-option-26.11",
+    "pname": "nixos-option",
+    "version": "26.11"
+   },
+   {
+    "name": "nixos-install",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-generate-config",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-enter",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-build-vms",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "lvm2-2.03.41",
+    "pname": "lvm2",
+    "version": "2.03.41"
+   },
+   {
+    "name": "dosfstools-4.2",
+    "pname": "dosfstools",
+    "version": "4.2"
+   },
+   {
+    "name": "mtools-4.0.49",
+    "pname": "mtools",
+    "version": "4.0.49"
+   },
+   {
+    "name": "e2fsprogs-1.47.4",
+    "pname": "e2fsprogs",
+    "version": "1.47.4"
+   },
+   {
+    "name": "dosfstools-4.2",
+    "pname": "dosfstools",
+    "version": "4.2"
+   },
+   {
+    "name": "bcache-tools-1.1",
+    "pname": "bcache-tools",
+    "version": "1.1"
+   },
+   {
+    "name": "systemd-262",
+    "pname": "systemd",
+    "version": "262"
+   },
+   {
+    "name": "kmod-31",
+    "pname": "kmod",
+    "version": "31"
+   },
+   {
+    "name": "kexec-tools-2.0.32",
+    "pname": "kexec-tools",
+    "version": "2.0.32"
+   },
+   {
+    "name": "xorg-server-21.1.24",
+    "pname": "xorg-server",
+    "version": "21.1.24"
+   },
+   {
+    "name": "xrandr-1.5.4",
+    "pname": "xrandr",
+    "version": "1.5.4"
+   },
+   {
+    "name": "xrdb-1.2.3",
+    "pname": "xrdb",
+    "version": "1.2.3"
+   },
+   {
+    "name": "setxkbmap-1.3.4",
+    "pname": "setxkbmap",
+    "version": "1.3.4"
+   },
+   {
+    "name": "iceauth-1.0.11",
+    "pname": "iceauth",
+    "version": "1.0.11"
+   },
+   {
+    "name": "xlsclients-1.1.6",
+    "pname": "xlsclients",
+    "version": "1.1.6"
+   },
+   {
+    "name": "xset-1.2.6",
+    "pname": "xset",
+    "version": "1.2.6"
+   },
+   {
+    "name": "xsetroot-1.1.4",
+    "pname": "xsetroot",
+    "version": "1.1.4"
+   },
+   {
+    "name": "xinput-1.6.4",
+    "pname": "xinput",
+    "version": "1.6.4"
+   },
+   {
+    "name": "xprop-1.2.8",
+    "pname": "xprop",
+    "version": "1.2.8"
+   },
+   {
+    "name": "xauth-1.1.5",
+    "pname": "xauth",
+    "version": "1.1.5"
+   },
+   {
+    "name": "xterm-411",
+    "pname": "xterm",
+    "version": "411"
+   },
+   {
+    "name": "xf86-input-evdev-2.11.0",
+    "pname": "xf86-input-evdev",
+    "version": "2.11.0"
+   },
+   {
+    "name": "hypridle-0.1.8",
+    "pname": "hypridle",
+    "version": "0.1.8"
+   },
+   {
+    "name": "dbus-1.16.2",
+    "pname": "dbus",
+    "version": "1.16.2"
+   },
+   {
+    "name": "dbus-broker-37",
+    "pname": "dbus-broker",
+    "version": "37"
+   },
+   {
+    "name": "cups-2.4.19",
+    "pname": "cups",
+    "version": "2.4.19"
+   },
+   {
+    "name": "xdg-utils-1.2.1",
+    "pname": "xdg-utils",
+    "version": "1.2.1"
+   },
+   {
+    "name": "cups-pk-helper-0.2.6",
+    "pname": "cups-pk-helper",
+    "version": "0.2.6"
+   },
+   {
+    "name": "wpa_supplicant-2.12",
+    "pname": "wpa_supplicant",
+    "version": "2.12"
+   },
+   {
+    "name": "tailscale-1.104.2",
+    "pname": "tailscale",
+    "version": "1.104.2"
+   },
+   {
+    "name": "syncthing-2.1.3",
+    "pname": "syncthing",
+    "version": "2.1.3"
+   },
+   {
+    "name": "networkmanager-1.58.1",
+    "pname": "networkmanager",
+    "version": "1.58.1"
+   },
+   {
+    "name": "modemmanager-1.24.2",
+    "pname": "modemmanager",
+    "version": "1.24.2"
+   },
+   {
+    "name": "iptables-1.8.13",
+    "pname": "iptables",
+    "version": "1.8.13"
+   },
+   {
+    "name": "nixos-firewall-tool-26.11",
+    "pname": "nixos-firewall-tool",
+    "version": "26.11"
+   },
+   {
+    "name": "avahi-0.8",
+    "pname": "avahi",
+    "version": "0.8"
+   },
+   {
+    "name": "nixos-icons-0-unstable-2025-06-28",
+    "pname": "nixos-icons",
+    "version": "0-unstable-2025-06-28"
+   },
+   {
+    "name": "xdg-utils-1.2.1",
+    "pname": "xdg-utils",
+    "version": "1.2.1"
+   },
+   {
+    "name": "upower-1.91.5",
+    "pname": "upower",
+    "version": "1.91.5"
+   },
+   {
+    "name": "udisks-2.11.2",
+    "pname": "udisks",
+    "version": "2.11.2"
+   },
+   {
+    "name": "power-profiles-daemon-0.30",
+    "pname": "power-profiles-daemon",
+    "version": "0.30"
+   },
+   {
+    "name": "xf86-input-libinput-1.5.0",
+    "pname": "xf86-input-libinput",
+    "version": "1.5.0"
+   },
+   {
+    "name": "fwupd-2.1.8",
+    "pname": "fwupd",
+    "version": "2.1.8"
+   },
+   {
+    "name": "bluez-5.87",
+    "pname": "bluez",
+    "version": "5.87"
+   },
+   {
+    "name": "sddm-wrapped",
+    "pname": "sddm",
+    "version": "0.21.0"
+   },
+   {
+    "name": "wireplumber-0.5.18",
+    "pname": "wireplumber",
+    "version": "0.5.18"
+   },
+   {
+    "name": "pipewire-1.6.9",
+    "pname": "pipewire",
+    "version": "1.6.9"
+   },
+   {
+    "name": "gnome-keyring-50.0",
+    "pname": "gnome-keyring",
+    "version": "50.0"
+   },
+   {
+    "name": "at-spi2-core-2.60.6",
+    "pname": "at-spi2-core",
+    "version": "2.60.6"
+   },
+   {
+    "name": "geoclue-2.8.2",
+    "pname": "geoclue",
+    "version": "2.8.2"
+   },
+   {
+    "name": "flatpak-1.18.4",
+    "pname": "flatpak",
+    "version": "1.18.4"
+   },
+   {
+    "name": "fuse-3.18.2",
+    "pname": "fuse",
+    "version": "3.18.2"
+   },
+   {
+    "name": "accountsservice-26.27.3",
+    "pname": "accountsservice",
+    "version": "26.27.3"
+   },
+   {
+    "name": "speech-dispatcher-0.12.1",
+    "pname": "speech-dispatcher",
+    "version": "0.12.1"
+   },
+   {
+    "name": "orca-50.2",
+    "pname": "orca",
+    "version": "50.2"
+   },
+   {
+    "name": "sudo-1.9.17p2",
+    "pname": "sudo",
+    "version": "1.9.17p2"
+   },
+   {
+    "name": "rtkit-0.14",
+    "pname": "rtkit",
+    "version": "0.14"
+   },
+   {
+    "name": "polkit-127",
+    "pname": "polkit",
+    "version": "127"
+   },
+   {
+    "name": "polkit-127",
+    "pname": "polkit",
+    "version": "127"
+   },
+   {
+    "name": "linux-pam-1.7.2",
+    "pname": "linux-pam",
+    "version": "1.7.2"
+   },
+   {
+    "name": "zsh-5.9.2",
+    "pname": "zsh",
+    "version": "5.9.2"
+   },
+   {
+    "name": "nix-zsh-completions-0.5.1-unstable-2025-12-12",
+    "pname": "nix-zsh-completions",
+    "version": "0.5.1-unstable-2025-12-12"
+   },
+   {
+    "name": "zsh-syntax-highlighting-0.8.0",
+    "pname": "zsh-syntax-highlighting",
+    "version": "0.8.0"
+   },
+   {
+    "name": "zoxide-0.10.0",
+    "pname": "zoxide",
+    "version": "0.10.0"
+   },
+   {
+    "name": "xwayland-24.1.14",
+    "pname": "xwayland",
+    "version": "24.1.14"
+   },
+   {
+    "name": "niri-26.04",
+    "pname": "niri",
+    "version": "26.04"
+   },
+   {
+    "name": "hyprlock-0.9.6",
+    "pname": "hyprlock",
+    "version": "0.9.6"
+   },
+   {
+    "name": "hyprland-0.56.2",
+    "pname": "hyprland",
+    "version": "0.56.2"
+   },
+   {
+    "name": "steam-1.0.0.87",
+    "pname": "steam",
+    "version": "1.0.0.87"
+   },
+   {
+    "name": "steam-run-1.0.0.87",
+    "pname": "steam-run",
+    "version": "1.0.0.87"
+   },
+   {
+    "name": "steam-gamescope",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "starship-1.27.0",
+    "pname": "starship",
+    "version": "1.27.0"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "bash-interactive-5.3p20",
+    "pname": "bash-interactive",
+    "version": "5.3p20"
+   },
+   {
+    "name": "nano-9.3",
+    "pname": "nano",
+    "version": "9.3"
+   },
+   {
+    "name": "less-710",
+    "pname": "less",
+    "version": "710"
+   },
+   {
+    "name": "akonadi-26.08.2",
+    "pname": "akonadi",
+    "version": "26.08.2"
+   },
+   {
+    "name": "akonadi-import-wizard-26.08.2",
+    "pname": "akonadi-import-wizard",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kdepim-runtime-26.08.2",
+    "pname": "kdepim-runtime",
+    "version": "26.08.2"
+   },
+   {
+    "name": "akonadiconsole-26.08.2",
+    "pname": "akonadiconsole",
+    "version": "26.08.2"
+   },
+   {
+    "name": "akonadi-search-26.08.2",
+    "pname": "akonadi-search",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kmail-26.08.2",
+    "pname": "kmail",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kmail-account-wizard-26.08.2",
+    "pname": "kmail-account-wizard",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kontact-26.08.2",
+    "pname": "kontact",
+    "version": "26.08.2"
+   },
+   {
+    "name": "merkuro-26.08.2",
+    "pname": "merkuro",
+    "version": "26.08.2"
+   },
+   {
+    "name": "kcontacts-6.31.0",
+    "pname": "kcontacts",
+    "version": "6.31.0"
+   },
+   {
+    "name": "akonadi-contacts-26.08.2",
+    "pname": "akonadi-contacts",
+    "version": "26.08.2"
+   },
+   {
+    "name": "git-2.56.0",
+    "pname": "git",
+    "version": "2.56.0"
+   },
+   {
+    "name": "git-lfs-3.8.0",
+    "pname": "git-lfs",
+    "version": "3.8.0"
+   },
+   {
+    "name": "gamescope",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "gamemode-1.8.2",
+    "pname": "gamemode",
+    "version": "1.8.2"
+   },
+   {
+    "name": "fuse-2.9.9",
+    "pname": "fuse",
+    "version": "2.9.9"
+   },
+   {
+    "name": "fuse-3.18.2",
+    "pname": "fuse",
+    "version": "3.18.2"
+   },
+   {
+    "name": "firefox-158.0.1",
+    "pname": "firefox",
+    "version": "158.0.1"
+   },
+   {
+    "name": "dconf-0.49.0",
+    "pname": "dconf",
+    "version": "0.49.0"
+   },
+   {
+    "name": "man-db-2.13.1",
+    "pname": "man-db",
+    "version": "2.13.1"
+   },
+   {
+    "name": "texinfo-interactive-7.3",
+    "pname": "texinfo-interactive",
+    "version": "7.3"
+   },
+   {
+    "name": "nixos-configuration-reference-manpage",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-manual-html",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nixos-help",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "sound-theme-freedesktop-0.8",
+    "pname": "sound-theme-freedesktop",
+    "version": "0.8"
+   },
+   {
+    "name": "xdg-desktop-portal-1.22.1",
+    "pname": "xdg-desktop-portal",
+    "version": "1.22.1"
+   },
+   {
+    "name": "xdg-utils-1.2.1",
+    "pname": "xdg-utils",
+    "version": "1.2.1"
+   },
+   {
+    "name": "kwallet-6.31.0",
+    "pname": "kwallet",
+    "version": "6.31.0"
+   },
+   {
+    "name": "xdg-desktop-portal-kde-6.8.1",
+    "pname": "xdg-desktop-portal-kde",
+    "version": "6.8.1"
+   },
+   {
+    "name": "xdg-desktop-portal-gtk-1.15.3",
+    "pname": "xdg-desktop-portal-gtk",
+    "version": "1.15.3"
+   },
+   {
+    "name": "gnome-keyring-50.0",
+    "pname": "gnome-keyring",
+    "version": "50.0"
+   },
+   {
+    "name": "xdg-desktop-portal-gnome-50.0",
+    "pname": "xdg-desktop-portal-gnome",
+    "version": "50.0"
+   },
+   {
+    "name": "xdg-desktop-portal-gtk-1.15.3",
+    "pname": "xdg-desktop-portal-gtk",
+    "version": "1.15.3"
+   },
+   {
+    "name": "xdg-desktop-portal-hyprland-1.4.1",
+    "pname": "xdg-desktop-portal-hyprland",
+    "version": "1.4.1"
+   },
+   {
+    "name": "xdg-desktop-portal-gtk-1.15.3",
+    "pname": "xdg-desktop-portal-gtk",
+    "version": "1.15.3"
+   },
+   {
+    "name": "plasma-workspace-6.8.1",
+    "pname": "plasma-workspace",
+    "version": "6.8.1"
+   },
+   {
+    "name": "hyprland-0.56.2",
+    "pname": "hyprland",
+    "version": "0.56.2"
+   },
+   {
+    "name": "shared-mime-info-2.5.1",
+    "pname": "shared-mime-info",
+    "version": "2.5.1"
+   },
+   {
+    "name": "hicolor-icon-theme-0.18",
+    "pname": "hicolor-icon-theme",
+    "version": "0.18"
+   },
+   {
+    "name": "fallback-cursor-theme",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "bash-interactive-5.3p20",
+    "pname": "bash-interactive",
+    "version": "5.3p20"
+   },
+   {
+    "name": "zsh-5.9.2",
+    "pname": "zsh",
+    "version": "5.9.2"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "bash-interactive-5.3p20",
+    "pname": "bash-interactive",
+    "version": "5.3p20"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "bash-interactive-5.3p20",
+    "pname": "bash-interactive",
+    "version": "5.3p20"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "bind-9.20.30",
+    "pname": "bind",
+    "version": "9.20.30"
+   },
+   {
+    "name": "hostname-hostname-debian-3.25",
+    "pname": "hostname-debian",
+    "version": "3.25"
+   },
+   {
+    "name": "iproute2-7.2.0",
+    "pname": "iproute2",
+    "version": "7.2.0"
+   },
+   {
+    "name": "iputils-20250605",
+    "pname": "iputils",
+    "version": "20250605"
+   },
+   {
+    "name": "openssh-10.6p1",
+    "pname": "openssh",
+    "version": "10.6p1"
+   },
+   {
+    "name": "acl-2.4.0",
+    "pname": "acl",
+    "version": "2.4.0"
+   },
+   {
+    "name": "attr-2.6.0",
+    "pname": "attr",
+    "version": "2.6.0"
+   },
+   {
+    "name": "bash-interactive-5.3p20",
+    "pname": "bash-interactive",
+    "version": "5.3p20"
+   },
+   {
+    "name": "bzip2-1.0.8",
+    "pname": "bzip2",
+    "version": "1.0.8"
+   },
+   {
+    "name": "coreutils-full-9.12",
+    "pname": "coreutils-full",
+    "version": "9.12"
+   },
+   {
+    "name": "cpio-2.15",
+    "pname": "cpio",
+    "version": "2.15"
+   },
+   {
+    "name": "curl-8.22.0",
+    "pname": "curl",
+    "version": "8.22.0"
+   },
+   {
+    "name": "diffutils-3.12",
+    "pname": "diffutils",
+    "version": "3.12"
+   },
+   {
+    "name": "findutils-4.11.0",
+    "pname": "findutils",
+    "version": "4.11.0"
+   },
+   {
+    "name": "gawk-5.4.1",
+    "pname": "gawk",
+    "version": "5.4.1"
+   },
+   {
+    "name": "getent-glibc-2.44-57",
+    "pname": "glibc",
+    "version": "2.44"
+   },
+   {
+    "name": "getconf-glibc-2.44-57",
+    "pname": "glibc",
+    "version": "2.44"
+   },
+   {
+    "name": "gnugrep-3.12",
+    "pname": "gnugrep",
+    "version": "3.12"
+   },
+   {
+    "name": "patch-2.8",
+    "pname": "patch",
+    "version": "2.8"
+   },
+   {
+    "name": "gnused-4.10",
+    "pname": "gnused",
+    "version": "4.10"
+   },
+   {
+    "name": "gnutar-1.35",
+    "pname": "gnutar",
+    "version": "1.35"
+   },
+   {
+    "name": "gzip-1.15",
+    "pname": "gzip",
+    "version": "1.15"
+   },
+   {
+    "name": "xz-5.8.4",
+    "pname": "xz",
+    "version": "5.8.4"
+   },
+   {
+    "name": "less-710",
+    "pname": "less",
+    "version": "710"
+   },
+   {
+    "name": "libcap-2.78",
+    "pname": "libcap",
+    "version": "2.78"
+   },
+   {
+    "name": "ncurses-6.6",
+    "pname": "ncurses",
+    "version": "6.6"
+   },
+   {
+    "name": "libressl-4.3.2",
+    "pname": "libressl",
+    "version": "4.3.2"
+   },
+   {
+    "name": "mkpasswd-5.6.6",
+    "pname": "mkpasswd",
+    "version": "5.6.6"
+   },
+   {
+    "name": "procps-4.0.7",
+    "pname": "procps",
+    "version": "4.0.7"
+   },
+   {
+    "name": "shadow-4.20.3",
+    "pname": "shadow",
+    "version": "4.20.3"
+   },
+   {
+    "name": "time-1.10",
+    "pname": "time",
+    "version": "1.10"
+   },
+   {
+    "name": "util-linux-2.42.4",
+    "pname": "util-linux",
+    "version": "2.42.4"
+   },
+   {
+    "name": "which-2.25",
+    "pname": "which",
+    "version": "2.25"
+   },
+   {
+    "name": "zstd-1.5.7",
+    "pname": "zstd",
+    "version": "1.5.7"
+   },
+   {
+    "name": "glibc-2.44-57",
+    "pname": "glibc",
+    "version": "2.44"
+   },
+   {
+    "name": "perl-5.42.3",
+    "pname": "perl",
+    "version": "5.42.3"
+   },
+   {
+    "name": "rsync-3.5.0",
+    "pname": "rsync",
+    "version": "3.5.0"
+   },
+   {
+    "name": "strace-7.2",
+    "pname": "strace",
+    "version": "7.2"
+   },
+   {
+    "name": "openresolv-3.17.4",
+    "pname": "openresolv",
+    "version": "3.17.4"
+   },
+   {
+    "name": "nix-2.34.9",
+    "pname": "nix",
+    "version": "2.34.9"
+   },
+   {
+    "name": "nix-info",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "nix-bash-completions-0.6.8",
+    "pname": "nix-bash-completions",
+    "version": "0.6.8"
+   },
+   {
+    "name": "glibc-locales-2.44-57",
+    "pname": "glibc-locales",
+    "version": "2.44"
+   },
+   {
+    "name": "X11-fonts",
+    "pname": null,
+    "version": null
+   },
+   {
+    "name": "fontconfig-2.18.3",
+    "pname": "fontconfig",
+    "version": "2.18.3"
+   },
+   {
+    "name": "kbd-2.9.0",
+    "pname": "kbd",
+    "version": "2.9.0"
+   }
+  ],
+  "programs": [
+   "bash",
+   "dconf",
+   "firefox",
+   "fuse",
+   "gamemode",
+   "gamescope",
+   "git",
+   "hyprland",
+   "hyprlock",
+   "kde-pim",
+   "less",
+   "nano",
+   "niri",
+   "starship",
+   "steam",
+   "xwayland",
+   "zoxide",
+   "zsh"
+  ]
+ }
+}
