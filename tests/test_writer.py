@@ -58,9 +58,10 @@ class FakeNix:
         *,
         options: dict[str, dict] | None = None,
         fail_check: str | None = None,
+        bad_value: str | None = None,
     ):
         self.installed, self.pkgs, self.fail = installed, pkgs, fail
-        self.options, self.fail_check = options or {}, fail_check
+        self.options, self.fail_check, self.bad_value = options or {}, fail_check, bad_value
         self.calls: list[list[str]] = []
 
     def __call__(self, args: list[str], **kw) -> str:
@@ -78,6 +79,10 @@ class FakeNix:
             return json.dumps(_option_entries(self.options, prefix))
         if self.fail_check and ("installed" in apply or "__nixinUnset" in apply):
             raise NixinError("eval-failed", self.fail_check)
+        if self.bad_value and "__nixinUnset" in apply:  # the option's value throws
+            return json.dumps({"__nixinError": True})
+        if self.bad_value and "builtins.deepSeq" in apply:  # … and why, without tryEval
+            raise NixinError("eval-failed", self.bad_value)
         if "hasAttrByPath" in apply:
             wanted = _lists(apply)
             return json.dumps([".".join(a) in self.pkgs for a in wanted])
@@ -925,6 +930,15 @@ def test_eval_failure_after_a_write_says_how_to_undo(cfg, monkeypatch, cache_dir
     assert d["error"]["undo"] == [f"nixin --host 19BK rm cowsay --home alice --config {cfg}"]
     rc, d = run(cfg, "rm", "--home", "alice", "cowsay", host="19BK", nix=True)
     assert d["error"]["undo"] == [f"nixin --host 19BK add cowsay --home alice --config {cfg}"]
+
+
+def test_a_value_that_does_not_evaluate_says_why(cfg, monkeypatch, cache_dir):
+    why = "error: A definition for option `services.openssh.enable' is not of type `boolean'."
+    _options_nix(monkeypatch, bad_value=why)
+    rc, d = run(cfg, "set", "services.openssh.enable", '"yes"', "--force", nix=True)
+    assert rc == 1 and d["error"]["code"] == "eval-failed"
+    assert d["checks"]["eval"]["message"] == f"services.openssh.enable does not evaluate:\n{why}"
+    assert why in d["error"]["message"] and d["error"]["undo"]
 
 
 # --- live -----------------------------------------------------------------------------

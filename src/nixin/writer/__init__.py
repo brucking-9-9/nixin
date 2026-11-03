@@ -691,11 +691,18 @@ def _check_option(ctx: Ctx, parts: list[str]):
         if err is not None:
             return {**err, "attr": attr}
         if isinstance(got, dict) and got.get("__nixinError"):
+            # tryEval keeps nix's reason to itself; force the value once more without it
+            why = (
+                "c: let lib = c.pkgs.lib; in "
+                f"builtins.deepSeq (lib.attrByPath {nix_value(parts)} null {base}) null"
+            )
+            _, again = _eval_or_error(ctx, why)
+            reason = f":\n{again['message']}" if again else ""
             return {
                 "ok": False,
                 "code": "eval-failed",
                 "attr": attr,
-                "message": f"{attr_key(parts)} does not evaluate",
+                "message": f"{attr_key(parts)} does not evaluate{reason}",
             }
         if isinstance(got, dict) and got.get("__nixinUnset"):
             return {
