@@ -48,6 +48,26 @@ PACKAGES = {
 }
 
 
+# the Options page: NixOS options on mbp13 (services.openssh.*, recorded against ~/nixos, the
+# writes in a throwaway clone of it) and Home Manager options on 19BK (programs.git.*, user
+# brucking, read-only against ~/nixos)
+OPTIONS = {
+    "search": "options_search_openssh",
+    "where": ["options_where_openssh_enable", "options_where_openssh_set"],
+    "where services.openssh.ports": "options_where_openssh_ports",
+    "set --dry-run": "options_set_dry_openssh",
+    "set": "options_set_openssh",
+    "unset --dry-run": "options_unset_dry_openssh",
+    "unset": "options_unset_openssh",
+    "status": "options_status_set",
+}
+HM_OPTIONS = {
+    "search": "options_search_hm_git",
+    "where": "options_where_hm_git_lfs",
+    "set --dry-run": "options_set_dry_hm_git_lfs",
+}
+
+
 def load(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / f"{name}.json").read_text())
 

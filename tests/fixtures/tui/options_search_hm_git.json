@@ -1,0 +1,244 @@
+{
+  "cached": true,
+  "channel": "unstable",
+  "count": 12,
+  "host": "19BK",
+  "kind": "hm",
+  "limit": 12,
+  "ok": true,
+  "query": "git",
+  "results": [
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "[ ]",
+      "description": "List of defining attributes set globally.",
+      "example": "[\n  \"*.pdf diff=pdf\"\n]",
+      "kind": "hm",
+      "name": "programs.git.attributes",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "list of string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable Git.",
+      "example": "true",
+      "kind": "hm",
+      "name": "programs.git.enable",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "{ }",
+      "description": "Configuration helper for Git hooks.\nSee <https://git-scm.com/docs/githooks>\nfor reference.",
+      "example": "{\n  pre-commit = ./pre-commit-script;\n}\n",
+      "kind": "hm",
+      "name": "programs.git.hooks",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "attribute set of absolute path"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "[ ]",
+      "description": "List of paths that should be globally ignored.",
+      "example": "[\n  \"*~\"\n  \"*.swp\"\n]",
+      "kind": "hm",
+      "name": "programs.git.ignores",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "list of string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "[ ]",
+      "description": "List of configuration files to include.",
+      "example": "[\n  {\n    path = \"~/path/to/config.inc\";\n  }\n  {\n    condition = \"gitdir:~/src/dir\";\n    path = \"~/path/to/conditional.inc\";\n  }\n]",
+      "kind": "hm",
+      "name": "programs.git.includes",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "list of (submodule)"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "null",
+      "description": "Include this configuration only when {var}`condition`\nmatches. Allowed conditions are described in\n{manpage}`git-config(1)`.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.git.includes.*.condition",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "null or string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "{ }",
+      "description": "Configuration to include. If empty then a path must be given.\n\nThis follows the configuration structure as described in\n{manpage}`git-config(1)`.",
+      "example": "{\n  commit = {\n    gpgSign = true;\n  };\n  user = {\n    email = \"bob@work.example.com\";\n    name = \"Bob Work\";\n    signingKey = \"1A2B3C4D5E6F7G8H\";\n  };\n}",
+      "kind": "hm",
+      "name": "programs.git.includes.*.contents",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "attribute set of anything"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "\"gitconfig\"",
+      "description": "Nix store name for the git configuration text file,\nwhen generating the configuration text from nix options.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.git.includes.*.contentSuffix",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "string"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": null,
+      "description": "Path of the configuration file to include.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.git.includes.*.path",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "string or absolute path"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "false",
+      "description": "Whether to enable Git Large File Storage.",
+      "example": "true",
+      "kind": "hm",
+      "name": "programs.git.lfs.enable",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "boolean"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "pkgs.git-lfs",
+      "description": "The git-lfs package to use.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.git.lfs.package",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "null or package"
+    },
+    {
+      "channel": "unstable",
+      "declaration_urls": [
+        "https://github.com/nix-community/home-manager/blob/master/modules/programs/git.nix"
+      ],
+      "declarations": [
+        "modules/programs/git.nix"
+      ],
+      "default": "false",
+      "description": "Skip automatic downloading of objects on clone or pull.\nThis requires a manual {command}`git lfs pull`\nevery time a new commit is checked out on your repository.",
+      "example": null,
+      "kind": "hm",
+      "name": "programs.git.lfs.skipSmudge",
+      "read_only": false,
+      "rev": null,
+      "source": "home-manager-options",
+      "type": "boolean"
+    }
+  ],
+  "rev": null,
+  "source": "home-manager-options",
+  "sources": {
+    "home-manager-options": {
+      "cached": true,
+      "channel": "unstable",
+      "count": 12,
+      "error": null,
+      "kinds": [
+        "hm"
+      ],
+      "rev": null,
+      "updated": "November 02, 2026 at 12:15 UTC"
+    }
+  },
+  "verb": "search"
+}

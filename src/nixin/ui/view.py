@@ -1258,3 +1258,242 @@ def update_summary(doc: Doc) -> str:
     """One line for the session log: `nixpkgs 3ec6363 → 0bb2eed (flake.lock)`."""
     fr, to = doc.get("from") or {}, doc.get("to") or {}
     return f"{doc.get('input')} {short(fr.get('rev'))} → {short(to.get('rev'))} (flake.lock)"
+
+
+# --- options: the Options page ----------------------------------------------------------------
+
+OPTION_KINDS = ("opt", "hm")  # the page's toggle: NixOS options, Home Manager options
+OPTION_KIND_LABEL = {"opt": "NixOS", "hm": "Home Manager"}
+OPTION_LIMIT = 50  # rows per search: a browser shows more than the CLI's 20
+
+# where a definition's priority comes from (lib/modules.nix: mkOptionDefault, mkDefault,
+# a plain definition, mkForce)
+_PRIO = {1500: "the option's default", 1000: "lib.mkDefault", 50: "lib.mkForce"}
+_PLACEHOLDER = re.compile(r"^<(derivation .*|function|package set|….*|mkIf .*|cannot .*)>$")
+
+
+def option_search_args(query: str, kind: str, channel: str) -> list[str]:
+    """`search` for the page: NixOS (`opt`) or Home Manager (`hm`) options only."""
+    return ["--kind", kind, "--channel", channel, "--limit", str(OPTION_LIMIT), "--", query]
+
+
+def option_template(name: str) -> bool:
+    """`users.users.<name>.shell`, `programs.git.includes.*.path`: a path with a placeholder
+    for an attribute name or a list element, which `set` cannot take as it is."""
+    return "<" in name or ".*." in name or name.endswith(".*")
+
+
+def option_placeholder(name: str) -> tuple[int, int] | None:
+    """Where the first `<name>` (or `*`) of a template is, to select it for typing over."""
+    m = re.search(r"<[^>]*>|(?:^|(?<=\.))\*(?=\.|$)", name)
+    return (m.start(), m.end()) if m else None
+
+
+def option_where_scopes(where: Doc | None, kind: str) -> list[dict[str, Any]]:
+    """The `where` scopes this page shows: the NixOS tree for `opt`, every Home Manager user's
+    for `hm` (`where` answers every tree that has the name: `programs.git.lfs.enable` is
+    both a NixOS and a Home Manager option)."""
+    if not where or not where.get("ok"):
+        return []
+    want = "home" if kind == "hm" else "nixos"
+    return [s for s in where.get("scopes") or [] if s.get("scope") == want]
+
+
+def option_users(where: Doc | None) -> list[str]:
+    """The Home Manager users whose tree has the option (from `where`)."""
+    return [str(s["user"]) for s in option_where_scopes(where, "hm") if s.get("user")]
+
+
+def _scope_for(where: Doc | None, kind: str, user: str | None) -> dict[str, Any] | None:
+    scopes = option_where_scopes(where, kind)
+    if kind == "hm":
+        return next((s for s in scopes if s.get("user") == user), None)
+    return scopes[0] if scopes else None
+
+
+def _first(scope: dict[str, Any] | None) -> dict[str, Any] | None:
+    opts = (scope or {}).get("options") or []
+    return opts[0] if opts else None
+
+
+def _lossy(v: Any) -> bool:
+    """A `where` value nix_text cannot give back exactly: a placeholder (a derivation, a
+    function, a capped list) or a multi-line string (cut to its first line)."""
+    if isinstance(v, str):
+        return "\n" in v or bool(_PLACEHOLDER.match(v))
+    if isinstance(v, list):
+        return any(_lossy(x) for x in v)
+    if isinstance(v, dict):
+        return "<…>" in v or any(_lossy(x) for x in v.values())
+    return False
+
+
+def option_value_text(where: Doc | None, kind: str, user: str | None) -> str | None:
+    """The value on this host (the user's for `hm`) as Nix text, None when `where` has none."""
+    o = _first(_scope_for(where, kind, user))
+    if o is None or o.get("value_error") or o.get("value_found") is False or "value" not in o:
+        return None
+    return nix_text(o.get("value"))
+
+
+def option_prefill(rec: dict[str, Any], where: Doc | None, kind: str, user: str | None) -> str:
+    """What the Set dialog starts with: the value on this host when it can be written back as
+    it is, else the documented default, else nothing."""
+    o = _first(_scope_for(where, kind, user))
+    if (
+        o is not None
+        and "value" in o
+        and not o.get("value_error")
+        and o.get("value_found") is not False
+        and not _lossy(o.get("value"))
+    ):
+        return nix_text(o.get("value"))
+    default = rec.get("default")
+    return str(default) if default not in (None, "") and "\n" not in str(default) else ""
+
+
+def option_cue(where: Doc | None, kind: str, user: str | None) -> Span | None:
+    """`= true` beside the title once `where` answered."""
+    text = option_value_text(where, kind, user)
+    return None if text is None else Span(f"= {clip(text, 30)}", "option")
+
+
+def option_fields(rec: dict[str, Any], where: Doc | None = None) -> list[Field]:
+    """What the option is: type, default, example (Nix text, an attrset keeps its lines),
+    read-only. Upstream's record first; the type from `where` (the locked nixpkgs) when
+    upstream has none."""
+    out: list[Field] = []
+    o = next((_first(s) for s in (where or {}).get("scopes") or [] if _first(s)), None)
+    typ = rec.get("type") or (o or {}).get("type")
+    for label, value in (("type", typ), ("default", rec.get("default"))):
+        if value not in (None, ""):
+            out.append(Field(label, str(value), "option"))
+    ex = rec.get("example")
+    out.append(
+        Field("example", str(ex), "option")
+        if ex not in (None, "")
+        else Field("example", "—", "dim")
+    )
+    if rec.get("read_only"):
+        out.append(Field("read-only", "yes: set by the module itself", "warn"))
+    if option_template(str(rec.get("name") or "")):
+        out.append(
+            Field("path", "a template: Set asks for the name in place of <name> / *", "warn")
+        )
+    return out
+
+
+def option_about(rec: dict[str, Any], where: Doc | None = None) -> str:
+    """The full description: upstream's, else the one `where` evaluated."""
+    text = str(rec.get("description") or "").strip()
+    if not text:
+        o = next((_first(s) for s in (where or {}).get("scopes") or [] if _first(s)), None)
+        text = str((o or {}).get("description") or "").strip()
+    return text or "(no description)"
+
+
+def _definition(df: dict[str, Any], prio: Any, several: bool) -> Field:
+    if df.get("source") == "config":
+        text = place(df)
+        if df.get("text"):
+            text += f"  {clip(df['text'], 60)}"
+        elif several:
+            text += f" = {clip(nix_text(df.get('value')), 40)}"
+        return Field("set in", text, "")
+    why = _PRIO.get(prio) if isinstance(prio, int) else None
+    return Field("set in", place(df) + (f" ({why})" if why else ""), "dim")
+
+
+def option_host(
+    where: Doc | None, host: str, kind: str, user: str | None = None, *, template: bool = False
+) -> Section:
+    """`where` for the page's tree: the value on this host and the files that set it (a config
+    file with its line, or the module that gives the default). For `hm`, one block per Home
+    Manager user, the selected `user` first."""
+    title = f"on {host}"
+    if template:
+        return Section(title, [], "a template: where needs the full name (Set asks for it)", "dim")
+    if where is None:
+        return Section(title, [], "evaluating…", "dim")
+    if not where.get("ok"):
+        n = notice(where)
+        assert n is not None
+        if n.code == "not-found":
+            what = "Home Manager option" if kind == "hm" else "option"
+            return Section(title, [], f"not an {what} of {host}'s config: {n.message}", "dim")
+        return Section(title, [], f"{n.code}: {n.message}", "error")
+    scopes = option_where_scopes(where, kind)
+    if not scopes:
+        if kind == "hm":
+            other = "no Home Manager user of this host has it"
+        else:
+            other = "only a Home Manager option here"
+        return Section(title, [], other, "dim")
+    scopes.sort(key=lambda s: s.get("user") != user)
+    fields: list[Field] = []
+    for s in scopes:
+        tag = f"  [home {s.get('user')}]" if kind == "hm" else ""
+        for o in s.get("options") or []:
+            fields.append(Field("value", option_value(o) + tag, "option"))
+            if o.get("option") != o.get("name"):
+                fields.append(Field("inside", f"{o.get('option')} ({o.get('type')})", "dim"))
+            defs = o.get("definitions") or []
+            for df in defs:
+                fields.append(_definition(df, o.get("highestPrio"), len(defs) > 1))
+            if not defs:
+                fields.append(Field("set in", "nothing (the default)", "dim"))
+    return Section(title, fields)
+
+
+def option_declared(rec: dict[str, Any], where: Doc | None, kind: str) -> list[Field]:
+    """Where the option is declared upstream: the module file and line on the locked nixpkgs
+    or home-manager (from `where`), and upstream's link to it (search.nixos.org, the HM index)."""
+    out: list[Field] = []
+    seen: set[str] = set()
+    for s in option_where_scopes(where, kind)[:1]:
+        o = _first(s) or {}
+        for dec in o.get("declarations") or []:
+            text = place(dec)
+            if text not in seen:
+                seen.add(text)
+                out.append(Field("module", text, ""))
+    urls = [str(u) for u in rec.get("declaration_urls") or []]
+    for u in urls[:2]:
+        out.append(Field("upstream", u, "dim"))
+    if not out:
+        for d in (rec.get("declarations") or [])[:2]:
+            out.append(Field("module", str(d), "dim"))
+    src = f"{rec.get('source') or ''} {rec.get('channel') or ''}".strip()
+    if rec.get("rev"):
+        src += f"@{short(rec['rev'], 8)}"
+    if src:
+        out.append(Field("docs", src, "dim"))
+    return out
+
+
+def option_sections(
+    rec: dict[str, Any], where: Doc | None, host: str, kind: str, user: str | None = None
+) -> list[Section]:
+    """The details of one option, in display order: what it is, the description, its value
+    and definitions on this host, where it is declared. `where` None: still evaluating.
+
+    The seam for `explain` (branch typed-set-explain): it joins the same two sides in one
+    document; a front end can call it instead of `where` and map it onto these sections."""
+    template = option_template(str(rec.get("name") or ""))
+    return [
+        Section("option", option_fields(rec, where)),
+        Section("about", [], option_about(rec, where), ""),
+        option_host(where, host, kind, user, template=template),
+        Section("declared", option_declared(rec, where, kind)),
+    ]
+
+
+def option_set_hint(rec: dict[str, Any]) -> list[Field]:
+    """Under the Set dialog's value: the type, and the example (as upstream writes it)."""
+    out = [Field("type", str(rec.get("type") or "?"), "option")]
+    ex = rec.get("example")
+    if ex not in (None, ""):
+        out.append(Field("example", str(ex), "option"))
+    if rec.get("default") not in (None, ""):
+        out.append(Field("default", str(rec.get("default")), "dim"))
+    return out
