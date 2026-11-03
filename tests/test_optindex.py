@@ -275,6 +275,21 @@ def test_search_hm_and_all(machine, transport, capsys, monkeypatch):
     assert rc == 1 and doc["error"]["code"] == "network"
 
 
+def test_index_info_for_other_verbs(machine):
+    import argparse
+
+    from nixin import discovery
+
+    machine.nixos()
+    ns = argparse.Namespace(host="mbp13", channel=None)  # explain's namespace has no more
+    part = discovery.index_info(ns, "opt", "services.openssh.enable")
+    assert part.source == "index" and part.results[0]["generation"]["number"] == 7
+    assert discovery.index_info(ns, "opt", "no.such.option").results == []
+    assert discovery.index_info(ns, "hm", "programs.git.enable") is None  # no HM index
+    ns.channel = "25.05"  # asked for a channel: upstream's answer, not this generation's
+    assert discovery.index_info(ns, "opt", "services.openssh.enable") is None
+
+
 def test_info_all_mixes_index_and_upstream(machine, es_transport, capsys):
     machine.nixos()
     rc, doc = run(capsys, "--host", "mbp13", "info", "services.openssh.enable")

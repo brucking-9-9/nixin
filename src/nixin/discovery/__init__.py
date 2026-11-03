@@ -320,6 +320,19 @@ def _index_part(ns: argparse.Namespace, kind: str, pick: Callable) -> Part | Non
     )
 
 
+def index_info(ns: argparse.Namespace, kind: str, name: str) -> Part | None:
+    """`info`'s exact lookup in this machine's option index, for callers outside
+    discovery (explain's upstream side): a Part with one result, a Part with none (the
+    index applies but lacks NAME), or None (no index for this kind and `ns.host`, or
+    `--no-index`/`--channel`/`--nixpkgs` on `ns`)."""
+
+    def exact(idx: Any) -> list[dict]:
+        hit = idx.lookup(name)
+        return [hit] if hit is not None else []
+
+    return _index_part(ns, kind, exact)
+
+
 def _prefer_index(ns: argparse.Namespace, kind: str, pick: Callable, upstream: Callable) -> Part:
     """The index's answer when it has one; else upstream's, with a note when the index
     was asked and had nothing."""
@@ -399,12 +412,14 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
 
         return noogle.info(cache, name)
 
-    def exact(idx: Any) -> list[dict]:
-        hit = idx.lookup(name)
-        return [hit] if hit is not None else []
-
     def one(kind: str) -> Part:
-        return _prefer_index(ns, kind, exact, upstream)
+        part = index_info(ns, kind, name)
+        if part is not None and part.results:
+            return part
+        up = upstream(kind)
+        if part is not None:
+            up.notes.append(f"nothing in this machine's option index; asked {up.source}")
+        return up
 
     parts = _fan_out(ns, kinds, one)
     doc = _merge(ns, parts)
