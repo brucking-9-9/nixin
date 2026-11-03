@@ -174,9 +174,10 @@ exercised live: generation 126 has no nixin module, so no index exists on mbp13 
 ## Left behind
 
 This run cannot `rm -rf`. `/tmp/integrate-night/` holds the build logs, the smoke outputs,
-the screenshot runs, the sudo stub, the clone `nixos-clone/` and the out-link `result`
-(a GC root for nixin-0.1.0 until removed): `rm -rf /tmp/integrate-night`. The live GUI run
-added a few images to `~/.cache/nixin/images/`.
+the screenshot runs, the sudo stub and the clone `nixos-clone/`: `rm -rf
+/tmp/integrate-night` (the smoke's out-link, a GC root, is already removed). The live GUI
+run added a few images to `~/.cache/nixin/images/`. Final `nix build` of HEAD: 930
+passed, 34 skipped, self-test ok.
 
 ## How to test
 

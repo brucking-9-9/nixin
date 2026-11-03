@@ -31,8 +31,8 @@ conflict decision, the live smoke table.
   at the end of HANDOFF-integrate-night. By hand, read-only: `nixin-tui --config ~/nixos`
   (`o` Options, `t` Try in Details) and `nixin-gui --config ~/nixos` (Ctrl+5 Options,
   Ctrl+B Browse).
-- **Left behind**: `/tmp/integrate-night` (logs, smoke outputs, a clone, an out-link that
-  roots nixin-0.1.0): `rm -rf /tmp/integrate-night`.
+- **Left behind**: `/tmp/integrate-night` (build logs, smoke outputs, screenshot runs, a
+  clone of `~/nixos`): `rm -rf /tmp/integrate-night`.
 
 ## Layers
 
