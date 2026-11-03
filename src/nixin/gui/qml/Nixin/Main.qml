@@ -123,6 +123,9 @@ ApplicationWindow {
     UpdateDialog {
         packages: win.backend.packages
     }
+    TryDialog {
+        trying: win.backend.trying
+    }
 
     function showPage(name: string) {
         win.backend.go(name);
