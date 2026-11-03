@@ -56,6 +56,7 @@ ERROR_CODES = {
     "unknown-user",
     "unknown-package",
     "invalid-nix",
+    "type-mismatch",
     "ambiguous",
     "import-site-missing",
     "file-conflict",
@@ -283,8 +284,23 @@ class World:
                         "value": {"X11Forwarding": _nix_value(mine[X11])},
                     }
                 )
+            sub = {}
+            if dotted == X11:  # options.nix follows the path into the submodule
+                sub = {
+                    "sub": {
+                        "option": X11,
+                        "description": "Whether to allow X11 connections to be forwarded.",
+                        "typeInfo": {
+                            "name": "nullOr",
+                            "description": "null or boolean",
+                            "nested": {"elemType": {"name": "bool", "description": "boolean"}},
+                        },
+                        "default": {"value": False},
+                    }
+                }
             return [
                 {
+                    **sub,
                     "name": "services.openssh.settings",
                     "type": "open submodule of attribute set of (atom)",
                     "description": "Configuration for `sshd_config(5)`.",
@@ -568,8 +584,23 @@ def test_option_flow(world, capsys):
     (scope,) = doc["scopes"]
     assert scope["mode"] == "sub" and scope["options"][0]["value"] is False
 
+    doc = nixin(capsys, world, "set", X11)  # no value: what it is, nothing written
+    assert (doc["type"], doc["default"], doc["value"]) == ("null or boolean", "false", False)
+    assert doc["target"] == {"file": "installer/mbp13.nix", "line": None, "in_place": False}
+    assert snapshot(world.root) == before
+
+    doc = nixin(capsys, world, "set", X11, "yes")
+    assert doc["error"]["code"] == "type-mismatch" and doc["error"]["expected"] == "null or boolean"
+    assert snapshot(world.root) == before
+
     doc = nixin(capsys, world, "set", X11, "true")
     assert doc["option"] == X11 and doc["value"] == "true"  # the Nix text as given
+    assert doc["checks"]["type"] == {
+        "ok": True,
+        "option": "services.openssh.settings",
+        "expected": "null or boolean",
+        "note": "fits",
+    }
     assert doc["checks"]["eval"] == {
         "ok": True,
         "attr": f"nixosConfigurations.mbp13.config.{X11}",
@@ -690,7 +721,10 @@ SWEEP = [
     ["rm", "no-such-pkg"],  # not-found
     ["rm", "x", "--where", "nonsense"],  # usage
     ["set", X11, "{ "],  # invalid-nix
-    ["set", X11],  # usage
+    ["set", X11, '"yes"'],  # type-mismatch
+    ["set", "services.nosuch.enable", "true"],  # not-found (no such option)
+    ["set", X11],  # what it is (no value)
+    ["set"],  # usage
     ["unset", X11],  # not-found
     ["add", "--home", "bob", "cowsay"],  # unknown-user
     # apply (the fixture copy is no git checkout: not-a-workspace)

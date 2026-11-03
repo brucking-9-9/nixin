@@ -798,19 +798,20 @@ mode, as under `tui`, so their logs stream into the window.
 | `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON; `update`: nix could not fetch the new commit |
 | `http-<status>` | discovery, outdated | a 4xx the caller may act on (`http-400`, …) |
 | `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`, `update`: a target ref GitHub does not know |
-| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
+| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `set`: OPTION is not an option of the host (or HM user); `--force` writes it anyway. `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
 | `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
 | `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target; `update`: `nix flake update`/`lock` failed |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
 | `config-not-found` | truth, writer, outdated | no `flake.nix` in the config dir |
 | `not-a-flake` | truth, outdated | `nix flake metadata`/`nix flake archive` failed on the config |
 | `unknown-host` | truth, writer, outdated | `--host` is not in `nixosConfigurations` |
-| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it) |
-| `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
+| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it). Writer: the eval after a write failed; the write stays (the document still has `changes[]`, `actions[]`, `checks`) and `error.undo[]` has the commands that take it back |
+| `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit); after a write, as `eval-failed` (the write stays, `undo[]`) |
 | `not-a-workspace` | writer, apply, outdated (`update`) | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
 | `unknown-user` | truth, writer, outdated | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |
+| `type-mismatch` | writer | `set`: the value's text does not fit the option's type (`expected`, `type_info`, `default`, `example`, `option`, `value`); nothing written; `--force` writes it anyway |
 | `ambiguous` | writer | several declarations match; `candidates[]`, repeat with `--where` |
 | `import-site-missing` | writer | no module or no `imports = [ … ];` to import the generated file from; `line` to add |
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
