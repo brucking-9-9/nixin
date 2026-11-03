@@ -36,7 +36,6 @@ import argparse
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -144,6 +143,8 @@ def _dead() -> set[str]:
 def estimate(drop: list[dict[str, Any]], *, dead: bool) -> dict[str, Any]:
     """What deleting `drop` (generation rows) and collecting would free; `dead` adds what
     is garbage already (a whole-store scan, run alongside)."""
+    from concurrent.futures import ThreadPoolExecutor  # here: 10 ms at import (logging)
+
     t = time.monotonic()
     with ThreadPoolExecutor(max_workers=1) as pool:
         dead_job = pool.submit(_dead) if dead else None

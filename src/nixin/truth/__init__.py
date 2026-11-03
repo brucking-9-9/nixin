@@ -22,6 +22,7 @@ from . import packages as pkgs
 from .cache import TruthCache
 
 VERBS = ("status", "where", "list")
+HOSTS_KEY = "_flake"  # the hosts cache file is per flake, not per host
 
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -63,6 +64,22 @@ def _run(ns: argparse.Namespace, fn) -> dict[str, Any]:
         return e.doc()
 
 
+def _hosts_of(repo: ConfigRepo, ns: argparse.Namespace) -> list[str]:
+    return hosts(repo, refresh=getattr(ns, "refresh", False))
+
+
+def hosts(repo: ConfigRepo, *, refresh: bool = False) -> list[str]:
+    """nixosConfigurations' names: one eval, cached by the flake fingerprint (any tracked
+    edit or lock change misses), so a warm `status`/`list`/`where` runs no eval at all."""
+    cache = TruthCache(repo, HOSTS_KEY, enabled=not refresh)
+    hit = cache.get("hosts", peek=True)
+    if isinstance(hit, list) and all(isinstance(h, str) for h in hit):
+        return hit
+    names = repo.hosts()
+    cache.put("hosts", names)
+    return names
+
+
 # --- status -------------------------------------------------------------------------
 
 
@@ -76,7 +93,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     if ns.args:
         raise NixinError("usage", f"status takes no arguments (got {' '.join(ns.args)!r})")
     host = ns.host
-    hosts = repo.hosts()
+    hosts = _hosts_of(repo, ns)
     if host not in hosts:
         raise NixinError(
             "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
@@ -162,7 +179,7 @@ def _list(ns: argparse.Namespace) -> dict[str, Any]:
             "usage", f"list takes no arguments (got {' '.join(ns.args)!r}; --filter TEXT?)"
         )
     host = ns.host
-    hosts = repo.hosts()
+    hosts = _hosts_of(repo, ns)
     if host not in hosts:
         raise NixinError(
             "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
@@ -188,7 +205,7 @@ def _where(ns: argparse.Namespace) -> dict[str, Any]:
         raise NixinError("usage", "where NAME  (one package attribute or option path)")
     name = ns.args[0]
     host = ns.host
-    hosts = repo.hosts()
+    hosts = _hosts_of(repo, ns)
     if host not in hosts:
         raise NixinError(
             "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"

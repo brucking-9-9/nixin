@@ -24,7 +24,6 @@ import argparse
 import json
 import shlex
 import time
-from concurrent.futures import ThreadPoolExecutor
 from importlib.resources import files
 from typing import Any
 
@@ -209,6 +208,8 @@ def _lock(
         flakeref, source = tgt.requested(np, None, tgt.channel_branch(ns.channel, stable))
     else:
         flakeref, source = tgt.requested(np, ns.nixpkgs, None)
+    from concurrent.futures import ThreadPoolExecutor  # here: 10 ms at import (logging)
+
     repo.source()  # the cache key's `nix flake metadata`, once, before two threads need it
     # The two evals are independent: the lock side runs in a thread while this one
     # resolves the target and evaluates it. Errors keep the sequential order: resolve,

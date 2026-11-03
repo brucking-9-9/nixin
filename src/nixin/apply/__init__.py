@@ -40,8 +40,6 @@ from typing import Any
 
 from ..cache import default_root
 from ..configrepo import DEFAULT_CONFIG, ConfigRepo, NixinError, local_hostname
-from ..writer.state import STATE_FILE
-from ..writer.workspace import Workspace
 from . import build, commitmsg, privilege, proc, render, safety, system
 from .git import Git, Status
 from .system import HISTORY
@@ -149,6 +147,8 @@ def authoritative_path(explicit: str | None = None) -> Path:
 
 
 def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
+    from ..writer.workspace import Workspace  # here: `status` imports this package
+
     ws = Workspace.open(ns.config, nix=build.nix)  # config-not-found / not-a-workspace
     git = Git(ws.root)
     if not git.is_repo():
@@ -174,7 +174,7 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
     )
 
 
-def _text_hosts(ws: Workspace) -> list[str]:
+def _text_hosts(ws) -> list[str]:
     try:
         return list(ws.flake_hosts())
     except Exception:  # noqa: BLE001 -- the scanner is a shortcut; the eval decides
@@ -416,6 +416,8 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
                 f"{ctx.auth_path} and /run/current-system is its build "
                 f"(generation {before['generation']})",
             )
+    from ..writer.state import STATE_FILE
+
     message = ns.message or commitmsg.message(
         ctx.git.show("HEAD", STATE_FILE), _read(ctx.path / STATE_FILE), to_commit
     )
