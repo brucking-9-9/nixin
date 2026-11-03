@@ -418,7 +418,11 @@ def test_lock_mode_document(repo, capsys):
     ]
     assert doc["notes"] == []
     # two package-list evals, never the toplevel; the target one overrides nixpkgs only
-    lock_eval, target_eval = repo.nix.evals()
+    # (they run side by side, so either may have been recorded first)
+    evals = repo.nix.evals()
+    assert len(evals) == 2
+    lock_eval = next(e for e in evals if "--override-input" not in e)
+    target_eval = next(e for e in evals if "--override-input" in e)
     assert "--override-input" not in lock_eval
     i = target_eval.index("--override-input")
     assert target_eval[i + 1] == "nixpkgs"
