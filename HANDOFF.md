@@ -4,127 +4,86 @@ Per-layer handoff notes live in `docs/HANDOFF-<layer>.md` (state, rough edges, n
 how to test). A layer branch keeps its own `HANDOFF.md` at the root while it is in flight;
 on merge it moves here.
 
+## Now: branch `integrate-night` (2026-11-02/03, mbp13)
+
+[HANDOFF-integrate-night](docs/HANDOFF-integrate-night.md): the merge record, every
+conflict decision, the live smoke table.
+
+- **Done**: the night's seven lane branches merged onto `origin/main` @ 318e6cc, in this
+  order: `typed-set-explain`, `ui-options`, `hosts-remote-diff`, `gc-generations-speed`,
+  `modules-optindex`, `try-verb`, `appstream-categories`. `nix build .#nixin` passed after
+  each merge; at the end 930 passed, 34 skipped (live), then `nixin gui: self-test ok`;
+  `ruff check`, `ruff format --check`, `nix fmt -- --check` clean. Two helpers folded into
+  one (the cached host list), the two sources of option docs in `where` reconciled,
+  colliding screenshot numbers and `--only` flags unified, a flaky outdated test fixed,
+  `explain`'s eager thread-pool import made lazy (startup test extended), the fixture
+  screenshots redrawn on the merged tree. Live smoke on mbp13 against `~/nixos`, read-only
+  (dry runs only, sudo stubbed out): the 22 verbs that have `--json` (34 runs): one
+  document each, nothing on stderr, `~/nixos` unchanged; for `tui`/`gui` the GUI
+  self-test and both screenshot scripts (fixtures and `--live`), clean.
+- **Half-done**: nothing. Not run: anything that writes or switches (by design), the
+  option index paths live (gen 126 has no nixin module), `apply --host 19BK` for real.
+- **Next**: wire `explain` into the Options page; a TUI Browse screen; count
+  `users.users.<name>.packages` as installed (truth); `default_host` on the cached host
+  list; the AppStream layer imported on use (~8 ms of CLI start); bump the hub's nixin
+  lock once this is on main (modules); `outdated --check` (ui-packages).
+- **How to test**: `nix build .#nixin --no-link -L`; `nix develop -c pytest`; the commands
+  at the end of HANDOFF-integrate-night. By hand, read-only: `nixin-tui --config ~/nixos`
+  (`o` Options, `t` Try in Details) and `nixin-gui --config ~/nixos` (Ctrl+5 Options,
+  Ctrl+B Browse).
+- **Left behind**: `/tmp/integrate-night` (logs, smoke outputs, a clone, an out-link that
+  roots nixin-0.1.0): `rm -rf /tmp/integrate-night`.
+
+## Layers
+
 - [discovery](docs/HANDOFF-discovery.md) — merged; verified live on 19BK and mbp13.
-- [truth](docs/HANDOFF-truth.md) — merged; verified end to end on mbp13.
-  `list` verb: branch `list-verb`. `nixin list [--home USER] [--scope system|home|all]
-  [--filter TEXT] [--programs]` shows the installed packages (system + every HM user)
-  from `status`'s cached package eval, with a best-effort `declared[]` (file:line) from
-  the writer's scanner. Verified live on mbp13 against `~/nixos` (mbp13, 19BK/brucking);
-  state, numbers, next steps and how to test: the "`list`" section of HANDOFF-truth.md.
-- [writer](docs/HANDOFF-writer.md) — merged; acceptance list verified on mbp13 against a clone of the config.
-  Fixes: branch `fix-set-validation` — `set` values are checked by syntax only (`pkgs.…`,
-  `lib.mkForce …`, `config.…` were `invalid-nix`), and the option eval check survives package sets.
-- [integrate](docs/HANDOFF-integrate.md) — the merged CLI run end to end on mbp13; envelope fixes,
-  `docs/CONTRACT.md`, integration tests, open judgement calls.
-- [apply](docs/HANDOFF-apply.md) — branch `apply`: `plan`, `apply`, `sync`, `status.pending`;
-  mbp13 switched for real from its workspace (gens 110–112), `/boot` freed to 81M.
-  Branch `core-history-safety`: `nixin history` (generations joined with
-  `history.jsonl`), `nixin rollback [GEN]` (system back + one revert commit pulled into
-  `/etc/nixos`), and the boot block in `plan`/`apply` (`reboot_needed`, `boot_space` from
-  systemd-boot's window; `boot-space` refuses). Round trip run for real on mbp13: gen 121
-  (cowsay) → rollback to 120 in 2.9 s, trees in sync. Its section of HANDOFF-apply.
-  Branch `hosts-remote-diff`: `nixin apply --host H` for another host (commit, push
-  to the hub, then the two pulls and the switch on H over one `ssh -t` session, with
-  checks that H switches to exactly the pushed commit; `~/.config/nixin/hosts.toml`;
-  `--dry-run` contacts nothing; `needs-tty` under `--json`/UIs). Offline-tested with a
-  fake ssh that runs the real script; live only as dry runs (19BK is not reachable from
-  mbp13). Same branch: `nixin list --diff A B` (truth). Its section of HANDOFF-apply,
-  "`list --diff`" in HANDOFF-truth.
-  Branch `gc-generations-speed`: `nixin generations` (history's rows + closure size,
-  boot entry, what `gc --keep N` drops) and `nixin gc [--keep N] [--older-than DAYS]
-  [--dry-run]` (never the running/booted/default generation; preview with an estimate,
-  then `nix-env --delete-generations`, the boot default's `switch-to-configuration
-  boot`, `nix-collect-garbage` through `sudo -n`; `gc-failed`); `outdated`'s two evals
-  side by side (4.1 → 2.3 s); warm `status` 0.32 → 0.20 s and `list` 0.35 → 0.23 s
-  (lazy imports: no requests/Textual/PySide6 at CLI start; the hosts list cached).
-  Real `gc --keep 3` on mbp13: 31 generations deleted (87–117), 3.5 GB freed (`df`;
-  estimate 4.8 GiB), /boot unchanged (already 2 entries), 77.5 s. Its section of
-  HANDOFF-apply.
-- [tui](docs/HANDOFF-tui.md) — branch `tui`: `nixin tui` / `nixin-tui` (Textual) over the same
-  documents, `view.py` as the view-model for the GUI; the cowsay round trip ran from a
-  50×25 terminal on mbp13 (gens 113–114).
-- [gui](docs/HANDOFF-gui.md) — branch `gui`: `nixin gui` / `nixin-gui` (PySide6 + QML) on the
-  shared `nixin.ui` data path and view-model (moved out of `tui/`); offscreen tests and
-  screenshots, live read-only on mbp13 and its Wayland session; the real apply round trip
-  was not run (another session had `~/nixos` mid-change).
-- [outdated](docs/HANDOFF-outdated.md) — branch `outdated-verb`: `nixin outdated`, what a
-  nixpkgs lock update would change for a host (two package-list evals, by pname, kernel),
-  and `--published` against a search.nixos.org channel; run live on mbp13 for both hosts.
-- **ui-packages** — merged (on `main` with `core-history-safety`): the **Packages** page in
-  both front ends and the `update` verb behind its one button. Details, live findings
-  (mbp13's config does not evaluate at nixos-unstable 0bb2eed: gtk2) and gaps: the
-  "Packages page" sections of [HANDOFF-tui](docs/HANDOFF-tui.md) and
-  [HANDOFF-gui](docs/HANDOFF-gui.md). Its leftovers (`~/nixos-ui-test`, `/tmp/uipk`) are gone.
-- [typed](docs/HANDOFF-typed.md) — branch `typed-set-explain`: `set` checks the value
-  against the option's type before writing (`type-mismatch`, `--force`; `set OPTION`
-  describes it), `nixin explain OPTION|PKG` (the config's side + upstream's docs, a `view`
-  for help panes), and the three judgement calls decided (eval failure after a write is
-  `ok: false` with `undo[]`; exclusions per host; the `--host` default). Run on mbp13
-  against `~/nixos` read-only and a clone.
-- **ui-options** — branch `ui-options` (cut from `origin/main` 318e6cc, which has
-  ui-packages): the **Options** page in both front ends. Details: the "Options page"
-  sections of [HANDOFF-tui](docs/HANDOFF-tui.md) and [HANDOFF-gui](docs/HANDOFF-gui.md).
-  - Done: a browser over `search --kind opt|hm` (NixOS or Home Manager options; name,
-    type, description), the selected option in full (type, default, example, the whole
-    description, the value on the host and the file:line that sets it from `where`, the
-    Home Manager user's tree for `hm`, the declaring module on the locked input and
-    upstream's link), Set (the dialog prefilled with the current value when it can be
-    written back exactly, the type, example and default as a hint; a template's `<name>`
-    filled in first; a list element set through its list) and Unset, each through the
-    writer's `--dry-run` diff, then `where` again; the write shows on Pending. TUI `o` /
-    `ctrl+5` (`ctrl+]` on legacy terminals), page keys `i o p s`; GUI rail entry,
-    `Ctrl+5`. Shared view-model `ui/view.py` ("options"). No backend change.
-  - Tests: TUI at 50×25 and 120×40, GUI offscreen, on documents recorded on mbp13
-    (`tests/fixtures/tui/options_*.json`); qmllint clean. Gates at b40df71: `nix build`
-    617 passed, 25 skipped (live), then `nixin gui: self-test ok`; `ruff check`, `ruff
-    format --check`, `nix fmt -- --check` clean. Screenshots: `docs/tui/*-13…18-*`,
-    `docs/gui/14…17-*` (fixtures), `live-*` (below).
-  - Live on mbp13: both UIs read-only against `~/nixos` (mbp13's openssh options, the
-    real `set --dry-run` diff, cancelled; 19BK's `programs.git.lfs.enable` for brucking);
-    `~/nixos` unchanged (HEAD a198757, status/diff and file hashes compared). One real set
-    → Pending → unset round trip through each UI on a throwaway clone `~/nixos-ui-test`
-    (set 1.1 s, where 2.9 s, unset 1.2 s). Nothing switched, no sudo.
-  - Not used yet: `explain` (merged alongside in `integrate-night`, not wired in). The seam is
-    `view.option_sections(record, where, …)` and the one `where` call per page; the
-    mapping is in HANDOFF-tui "Options page", judgement call 5.
-  - Half-done: nothing. Next: wire `explain` after that branch merges (locked
-    default/example, HM links at the locked rev); paging past 50 results; say in the Set
-    dialog when it starts from the default because the value cannot be written back.
-  - Left behind (this run's settings deny `rm -rf`): `rm -rf ~/nixos-ui-test
-    /tmp/nixin-ui-options` (the clone, with `hosts/mbp13/default.nix` edited by the
-    unset; recordings and scratch scripts).
-  - How to test: `nix develop -c pytest tests/test_tui.py tests/test_gui.py -k option`;
-    `nix build`; by hand `nixin-tui --config ~/nixos` → `o` and `nixin-gui --config
-    ~/nixos` → Ctrl+5 (read-only; Set/Unset only on a clone).
-- [modules](docs/HANDOFF-modules.md) — branch `modules-optindex`: `nixosModules.default`
-  / `homeModules.default` (`programs.nixin.{enable, package, optionIndex, outdated,
-  pending}`) and build-time option indexes (`lib/options-index.nix`:
-  `/etc/nixin/options-nixos.json`, `$XDG_CONFIG_HOME/nixin/options-home.json`), read by
-  `search --kind opt|hm`, `info`, `where` (docs, skipped scopes) and `status.indexes`;
-  `nixin-state` moved in from the hub's `nixin-integration` lane. mbp13 switched to the
-  module from the hub worktree `~/nixos-modules-wt` (branch `nixin-modules`, 1c1da1e;
-  gen 125), tested, and put back on main (gen 126). The hub's nixin lock is bumped
-  after this merges.
-- [try](docs/HANDOFF-try.md) — branch `try-verb`: `nixin try PKG [-- ARGS] [--shell]
-  [--program NAME] [--nixpkgs REF] [--impure] [--build-only]`, which runs a package from
-  the host's locked nixpkgs without installing it. A probe eval, `nix build --no-link`
-  (progress on stderr), then an exec of `nix run`/`nix shell`. `--json` only builds and
-  returns `{out, programs, size, cached, fetched, command, gui, …}`. Errors: `not-found`
-  (with suggestions), `unfree` (the `NIXPKGS_ALLOW_UNFREE=1 … --impure` commands),
-  `ambiguous-program`, `no-program`, `build-failed`. **Try** sits next to Add in both front
-  ends: the build streams into the log, then a GUI app is launched detached (`setsid`), and
-  a CLI program gets the command to copy (TUI) or opens in the terminal (GUI: `$TERMINAL
-  -e`, else kitty, …). Live on mbp13: cowsay, figlet on a pty, `--shell`, gnome-calculator
-  built (detached `--version` only: no window on the kiosk screen), lolcat built from
-  source. Nothing switched, no sudo, `~/nixos` only read.
-- **appstream-categories** — branch `appstream-categories`: a package as an application
-  (AppStream metainfo + desktop entries) in `info` (`appstream`, `--appstream
-  local|fetch|hint|off`), `search --appstream` (GUI-app mark), the `browse` verb
-  (freedesktop categories: installed, a shipped well-known list, search.nixos.org's most
-  popular), the GUI's Browse page (`Ctrl+B`) and the details pane's icon, chips and lazily
-  fetched screenshots; the TUI shows it as text. search.nixos.org's index generation 52
-  turned out to carry desktop entries, categories, icons and screenshot copies (not for
-  unfree packages or wrappers: the shipped list covers those). Live on mbp13, read-only.
-  Gates at 55c5e5a: `nix build` 657 passed, 25 skipped, self-test ok; ruff, nix fmt clean.
-  State, findings, judgement calls, merge notes, how to test: the "AppStream and Browse" section of
-  [HANDOFF-gui](docs/HANDOFF-gui.md).
+- [truth](docs/HANDOFF-truth.md) — merged; verified end to end on mbp13. `list` (branch
+  `list-verb`, merged): the installed packages with a best-effort `declared[]`; `list --diff
+  A B` (branch `hosts-remote-diff`, merged on integrate-night): two hosts compared. Their
+  sections of HANDOFF-truth.
+- [writer](docs/HANDOFF-writer.md) — merged; acceptance list verified on mbp13 against a
+  clone of the config. Fixes: branch `fix-set-validation` — `set` values are checked by
+  syntax only, and the option eval check survives package sets.
+- [typed](docs/HANDOFF-typed.md) — branch `typed-set-explain`, merged on integrate-night:
+  `set` checks the value against the option's type before writing (`type-mismatch`,
+  `--force`; `set OPTION` describes it), `nixin explain OPTION|PKG` (the config's side +
+  upstream's docs, a `view` for help panes), and three judgement calls decided (eval
+  failure after a write is `ok: false` with `undo[]`; exclusions per host; the `--host`
+  default: this machine, else the config's only host).
+- [integrate](docs/HANDOFF-integrate.md) — the merged CLI run end to end on mbp13; envelope
+  fixes, `docs/CONTRACT.md`, integration tests, open judgement calls.
+- [apply](docs/HANDOFF-apply.md) — `plan`, `apply`, `sync`, `status.pending` (branch
+  `apply`; mbp13 switched for real, gens 110–112). `history`, `rollback [GEN]` and the boot
+  block in `plan`/`apply` (branch `core-history-safety`; round trip gen 121 → 120 in
+  2.9 s). On integrate-night: `apply --host H` for another host over one `ssh -t` session,
+  `~/.config/nixin/hosts.toml`, `needs-tty` (branch `hosts-remote-diff`; offline-tested with
+  a fake ssh, live only as dry runs: 19BK is not reachable from mbp13); `generations` and
+  `gc [--keep N] [--older-than DAYS] [--dry-run]`, `outdated`'s evals side by side, lazy
+  imports and the cached host list (branch `gc-generations-speed`; a real `gc --keep 3` on
+  mbp13 deleted gens 87–117 and freed 3.5 GB). One section per branch in HANDOFF-apply.
+- [outdated](docs/HANDOFF-outdated.md) — branch `outdated-verb`, merged: what a nixpkgs
+  lock update would change for a host, and `--published` against a channel; `update`
+  takes it (branch `ui-packages`).
+- [modules](docs/HANDOFF-modules.md) — branch `modules-optindex`, merged on
+  integrate-night: `nixosModules.default` / `homeModules.default` (`programs.nixin.{enable,
+  package, optionIndex, outdated, pending}`) and build-time option indexes
+  (`lib/options-index.nix`), read by `search --kind opt|hm`, `info`, `where` and
+  `status.indexes`; `nixin-state` for the modules' timers. mbp13 ran the module on gen 125
+  and is back on main (gen 126). The hub's nixin lock is bumped after this reaches main.
+- [try](docs/HANDOFF-try.md) — branch `try-verb`, merged on integrate-night: `nixin try PKG
+  [-- ARGS] [--shell] [--program NAME] [--nixpkgs REF] [--impure] [--build-only]` runs a
+  package from the host's locked nixpkgs without installing it; **Try** next to Add in
+  both front ends (a GUI app launched detached, a CLI program's command to copy or opened
+  in a terminal).
+- [tui](docs/HANDOFF-tui.md) — `nixin tui` / `nixin-tui` (Textual) over the same documents;
+  the cowsay round trip ran from a 50×25 terminal on mbp13. Pages since: **Packages**
+  (branch `ui-packages`, merged) and **Options** (branch `ui-options`, merged on
+  integrate-night); their sections of HANDOFF-tui.
+- [gui](docs/HANDOFF-gui.md) — `nixin gui` / `nixin-gui` (PySide6 + QML) on the shared
+  `nixin.ui` data path and view-model; offscreen tests and screenshots. Pages since:
+  **Packages** (ui-packages), **Options** (ui-options) and **Browse** with the details
+  pane's AppStream block (branch `appstream-categories`: `info`'s `appstream`, `search
+  --appstream`, the `browse` verb), the last two merged on integrate-night; their sections
+  of HANDOFF-gui.
+  - ui-options left behind `~/nixos-ui-test` and `/tmp/nixin-ui-options` (`rm -rf` both);
+    appstream-categories left `/tmp/appstream-run` (`rm -rf /tmp/appstream-run`).
