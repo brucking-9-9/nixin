@@ -153,17 +153,17 @@ async def live_options(
     async with app.run_test(size=SIZES[size]) as pilot:
         await pilot.press("escape", "o", *query, "enter")
         await settle(app, pilot, 0.5)
-        shot(app, outdir / f"live-{size}-6-options.svg", f"options {query}")
+        shot(app, outdir / f"live-{size}-8-options.svg", f"options {query}")
         rows = [h.target for h in app.screen.hits]
         await pilot.press(*["down"] * (rows.index(option) if option in rows else 0), "enter")
         await settle(app, pilot, 0.5)
-        shot(app, outdir / f"live-{size}-7-option.svg", option)
+        shot(app, outdir / f"live-{size}-9-option.svg", option)
         await pilot.press("e")
         await settle(app, pilot)
-        shot(app, outdir / f"live-{size}-8-option-set.svg", f"set {option}")
+        shot(app, outdir / f"live-{size}-10-option-set.svg", f"set {option}")
         await pilot.press("ctrl+e", "ctrl+u", *value, "enter")
         await settle(app, pilot, 0.5)
-        shot(app, outdir / f"live-{size}-9-option-diff.svg", f"set {option} {value} --dry-run")
+        shot(app, outdir / f"live-{size}-11-option-diff.svg", f"set {option} {value} --dry-run")
         await pilot.press("escape")  # cancel: nothing is written
 
 
@@ -175,7 +175,7 @@ async def live_hm(size: str, outdir: Path, host: str, config: str, query: str, o
         rows = [h.target for h in app.screen.hits]
         await pilot.press(*["down"] * (rows.index(option) if option in rows else 0), "enter")
         await settle(app, pilot, 0.5)
-        shot(app, outdir / f"live-{size}-10-option-hm.svg", f"{option} on {host}")
+        shot(app, outdir / f"live-{size}-12-option-hm.svg", f"{option} on {host}")
 
 
 async def live(size: str, outdir: Path, host: str, config: str, query: str, pkg: str) -> None:
