@@ -58,6 +58,10 @@ Done, tested, run live on mbp13:
   build cost, the timers and the files the bar/companion read), CONTRACT "Option
   indexes", `search`/`info`/`status`/`where` fields, "`nixin-state`", costs.
 
+Gates at e3aaaf2: `nix build` 630 passed, 30 skipped (live), then `nixin gui: self-test
+ok`; `nix develop -c pytest` the same; `NIXIN_LIVE=1 … tests/test_modules_live.py` 5
+passed; `ruff check`, `ruff format --check`, `nix fmt -- --check` clean.
+
 Half-done: nothing in the code. Not done live: anything on 19BK (mbp13 cannot ssh there;
 19BK was evaluated only), a real Home Manager activation with the index, and the
 timers (not enabled on the hub branch, see "Hub").
@@ -194,7 +198,7 @@ leak into tests), README, CONTRACT. `cli.py` is unchanged.
 ```
 nix develop -c pytest tests/test_optindex.py tests/test_state.py   # sandbox-safe, fixtures
 NIXIN_LIVE=1 nix develop -c pytest tests/test_modules_live.py      # nix eval of tests/nix (~20 s, 2 GiB)
-nix build                                                           # 629 passed, 30 skipped; self-test
+nix build                                                           # 630 passed, 30 skipped; self-test
 nix develop -c ruff check src tests && nix develop -c ruff format --check src tests
 nix fmt -- --check
 scripts/record-index-fixtures.sh                                    # re-record the fixtures
