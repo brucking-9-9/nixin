@@ -204,9 +204,9 @@ does not.
 
 ## Open questions
 
-- A seeded exclusion hides an option the index could evaluate on a host that uses it
-  (`hardware.nvidia.open` with nvidia enabled). `where` still answers for it. Should the
-  index retry excluded options that the config defines, or key the store per host as well?
+- ~~A seeded exclusion hides an option the index could evaluate on a host that uses it.~~
+  Decided (branch `typed-set-explain`): the store is keyed per host as well
+  (`exclude-<nixpkgs12>-<hm12>-<host>.json`); files without the host are ignored.
 - Should an `eval-failed` status still carry `config`/`lock`/`running` (known without the
   eval)? Today the error doc is strictly `{ok, verb, host, error}` per the contract.
 - `definitionsWithLocations` has no line numbers; lines come from the text scanner. Is
@@ -254,3 +254,15 @@ nix develop -c sh -c 'PYTHONPATH=src:$PYTHONPATH NIXIN_WIDTH=50 python3 -m nixin
 Scratch from the mbp13 session (not in the repo): `/tmp/nixin-mbp13/`, with `bench.sh` (the
 `time -v` wrapper), `*.out` (JSON of each run), `*.time` (`time -v` + load), `split.py`, and
 `nixos-head/` (the clone used for the `eval-failed` check).
+
+## Note: option docs, `option_info`, `explain` (branch `typed-set-explain`, 2026-11-02)
+
+Prefix queries now run `options.nix` in `docs` mode: each entry has `typeInfo` (the type
+as a tree), `default`/`example` (module text or value) and, for an option above the path
+asked, `sub` (the type and docs followed into a submodule, freeform type, `attrsOf`
+element). `where` shows them (`type_info`, `default`, `example`, `sub_description`).
+`truth.option_info()`, `option_infos()`, `hm_users()` and `package_info()` are the
+public entry points the writer's type check and `explain` use. `options.nix` is tested on
+the real module system in the sandbox (storeless `nix-instantiate`, nixpkgs' lib from the
+flake as `NIXIN_TEST_NIXPKGS_LIB`). The exclusion store is per host. `docs/HANDOFF-typed.md`
+has the details.

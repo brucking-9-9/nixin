@@ -55,3 +55,9 @@ on merge it moves here.
   - How to test: `nix develop -c pytest tests/test_update.py tests/test_tui.py
     tests/test_gui.py`; `nix build`; by hand `nixin-tui --config ~/nixos` → `i`, `t`, `m`
     and `nixin-gui --config ~/nixos` → Ctrl+4 (read-only; use Update only on a clone).
+- [typed](docs/HANDOFF-typed.md) — branch `typed-set-explain`: `set` checks the value
+  against the option's type before writing (`type-mismatch`, `--force`; `set OPTION`
+  describes it), `nixin explain OPTION|PKG` (the config's side + upstream's docs, a `view`
+  for help panes), and the three judgement calls decided (eval failure after a write is
+  `ok: false` with `undo[]`; exclusions per host; the `--host` default). Run on mbp13
+  against `~/nixos` read-only and a clone.

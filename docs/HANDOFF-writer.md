@@ -136,10 +136,13 @@ on every tracked `.nix` clean.
 
 ## Open questions
 
-- Should `eval-failed` after a write keep `ok: true` (today: the text change happened,
-  `checks.eval.ok == false` + a warning) or be `ok: false` with the changes attached?
-- `--host` default is this machine's hostname (cli.py); `--home` users are looked up on
-  that host, so `add --home brucking` on mbp13 needs `--host 19BK` (the error says so).
+- ~~Should `eval-failed` after a write keep `ok: true`?~~ Decided (branch
+  `typed-set-explain`, `docs/HANDOFF-typed.md`): `ok: false`, code `eval-failed`, the
+  change kept and listed in `changes[]`, `error.undo[]` says how to go back; `--no-check`
+  skips the eval.
+- `--host` default is this machine's hostname, or the config's only host when it has
+  no host of that name (branch `typed-set-explain`); `--home` users are looked up on that
+  host, so `add --home brucking` on mbp13 needs `--host 19BK` (the error says so).
 - One generated HM file per user (`installer/<user>-home.nix`): if two hosts import the
   same `home/home.nix`, the user's additions apply on both. Per-host HM files would need
   `installer/<user>@<host>-home.nix` and a host-specific import site.
@@ -225,3 +228,14 @@ names, so the suite never saw it.
   value using `inputs`/`options`/`modulesPath` into it is `invalid-nix` (correct: the
   file would not parse). Binding more would mean knowing the host's specialArgs. The
   eval `note` still says `{…}` for a list value.
+
+### Type-aware `set` (branch `typed-set-explain`, mbp13, 2026-11-02)
+
+`set` now checks, before writing, that OPTION is an option of the scope and that the
+value's text fits its type (`writer/typecheck.py`, the type from truth's `option_info`):
+`type-mismatch` with `expected`/`type_info`/`default`/`example`, `--force` to write anyway.
+`set OPTION` without a value describes it and says where `set` would write. An eval
+failure after a write fails the verb with `undo[]`. Details, live runs and gaps:
+`docs/HANDOFF-typed.md`. This supersedes "Next steps" 3 above in part: there is still no
+automatic `lib.mkForce`, but a conflicting definition is now an `eval-failed` with the
+undo command instead of a warning.
