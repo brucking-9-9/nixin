@@ -319,6 +319,44 @@ def option_info(
     return doc
 
 
+def hm_users(repo: ConfigRepo, host: str, cache: TruthCache) -> list[str]:
+    """The host's Home Manager users: from the cached package eval when there is one, else
+    one small eval (cached on its own)."""
+    hit = cache.get(pkgs.CACHE_NAME, pkgs.helper_text(), peek=True)
+    if hit is not None:
+        return list(hit["hm_users"])
+    users = cache.get("hm-users", "1", peek=True)
+    if users is None:
+        users = sorted(repo.hm_users(host))
+        cache.put("hm-users", users, "1")
+    return list(users)
+
+
+def option_infos(
+    repo: ConfigRepo, host: str, path: list[str], *, home: str | None, cache: TruthCache
+) -> list[dict[str, Any]]:
+    """option_info() for every scope that has the path: NixOS, then each HM user (only
+    `home` when given; `unknown-user` when the host has no such user)."""
+    users = hm_users(repo, host, cache)
+    if home is not None and home not in users:
+        raise NixinError(
+            "unknown-user",
+            f"{home!r} is not a Home Manager user of {host} (users: {', '.join(users) or 'none'})",
+        )
+    scopes = [home] if home is not None else [None, *users]
+    found = [option_info(repo, host, path, hm=u, cache=cache) for u in scopes]
+    return [f for f in found if f is not None]
+
+
+def package_info(repo: ConfigRepo, host: str, name: str, *, cache: TruthCache) -> dict[str, Any]:
+    """`where PACKAGE`'s answer: installed copies, enabled programs.NAME.enable, the files
+    that list it, mentions."""
+    hosts = repo.hosts()
+    if host not in hosts:
+        raise unknown_host(host, hosts)
+    return _where_package(repo, host, cache, pkgs.collect(repo, host, cache), name, hosts)
+
+
 def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str) -> dict:
     path = name.split(".")
     scopes_out = []

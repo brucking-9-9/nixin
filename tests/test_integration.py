@@ -209,6 +209,8 @@ class World:
         apply = args[args.index("--apply") + 1]
         if "programsFromOptions" in apply:  # truth/packages.nix
             return json.dumps(self.packages(host))
+        if "home-manager.users or { }" in apply:  # ConfigRepo.hm_users
+            return json.dumps(HM_USERS[host])
         if "nixin-option" in apply:  # truth/options.nix; its ARGS attrset is the tail
             spec = apply[apply.rindex("{ prefix = ") :]
             prefix = _strings(re.search(r"prefix = \[([^\]]*)\]", spec).group(1))
@@ -461,6 +463,7 @@ def nixin(capsys, world: World, *argv: str, host: str = "mbp13") -> dict:
         "status",
         "where",
         "list",
+        "explain",
         "add",
         "rm",
         "set",
@@ -725,6 +728,16 @@ SWEEP = [
     ["set", "services.nosuch.enable", "true"],  # not-found (no such option)
     ["set", X11],  # what it is (no value)
     ["set"],  # usage
+    # explain
+    ["explain", X11],
+    ["explain", X11, "--offline"],
+    ["explain", "cowsay"],
+    ["explain", "git", "--kind", "package"],
+    ["explain", "no-such-pkg"],  # not-found
+    ["explain", "services.nosuch.option"],  # not-found
+    ["explain", "programs.bat.enable", "--home", "bob"],  # unknown-user
+    ["explain"],  # usage
+    ["explain", "a", "b"],  # usage
     ["unset", X11],  # not-found
     ["add", "--home", "bob", "cowsay"],  # unknown-user
     # apply (the fixture copy is no git checkout: not-a-workspace)
@@ -862,3 +875,123 @@ def test_host_default_without_a_config_is_the_hostname(world, capsys, monkeypatc
     rc = main(["--json", "where", X11, "--config", "/nonexistent/nixin"])
     doc = envelope(*capsys.readouterr(), rc, "where")
     assert doc["host"] == "laptop" and doc["error"]["code"] == "config-not-found"
+
+
+# --- explain -----------------------------------------------------------------------------
+
+
+def test_explain_option_joins_the_config_and_upstream(world, capsys):
+    shutil.copy(ROOT / "tests" / "fixtures" / "flake.lock.json", world.root / "flake.lock")
+    doc = nixin(capsys, world, "explain", X11)
+    assert doc["kind"] == "option" and doc["name"] == X11
+    assert (doc["type"], doc["default"], doc["example"]) == ("null or boolean", "false", None)
+    assert doc["type_info"]["nested"]["elemType"]["name"] == "bool"
+    assert doc["description"] == "Whether to allow X11 connections."  # upstream's text
+    (s,) = doc["scopes"]
+    assert (s["scope"], s["user"], s["mode"], s["value"]) == ("nixos", None, "sub", False)
+    assert s["option"] == "services.openssh.settings"
+    (decl,) = doc["declarations"]
+    assert decl["source"] == "nixpkgs" and decl["line"] == 475
+    assert decl["url"] == (
+        "https://github.com/nixos/nixpkgs/blob/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504/"
+        "nixos/modules/services/networking/ssh/sshd.nix#L475"
+    )
+    assert doc["upstream"]["kind"] == "opt" and doc["upstream"]["source"] == "search.nixos.org"
+    assert doc["sources"]["config"]["ok"] and doc["sources"]["upstream"]["ok"]
+    assert doc["sources"]["upstream"]["channel"] == "unstable"  # the lock follows nixos-unstable
+    view = doc["view"]
+    assert (view["title"], view["subtitle"], view["notes"]) == (X11, "NixOS option", [])
+    assert [(r["label"], r["text"]) for r in view["rows"]] == [
+        ("type", "null or boolean"),
+        ("default", "false"),
+        ("value", "false"),
+        ("set in", "nothing in the config (the default or a module)"),
+        ("declared", "nixpkgs nixos/modules/services/networking/ssh/sshd.nix:475"),
+    ]
+    assert view["rows"][-1]["url"] == decl["url"]
+    assert view["about"] == doc["description"]
+
+    nixin(capsys, world, "set", X11, "true")
+    doc = nixin(capsys, world, "explain", X11, "--offline")
+    assert doc["scopes"][0]["value"] is True and doc["upstream"] is None
+    assert doc["view"]["notes"] == ["upstream docs not asked (--offline)"]
+    (set_in,) = [r for r in doc["view"]["rows"] if r["label"] == "set in"]
+    assert set_in["text"].startswith("installer/mbp13.nix:")
+    # offline, the eval's own text: the sub-option's description, not its parent's
+    assert doc["description"] == "Whether to allow X11 connections to be forwarded."
+
+
+def test_explain_package_installed_vs_channel(world, capsys):
+    doc = nixin(capsys, world, "explain", "cowsay")
+    assert doc["kind"] == "package" and doc["installed"] == [] and doc["declared"] == []
+    assert doc["channel_version"] == "3.8.4" and doc["license"] == ["GPL-3.0-only"]
+    assert doc["programs"] == ["cowsay", "cowthink"]
+    rev = ES_INDEX.rsplit("-", 1)[1]
+    assert doc["source_url"] == (
+        f"https://github.com/NixOS/nixpkgs/blob/{rev}/pkgs/by-name/co/cowsay/package.nix#L58"
+    )
+    assert doc["view"]["subtitle"] == "package (not installed)"
+    assert doc["view"]["rows"][0] == {
+        "label": "installed",
+        "text": "no (not on mbp13)",
+        "url": None,
+    }
+
+    nixin(capsys, world, "add", "cowsay")
+    doc = nixin(capsys, world, "explain", "cowsay")
+    assert [(p["scope"], p["version"]) for p in doc["installed"]] == [("system", "1.0")]
+    assert doc["declared"][0]["file"] == "installer/mbp13.nix"
+    labels = [(r["label"], r["text"]) for r in doc["view"]["rows"]][:3]
+    assert labels[:2] == [("installed", "1.0  [system]"), ("channel", "3.8.4 on unstable")]
+    assert labels[2][0] == "listed in" and labels[2][1].startswith("installer/mbp13.nix")
+
+    doc = nixin(capsys, world, "explain", "git")  # no upstream answer: the config's side alone
+    assert doc["upstream"] is None and doc["installed"][0]["pname"] == "git"
+
+
+def test_explain_home_manager_scope(world, capsys):
+    doc = nixin(capsys, world, "explain", "programs.bat.enable", "--home", "alice", host="19BK")
+    (s,) = doc["scopes"]
+    assert (s["scope"], s["user"], s["value"]) == ("home", "alice", False)
+    assert doc["view"]["subtitle"] == "Home Manager (alice) option"
+    assert doc["description"] == "Whether to enable bat."  # the HM index has no bat: the eval's
+    doc = nixin(capsys, world, "explain", "programs.bat.enable", host="19BK")  # every scope
+    assert [(s["scope"], s["user"]) for s in doc["scopes"]] == [("home", "alice")]
+
+
+def test_explain_without_a_config_or_a_network(world, capsys, transport):
+    def no_config(*argv: str) -> dict:
+        rc = main(["--json", "--host", "mbp13", "explain", *argv, "--config", "/nonexistent/x"])
+        return envelope(*capsys.readouterr(), rc, "explain")
+
+    doc = no_config(X11)
+    assert doc["scopes"] == [] and doc["sources"]["config"]["error"]["code"] == "config-not-found"
+    assert doc["declarations"][0]["source"] == "nixpkgs"
+    assert doc["view"]["notes"][0].startswith("config not read (config-not-found)")
+    assert doc["view"]["subtitle"] == "NixOS option"
+    doc = no_config(X11, "--offline")
+    assert doc["error"]["code"] == "config-not-found"  # neither side: the config's error
+    doc = nixin(capsys, world, "explain", X11, host="nope")  # upstream still answers
+    assert doc["ok"] and doc["sources"]["config"]["error"]["code"] == "unknown-host"
+    doc = nixin(capsys, world, "explain", X11, "--offline", host="nope")
+    assert doc["error"]["code"] == "unknown-host"
+    doc = nixin(capsys, world, "explain", "services.nosuch.option")
+    assert doc["error"]["code"] == "not-found"
+    assert "no option or package named 'services.nosuch.option'" in doc["error"]["message"]
+
+
+def test_explain_human_block_wraps_to_the_width(world, capsys, monkeypatch):
+    shutil.copy(ROOT / "tests" / "fixtures" / "flake.lock.json", world.root / "flake.lock")
+    monkeypatch.setenv("NIXIN_WIDTH", "60")
+    assert main(["--host", "mbp13", "explain", X11, "--config", str(world.root)]) == 0
+    out, err = capsys.readouterr()
+    lines = out.splitlines()
+    assert err == "" and lines[0] == f"{X11} — NixOS option"
+    assert lines[1] == "  type      null or boolean"
+    i = lines.index("  declared  nixpkgs")  # the path does not fit beside it: next line, whole
+    assert lines[i + 1] == " " * 14 + "nixos/modules/services/networking/ssh/sshd.nix:475"
+    url = [x for x in lines if x.strip().startswith("https://")]
+    assert url and url[0].startswith(" " * 12)  # under the value column, never cut
+    assert lines[-1] == "  Whether to allow X11 connections."
+    # wrapped to 60 columns, except a path or URL that is longer than the room by itself
+    assert all(len(x) <= 60 or len(x.split()[-1]) > 46 for x in lines), lines

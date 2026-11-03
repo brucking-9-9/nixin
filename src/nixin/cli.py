@@ -25,7 +25,7 @@ import socket
 import sys
 import traceback
 
-from . import __version__, apply, discovery, gui, outdated, truth, tui, writer
+from . import __version__, apply, discovery, explain, gui, outdated, truth, tui, writer
 from .configrepo import default_host
 
 VERBS: dict[str, tuple[str, str]] = {
@@ -36,6 +36,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "status": ("truth", "this host: lock rev, generation, counts, pending (unapplied) changes"),
     "where": ("truth", "where a package / option is declared in the config, with its value"),
     "list": ("truth", "the installed packages (system, Home Manager), where each is listed"),
+    "explain": ("explain", explain.HELP),
     "add": ("writer", "add a package (system, or --home for Home Manager)"),
     "rm": ("writer", "remove a package, wherever it is declared"),
     "set": ("writer", "set an option to a Nix value"),
@@ -89,6 +90,7 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("args", nargs="*")
     truth.register(sub)
     writer.register(sub)
+    explain.register(sub)
     apply.register(sub)
     outdated.register(sub)
     tui.register(sub)
