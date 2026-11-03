@@ -19,8 +19,18 @@
       });
 
       # For consumers (the nixos-config flake): `nixpkgs.overlays = [ nixin.overlays.default ]`
-      # then `pkgs.nixin`, built against the consumer's own nixpkgs.
+      # then `pkgs.nixin`, built against the consumer's own nixpkgs. The modules below do
+      # not need it.
       overlays.default = final: prev: { nixin = final.python3Packages.callPackage ./package.nix { }; };
+
+      # programs.nixin.{enable, package, optionIndex, outdated, pending}: README, "Modules".
+      # A path, so the module system dedups a second import and names it in declarations.
+      nixosModules.default = ./modules/nixos.nix;
+      homeModules.default = ./modules/home.nix;
+      homeManagerModules.default = self.homeModules.default; # the older output name
+
+      # The option index builder the modules use: lib/options-index.nix.
+      lib.optionsIndex = import ./lib/options-index.nix { inherit (nixpkgs) lib; };
 
       devShells = forAll (
         pkgs:
