@@ -461,6 +461,9 @@ def cmd_report(argv: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     cmd = argv[0] if argv else ""
+    if any(a in ("-h", "--help") for a in argv):  # never the job: `outdated --help` notified
+        print((__doc__ or "").strip())
+        return 0
     if cmd == "outdated":
         return cmd_outdated(argv[1:])
     if cmd == "status":

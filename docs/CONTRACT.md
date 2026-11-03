@@ -1629,6 +1629,9 @@ nixin-state summary
 nixin-state report LOCK.json PUBLISHED.json
 ```
 
+`-h`/`--help` anywhere on the line prints this usage on stdout and exits 0 without running
+anything (a `nixin-state outdated --help` used to run the job, notification included).
+
 | file | written by | what |
 |---|---|---|
 | `outdated-lock.json`, `outdated-published.json` | `outdated` | the `outdated` and `outdated --published` documents for the authoritative tree (`$NIXIN_AUTHORITATIVE`, else `/etc/nixos`) |
