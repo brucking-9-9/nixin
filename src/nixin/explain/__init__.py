@@ -25,7 +25,6 @@ TUI/GUI help pane can show it as is.
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, unknown_host
@@ -194,6 +193,8 @@ def _upstream(ns: argparse.Namespace, name: str, kinds: tuple[str, ...], channel
 
 
 def _both(truth_fn, upstream_fn) -> tuple[tuple[Any, Any], dict]:
+    from concurrent.futures import ThreadPoolExecutor  # here: 10 ms at import (logging)
+
     with ThreadPoolExecutor(max_workers=2) as pool:
         t = pool.submit(truth_fn)
         u = pool.submit(upstream_fn)

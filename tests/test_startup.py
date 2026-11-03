@@ -1,7 +1,8 @@
 """The CLI starts light: building the parser and running a verb that needs neither never
-imports the UI toolkits (Textual, PySide6) or the HTTP stack (requests is imported on
-first use by discovery). Run in a fresh interpreter, since this test process has
-imported all of them."""
+imports the UI toolkits (Textual, PySide6), the HTTP stack (requests is imported on
+first use by discovery) or a thread pool (concurrent.futures brings logging: outdated and
+explain import it where they use it). Run in a fresh interpreter, since this test process
+has imported all of them."""
 
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ import os
 import subprocess
 import sys
 
-HEAVY = ["PySide6", "shiboken6", "textual", "rich", "requests", "urllib3"]
+HEAVY = ["PySide6", "shiboken6", "textual", "rich", "requests", "urllib3", "concurrent", "logging"]
 
 CODE = """
 import json, sys
