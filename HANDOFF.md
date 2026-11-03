@@ -68,5 +68,6 @@ on merge it moves here.
   fetched screenshots; the TUI shows it as text. search.nixos.org's index generation 52
   turned out to carry desktop entries, categories, icons and screenshot copies (not for
   unfree packages or wrappers: the shipped list covers those). Live on mbp13, read-only.
+  Gates at 55c5e5a: `nix build` 657 passed, 25 skipped, self-test ok; ruff, nix fmt clean.
   State, findings, judgement calls, merge notes, how to test: the last section of
   [HANDOFF-gui](docs/HANDOFF-gui.md).

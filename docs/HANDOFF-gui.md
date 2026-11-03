@@ -302,9 +302,10 @@ Done and run live on mbp13; nothing half-written.
 - **TUI**: the details' info pane lists `app`, `summary`, `category`, `app id`, `shots`,
   `appstream`, `details`, `note` lines (view.appstream_fields); no images, no Browse
   screen.
-- Gates (`nix develop -c pytest`): 657 passed, 25 skipped; `ruff check`, `ruff format
-  --check`, `nix fmt -- --check` clean; qmllint clean (test). `nix build`: see the index
-  entry in HANDOFF.md for the last result.
+- Gates at 55c5e5a: `nix build` 657 passed, 25 skipped (live), then `nixin gui: self-test
+  ok`; `nix develop -c pytest` the same; `ruff check`, `ruff format --check`, `nix fmt --
+  --check` clean; qmllint clean (a test). The built `bin/nixin info --json kitty` and
+  `search --appstream firefox` answer as in the table below.
 
 ### The finding that changed the plan
 
