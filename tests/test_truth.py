@@ -123,7 +123,11 @@ class FakeNix:
                 if 'hm = "brucking"' in tail and '"programs" "kitty"' in tail:
                     return (FIXTURES / "prefix-home-brucking-programs.kitty.json").read_text()
                 if "hm = null" in tail and '"services" "openssh"' in tail:
-                    return (FIXTURES / "prefix-nixos-services.openssh.json").read_text()
+                    entries = fixture("prefix-nixos-services.openssh.json")
+                    if '"PermitRootLogin"' in tail:  # options.nix follows the rest: `sub`
+                        sub = fixture("sub-services.openssh.settings.PermitRootLogin.json")
+                        entries[2]["sub"] = sub
+                    return json.dumps(entries)
                 if "hm = null" in tail and '"environment" "systemPackages"' in tail:
                     return json.dumps([SYSTEM_PACKAGES])
                 return "[]"
@@ -340,11 +344,11 @@ def test_index_seeds_learns_and_persists_exclusions(repo):
     doc = options.index(repo, "19BK", TruthCache(repo, "19BK"))
     assert len(args_seen) == 2 and '"hardware.nvidia.open"' in args_seen[0]  # seeded
     assert len(doc["excluded"]) == len(options.SEED_EXCLUSIONS["nixos"]) + 1
-    store = options.ExclusionStore(repo)
-    assert store.path.name == "exclude-3ec636362e18-c216bf5a1f17.json"
+    store = options.ExclusionStore(repo, "19BK")
+    assert store.path.name == "exclude-3ec636362e18-c216bf5a1f17-19BK.json"
     saved = json.loads(store.path.read_text())
     assert saved["nixos"]["services.new.thing"] == "boom"  # first line only
-    assert saved["nixpkgs"].startswith("3ec6363")
+    assert saved["nixpkgs"].startswith("3ec6363") and saved["host"] == "19BK"
     assert saved["home"] == options.SEED_EXCLUSIONS["home"]
 
     args_seen.clear()  # a new config tree (cache miss) on the same lock: one eval
@@ -354,6 +358,21 @@ def test_index_seeds_learns_and_persists_exclusions(repo):
     hm = options.index(repo, "19BK", TruthCache(repo, "19BK"), hm="brucking")
     assert len(args_seen) == 1 and '"programs.radicle.uri.web-rad.browser"' in args_seen[0]
     assert options.summarize(hm)["excluded"] == len(options.SEED_EXCLUSIONS["home"])
+
+
+def test_exclusions_are_kept_per_host_and_old_files_ignored(repo):
+    """An option learned as poisoned on one host is not skipped on another (nvidia on one
+    machine only); the pre-host files (one per rev pair, mixing hosts) are not read."""
+    a, b = options.ExclusionStore(repo, "19BK"), options.ExclusionStore(repo, "mbp13")
+    assert a.path != b.path and a.path.parent == b.path.parent
+    legacy = a.path.parent / "exclude-3ec636362e18-c216bf5a1f17.json"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps({"nixos": {"from.another.host": "x"}, "home": {}}))
+    a.add("nixos", {"hardware.nvidia.open": "expected a set", "only.on.19BK": "boom"})
+    assert "only.on.19BK" in a.load("nixos")
+    assert "only.on.19BK" not in b.load("nixos") and "from.another.host" not in b.load("nixos")
+    assert b.load("nixos") == options.SEED_EXCLUSIONS["nixos"]
+    assert options.ExclusionStore(repo, "19 BK/x").path.name.endswith("-19_BK_x.json")
 
 
 def test_evaluate_gives_up_without_a_marker(repo):
@@ -441,7 +460,8 @@ def test_status_json_contract(repo, monkeypatch, capsys):
     rc = main(["--json", "--host", "19BK", "status", "--full"])
     full = json.loads(capsys.readouterr().out)["options"]
     assert full["nixos"]["total"] == 0 and full["nixos"]["excluded"] == 8
-    saved = json.loads(options.ExclusionStore(repo).path.read_text())  # first pass writes it
+    store = options.ExclusionStore(repo, "19BK")
+    saved = json.loads(store.path.read_text())  # the first pass writes it
     assert saved["nixos"] == options.SEED_EXCLUSIONS["nixos"]
     assert set(full["home"]) == {"brucking"}
     n = len(repo.nix.calls)
@@ -534,6 +554,176 @@ def test_human_rendering(repo, monkeypatch, capsys):
     assert "services.openssh.enable = true  [nixos]" in out
     assert "  declared  nixpkgs nixos/modules/services/networking/ssh/sshd.nix:247" in out
     assert "  set in    ssh.nix:4" in out
+
+
+# --- docs: type, default, example ---------------------------------------------------------
+
+
+def test_where_option_has_type_default_example(repo, monkeypatch, capsys):
+    from nixin.cli import main
+
+    monkeypatch.setattr(
+        configrepo.ConfigRepo, "locate", classmethod(lambda cls, explicit=None, nix=None: repo)
+    )
+    rc = main(["--json", "--host", "19BK", "where", "services.openssh.enable"])
+    o = json.loads(capsys.readouterr().out)["scopes"][0]["options"][0]
+    assert rc == 0 and o["type_info"] == {"name": "bool", "description": "boolean"}
+    assert o["default"] == "false" and o["example"] is None and "sub_description" not in o
+
+    rc = main(["--json", "--host", "19BK", "where", "services.openssh.settings.PermitRootLogin"])
+    o = json.loads(capsys.readouterr().out)["scopes"][0]["options"][0]
+    assert o["option"] == "services.openssh.settings"  # the real option, its type unchanged
+    assert o["type"].startswith("open submodule")
+    ti = o["type_info"]  # … and the type of the path asked, followed through the submodule
+    assert ti["name"] == "nullOr" and ti["nested"]["elemType"]["values"][-1] == "no"
+    assert o["default"] == '"prohibit-password"' and o["example"] is None
+    assert o["sub_description"] == "Whether the root user can login using ssh."
+
+    rc = main(["--json", "--host", "19BK", "where", "services.openssh.settings"])
+    o = json.loads(capsys.readouterr().out)["scopes"][0]["options"][0]
+    assert o["example"] == "{\n  UseDns = true;\n  PasswordAuthentication = false;\n}"
+
+    assert main(["--host", "19BK", "where", "services.openssh.settings.PermitRootLogin"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[1].startswith('  type      null or one of "yes", "without-password"')
+    assert out[2].startswith("  inside    services.openssh.settings (open submodule")
+    assert '  default   "prohibit-password"' in out
+    assert "  about     Whether the root user can login using ssh." in out
+    assert main(["--host", "19BK", "where", "services.openssh.settings"]) == 0
+    out = capsys.readouterr().out
+    assert "  example   { UseDns = true; PasswordAuthentication = false; }" in out
+
+
+def test_option_info_modes(repo):
+    from nixin.truth import option_info
+
+    o = option_info(repo, "19BK", "services.openssh.ports")
+    assert o["mode"] == "exact" and o["scope"] == "nixos" and o["user"] is None
+    assert o["type_info"]["nested"]["elemType"]["name"] == "unsignedInt16"
+    assert o["default"] == "[ 22 ]" and o["value"] == [22]
+    o = option_info(repo, "19BK", ["services", "openssh", "settings", "PermitRootLogin"])
+    assert o["mode"] == "sub" and o["value"] == "no" and o["name"].endswith("PermitRootLogin")
+    o = option_info(repo, "19BK", "services.openssh")
+    assert o["mode"] == "prefix" and len(o["options"]) == 3
+    o = option_info(repo, "19BK", "programs.kitty.enable", hm="brucking")
+    assert o["scope"] == "home" and o["user"] == "brucking" and o["type"] == "boolean"
+    assert option_info(repo, "19BK", "no.such.option") is None
+
+
+def test_literal_text():
+    assert options.literal_text(None) is None
+    assert options.literal_text({"text": "pkgs.kitty\n", "kind": "expression"}) == "pkgs.kitty"
+    assert options.literal_text({"text": "the *usual*", "kind": "markdown"}) == "the *usual*"
+    assert options.literal_text({"value": {"a": [1, "<derivation x>"]}}) == (
+        "{ a = [ 1 <derivation x> ]; }"
+    )
+    assert options.literal_text({"value": None}) == "null"
+
+
+NIXPKGS_LIB = os.environ.get("NIXIN_TEST_NIXPKGS_LIB")
+
+# the option tree options.nix walks, built by the real module system (lib.evalModules)
+DOCS_MODULES = """
+{ lib, ... }:
+let t = lib.types; in
+{
+  options.a.enable = lib.mkEnableOption "a";
+  options.a.mode = lib.mkOption {
+    type = t.enum [ "fast" "slow" ];
+    default = "fast";
+    example = lib.literalExpression ''"slow"'';
+  };
+  options.a.ports = lib.mkOption { type = t.listOf t.port; default = [ 22 ]; };
+  options.a.dir = lib.mkOption {
+    type = t.nullOr t.str;
+    default = null;
+    defaultText = lib.literalMD "the *state* directory";
+  };
+  options.a.broken = lib.mkOption { type = t.int; default = throw "no default"; };
+  options.a.settings = lib.mkOption {
+    default = { };
+    type = t.submodule {
+      freeformType = t.attrsOf (t.either t.bool t.int);
+      options.Port = lib.mkOption { type = t.port; default = 22; description = "The port."; };
+      options.log.level = lib.mkOption { type = t.enum [ "INFO" "DEBUG" ]; default = "INFO"; };
+    };
+  };
+  options.a.users = lib.mkOption {
+    default = { };
+    type = t.attrsOf (t.submodule {
+      options.shell = lib.mkOption { type = t.str; default = "bash"; };
+    });
+  };
+  config.a.enable = true;
+}
+"""
+
+
+def _options_nix(args: str) -> list[dict]:
+    import subprocess
+
+    helper = options.HELPER.read_text()
+    expr = (
+        f"let lib = import {NIXPKGS_LIB}; "
+        f"ev = lib.evalModules {{ modules = [ ({DOCS_MODULES}) ]; }}; "
+        f"in ({helper}) {args} {{ inherit lib; inherit (ev) options; }}"
+    )
+    out = subprocess.run(
+        ["nix-instantiate", "--eval", "--strict", "--json", "--expr", expr],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return json.loads(out)
+
+
+@pytest.mark.skipif(
+    not NIXPKGS_LIB, reason="NIXIN_TEST_NIXPKGS_LIB (package.nix, the dev shell) is not set"
+)
+def test_options_nix_docs_on_the_real_module_system(storeless):
+    """typeInfo, default/example and `sub` from lib.evalModules + lib.types, storeless."""
+    q = '{ prefix = [ "a" ]; values = "all"; docs = true; }'
+    got = {e["name"]: e for e in _options_nix(q)}
+    assert got["a.enable"]["typeInfo"] == {"name": "bool", "description": "boolean"}
+    assert got["a.enable"]["default"] == {"value": False}
+    assert got["a.enable"]["example"] == {"value": True}
+    assert got["a.mode"]["typeInfo"]["values"] == ["fast", "slow"]
+    assert got["a.mode"]["example"] == {"text": '"slow"', "kind": "expression"}
+    ports = got["a.ports"]["typeInfo"]
+    assert ports["name"] == "listOf" and ports["nested"]["elemType"]["name"] == "unsignedInt16"
+    assert got["a.dir"]["default"] == {"text": "the *state* directory", "kind": "markdown"}
+    assert got["a.dir"]["typeInfo"]["nested"]["elemType"]["name"] == "str"
+    assert "default" not in got["a.broken"]  # it throws: left out, the entry stays
+    free = got["a.settings"]["typeInfo"]["nested"]["freeformType"]
+    assert free["name"] == "attrsOf" and free["nested"]["elemType"]["name"] == "either"
+    assert "sub" not in got["a.settings"]
+
+    def sub(*path: str) -> dict:
+        args = '{ prefix = [ "a" ' + " ".join(f'"{p}"' for p in path) + " ]; docs = true; }"
+        (entry,) = _options_nix(args)
+        return entry["sub"]
+
+    port = sub("settings", "Port")  # a declared sub-option
+    assert port["option"] == "a.settings.Port" and port["description"] == "The port."
+    assert port["typeInfo"]["name"] == "unsignedInt16" and port["default"] == {"value": 22}
+    assert sub("settings", "UseDns")["typeInfo"]["name"] == "either"  # the freeform type
+    assert sub("settings", "log", "level")["typeInfo"]["values"] == ["INFO", "DEBUG"]
+    assert sub("settings", "log") == {"group": ["level"]}
+    assert sub("users", "bob", "shell")["typeInfo"]["name"] == "str"  # attrsOf submodule
+    assert sub("users", "bob", "shell")["option"] == "a.users.bob.shell"
+    assert sub("users", "bob", "nope") == {"missing": "nope"}
+    assert sub("ports", "x") == {"opaque": "listOf"}
+
+
+@pytest.fixture
+def storeless(tmp_path, monkeypatch):
+    import shutil
+
+    if shutil.which("nix-instantiate") is None:
+        pytest.skip("nix-instantiate not on PATH")
+    (tmp_path / "home").mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("NIX_REMOTE", "dummy://")
 
 
 # --- list -------------------------------------------------------------------------------

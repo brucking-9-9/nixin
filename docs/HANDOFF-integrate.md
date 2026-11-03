@@ -112,7 +112,13 @@ the UI author and the layer owners.
 12. Discovery's human `info` footer repeats the same `bad-channel` sentence once per
     failed source (`--nixpkgs` with a bare rev). Cosmetic.
 
-## Open questions (from the brief, not decided)
+## Open questions (from the brief), decided since
+
+All three were decided on branch `typed-set-explain` (`docs/HANDOFF-typed.md`): (1) an
+eval failure after a write is `ok: false`, `eval-failed`, the change kept and listed,
+`error.undo[]`; (2) exclusions are keyed per host too; (3) without `--host`, this
+machine if the config has it, else the config's only host, else `unknown-host` listing
+the hosts (never one of several). The text below is the question as it was asked.
 
 1. **Writer `ok: true` when the post-write eval fails.** Today the edit stands and is
    reported, `checks.eval.ok: false`, the failure is repeated in `warnings`, exit 0. The

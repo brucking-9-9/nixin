@@ -10,6 +10,9 @@
   "declarations": [
    "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
   ],
+  "default": {
+   "value": false
+  },
   "definitionValues": [
    {
     "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix",
@@ -26,6 +29,10 @@
   "name": "services.openssh.enable",
   "readOnly": false,
   "type": "boolean",
+  "typeInfo": {
+   "description": "boolean",
+   "name": "bool"
+  },
   "value": true,
   "visible": true
  },
@@ -40,6 +47,11 @@
   "declarations": [
    "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
   ],
+  "default": {
+   "value": [
+    22
+   ]
+  },
   "definitionValues": [
    {
     "file": "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix",
@@ -58,6 +70,16 @@
   "name": "services.openssh.ports",
   "readOnly": false,
   "type": "list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+  "typeInfo": {
+   "description": "list of 16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+   "name": "listOf",
+   "nested": {
+    "elemType": {
+     "description": "16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+     "name": "unsignedInt16"
+    }
+   }
+  },
   "value": [
    22
   ],
@@ -74,6 +96,9 @@
   "declarations": [
    "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
   ],
+  "default": {
+   "value": {}
+  },
   "definitionValues": [
    {
     "file": "/nix/store/4naz5g774cwbir62rw4fgdzrjv1m8rgc-source/ssh.nix",
@@ -102,21 +127,77 @@
    "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source/nixos/modules/services/networking/ssh/sshd.nix"
   ],
   "description": "Configuration for `sshd_config(5)`.",
+  "example": {
+   "kind": "expression",
+   "text": "{\n  UseDns = true;\n  PasswordAuthentication = false;\n}\n"
+  },
   "highestPrio": 100,
   "internal": false,
   "isDefined": true,
   "name": "services.openssh.settings",
   "readOnly": false,
   "type": "open submodule of attribute set of (atom (null, bool, int, float or string))",
+  "typeInfo": {
+   "description": "open submodule of attribute set of (atom (null, bool, int, float or string))",
+   "name": "submodule",
+   "nested": {
+    "freeformType": {
+     "description": "attribute set of (atom (null, bool, int, float or string))",
+     "name": "attrsOf",
+     "nested": {
+      "elemType": {
+       "description": "atom (null, bool, int, float or string)",
+       "name": "nullOr",
+       "nested": {
+        "elemType": {
+         "description": "boolean or signed integer or floating point number or string",
+         "name": "either",
+         "nested": {
+          "left": {
+           "description": "boolean or signed integer or floating point number",
+           "name": "either",
+           "nested": {
+            "left": {
+             "description": "boolean or signed integer",
+             "name": "either",
+             "nested": {
+              "left": {
+               "description": "boolean",
+               "name": "bool"
+              },
+              "right": {
+               "description": "signed integer",
+               "name": "int"
+              }
+             }
+            },
+            "right": {
+             "description": "floating point number",
+             "name": "float"
+            }
+           }
+          },
+          "right": {
+           "description": "string",
+           "name": "str"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "value": {
    "AllowUsers": [
     "brucking"
    ],
    "KbdInteractiveAuthentication": false,
+   "LogLevel": "INFO",
    "PasswordAuthentication": false,
    "PermitRootLogin": "no",
-   "X11Forwarding": false,
-   "LogLevel": "INFO"
+   "X11Forwarding": false
   },
   "visible": true
  }

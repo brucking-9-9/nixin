@@ -14,7 +14,7 @@
     in
     {
       packages = forAll (pkgs: rec {
-        nixin = pkgs.python3Packages.callPackage ./package.nix { };
+        nixin = pkgs.python3Packages.callPackage ./package.nix { nixpkgsLib = "${nixpkgs}/lib"; };
         default = nixin;
       });
 
@@ -37,8 +37,11 @@
               ruff
               nixfmt
             ];
-            # Qt's plugins and QML modules for pytest and for the GUI run from the tree
-            env = nixin.qtEnv;
+            # Qt's plugins and QML modules for pytest and for the GUI run from the tree;
+            # nixpkgs' lib for the options.nix test (as package.nix's check has it)
+            env = nixin.qtEnv // {
+              NIXIN_TEST_NIXPKGS_LIB = "${nixpkgs}/lib";
+            };
           };
         }
       );

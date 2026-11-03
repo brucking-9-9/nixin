@@ -15,7 +15,7 @@ import argparse
 import time
 from typing import Any
 
-from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system
+from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system, unknown_host
 from . import listing, render, scan
 from . import options as opts
 from . import packages as pkgs
@@ -78,9 +78,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     src, lock, run = repo.source(), repo.lock(), running_system()
     timings: dict[str, float] = {}
@@ -98,7 +96,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
     timings["packages"] = pk["seconds"]
     option_docs: dict[str, Any] = {}
     if ns.full:
-        store = opts.ExclusionStore(repo)
+        store = opts.ExclusionStore(repo, host)
         option_docs["nixos"] = opts.summary(repo, host, cache, store=store)
         option_docs["home"] = {
             u: opts.summary(repo, host, cache, hm=u, store=store) for u in pk["hm_users"]
@@ -164,9 +162,7 @@ def _list(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     doc = listing.collect(repo, host, cache, ns)
     doc["cache"] = cache.doc()
@@ -190,9 +186,7 @@ def _where(ns: argparse.Namespace) -> dict[str, Any]:
     host = ns.host
     hosts = repo.hosts()
     if host not in hosts:
-        raise NixinError(
-            "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
-        )
+        raise unknown_host(host, hosts)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     pk = pkgs.collect(repo, host, cache)
     kind = ns.kind or ("option" if "." in name else "package")
@@ -247,6 +241,7 @@ def _entry_doc(repo: ConfigRepo, e: dict, rest: list[str]) -> dict[str, Any]:
         "declarations": [_location(repo, f, positions.get(f)) for f in e.get("declarations", [])],
         "definitions": [],
     }
+    out.update(_docs(e, rest))
     if "value" in e:
         found, v = opts.dig(e["value"], rest)
         out["value"] = v if found else None
@@ -266,6 +261,102 @@ def _entry_doc(repo: ConfigRepo, e: dict, rest: list[str]) -> dict[str, Any]:
     return out
 
 
+def _docs(e: dict, rest: list[str]) -> dict[str, Any]:
+    """`type_info`, `default`, `example` of the name asked (the option itself, or the path
+    `rest` below it, followed through its type by options.nix's `sub`); in sub mode also
+    `sub_description` when that path is a declared sub-option."""
+    d = e if not rest else (e.get("sub") or {})
+    out: dict[str, Any] = {
+        "type_info": d.get("typeInfo"),
+        "default": opts.literal_text(d.get("default")),
+        "example": opts.literal_text(d.get("example")),
+    }
+    if rest and d.get("description"):
+        out["sub_description"] = d["description"].strip()
+    return out
+
+
+def _resolve(entries: list[dict], path: list[str]) -> tuple[str, dict | None, list[str]]:
+    """(mode, entry, rest): the path is an option (`exact`), a path inside one (`sub`, the
+    option and the rest of the path), or has only options below it (`prefix`, None)."""
+    exact = opts.lookup(entries, ".".join(path))
+    if exact is not None:
+        return "exact", exact, []
+    parent, rest = opts.longest_parent(entries, path)
+    if parent is not None:
+        return "sub", parent, rest
+    return "prefix", None, []
+
+
+def option_info(
+    repo: ConfigRepo,
+    host: str,
+    path: list[str] | str,
+    *,
+    hm: str | None = None,
+    cache: TruthCache | None = None,
+) -> dict[str, Any] | None:
+    """An option path (parsed, or dotted) in one scope (the NixOS tree, or HM user `hm`): `where`'s option entry (type,
+    `type_info`, default, example, value, declarations, definitions) plus `mode` (`exact`,
+    `sub`) and `excluded`; for a path that only has options below it, `mode` `prefix` with
+    `options[]` (their names). None when the scope has nothing at or under NAME. One prefix
+    eval, cached like `where`'s (the writer's type check and `explain` call it)."""
+    path = path.split(".") if isinstance(path, str) else list(path)
+    name = ".".join(path)
+    cache = cache or TruthCache(repo, host)
+    q = opts.prefix_query(repo, host, cache, path, hm=hm)
+    entries, excluded = q["entries"], q["excluded"]
+    mode, entry, rest = _resolve(entries, path)
+    if entry is not None:
+        doc = {"mode": mode, **_entry_doc(repo, entry, rest)}
+    elif entries:
+        doc = {"mode": mode, "name": name, "options": [e["name"] for e in entries]}
+    elif excluded:
+        doc = {"mode": "excluded", "name": name}
+    else:
+        return None
+    doc.update({"scope": "nixos" if hm is None else "home", "user": hm, "excluded": excluded})
+    return doc
+
+
+def hm_users(repo: ConfigRepo, host: str, cache: TruthCache) -> list[str]:
+    """The host's Home Manager users: from the cached package eval when there is one, else
+    one small eval (cached on its own)."""
+    hit = cache.get(pkgs.CACHE_NAME, pkgs.helper_text(), peek=True)
+    if hit is not None:
+        return list(hit["hm_users"])
+    users = cache.get("hm-users", "1", peek=True)
+    if users is None:
+        users = sorted(repo.hm_users(host))
+        cache.put("hm-users", users, "1")
+    return list(users)
+
+
+def option_infos(
+    repo: ConfigRepo, host: str, path: list[str], *, home: str | None, cache: TruthCache
+) -> list[dict[str, Any]]:
+    """option_info() for every scope that has the path: NixOS, then each HM user (only
+    `home` when given; `unknown-user` when the host has no such user)."""
+    users = hm_users(repo, host, cache)
+    if home is not None and home not in users:
+        raise NixinError(
+            "unknown-user",
+            f"{home!r} is not a Home Manager user of {host} (users: {', '.join(users) or 'none'})",
+        )
+    scopes = [home] if home is not None else [None, *users]
+    found = [option_info(repo, host, path, hm=u, cache=cache) for u in scopes]
+    return [f for f in found if f is not None]
+
+
+def package_info(repo: ConfigRepo, host: str, name: str, *, cache: TruthCache) -> dict[str, Any]:
+    """`where PACKAGE`'s answer: installed copies, enabled programs.NAME.enable, the files
+    that list it, mentions."""
+    hosts = repo.hosts()
+    if host not in hosts:
+        raise unknown_host(host, hosts)
+    return _where_package(repo, host, cache, pkgs.collect(repo, host, cache), name, hosts)
+
+
 def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str) -> dict:
     path = name.split(".")
     scopes_out = []
@@ -274,16 +365,11 @@ def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name
         entries, excluded = q["entries"], q["excluded"]
         if not entries and not excluded:
             continue
-        exact = opts.lookup(entries, name)
-        if exact is not None:
-            mode, items = "exact", [_entry_doc(repo, exact, [])]
+        mode, entry, rest = _resolve(entries, path)
+        if entry is not None:
+            items = [_entry_doc(repo, entry, rest)]
         else:
-            parent, rest = opts.longest_parent(entries, path)
-            if parent is not None:
-                mode, items = "sub", [_entry_doc(repo, parent, rest)]
-            else:
-                mode = "prefix"
-                items = [_entry_doc(repo, e, []) for e in entries if opts.is_set(e)]
+            items = [_entry_doc(repo, e, []) for e in entries if opts.is_set(e)]
         scopes_out.append(
             {
                 "scope": scope,

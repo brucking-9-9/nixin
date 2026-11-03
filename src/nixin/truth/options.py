@@ -5,8 +5,9 @@ Two shapes of query, both cached by TruthCache (nix's flake fingerprint invalida
 * `index()`     every option of a scope (NixOS tree, or one HM user's tree) without values —
                 heavy (19BK: ~20-40 s, 1.4 GiB; see README) but needed once per tree change
                 for counts and for "which option is declared in that module file".
-* `prefix_query()` everything under one option path WITH values and per-definition values —
-                cheap (~3-4 s), what `where` runs.
+* `prefix_query()` everything under one option path WITH values, per-definition values and
+                docs (structured type, default, example; `sub` for a path below an
+                option) — cheap (~1-4 s), what `where`, `explain` and `set` run.
 
 A scope is the NixOS tree (hm=None) or a Home Manager user's tree (hm="brucking").
 """
@@ -24,6 +25,7 @@ from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, nix_value
 from .cache import TruthCache, cache_dir
+from .render import nix_text
 
 HELPER = files("nixin.truth") / "options.nix"
 MARKER = re.compile(r"nixin-option ([^\s'\"`]+)")
@@ -76,6 +78,7 @@ def evaluate(
     max_items: int | None = None,
     exclude: list[str] | tuple[str, ...] = (),
     max_retries: int = MAX_RETRIES,
+    docs: bool = False,
 ) -> dict[str, Any]:
     """Run options.nix; when an option's definitions raise an uncatchable error, exclude it
     (its name comes from the `nixin-option` marker in the trace) and run again."""
@@ -91,6 +94,8 @@ def evaluate(
         }
         if max_items:
             args["maxItems"] = max_items
+        if docs:
+            args["docs"] = True
         try:
             entries = repo.eval_json(repo.host_attr(host), apply=f"({helper}) {nix_value(args)}")
         except NixinError as e:
@@ -117,9 +122,13 @@ def evaluate(
 
 
 class ExclusionStore:
-    """The full index's exclusions, persisted per (nixpkgs rev, home-manager rev) as
-    `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>.json` = {"nixos": {name: message},
-    "home": {...}}, seeded with SEED_EXCLUSIONS. Kind "home" covers every HM user.
+    """The full index's exclusions, persisted per (nixpkgs rev, home-manager rev, host) as
+    `$XDG_CACHE_HOME/nixin/truth/exclude-<nixpkgs>-<hm>-<host>.json` = {"nixos": {name:
+    message}, "home": {...}}, seeded with SEED_EXCLUSIONS. Kind "home" covers every HM user
+    of the host. Per host, because whether an option's definitions throw depends on the
+    config: one learned on a host without nvidia must not hide it on a host with nvidia.
+    Files from before the host was part of the key (`exclude-<nixpkgs>-<hm>.json`) are
+    ignored: they mix hosts, and the seed covers what they held.
 
     Not used by prefix queries: `where` asks for values (other failures) and should still
     answer for an excluded option on a host where it does evaluate (nvidia enabled).
@@ -127,15 +136,17 @@ class ExclusionStore:
 
     _lock = threading.Lock()  # the NixOS and HM index may learn at the same time
 
-    def __init__(self, repo: ConfigRepo) -> None:
+    def __init__(self, repo: ConfigRepo, host: str) -> None:
         nixpkgs, hm = repo.lock("nixpkgs"), repo.lock("home-manager")
         self.revs = {
             "nixpkgs": nixpkgs.rev if nixpkgs else None,
             "home-manager": hm.rev if hm else None,
         }
+        self.host = host
         np_rev = (self.revs["nixpkgs"] or "unknown")[:12]
         hm_rev = (self.revs["home-manager"] or "none")[:12]
-        self.path = cache_dir() / f"exclude-{np_rev}-{hm_rev}.json"
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", host)
+        self.path = cache_dir() / f"exclude-{np_rev}-{hm_rev}-{safe}.json"
 
     def _read(self) -> dict[str, dict[str, str]]:
         try:
@@ -158,7 +169,8 @@ class ExclusionStore:
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 tmp = self.path.with_suffix(f".{os.getpid()}.tmp")
-                tmp.write_text(json.dumps({**self.revs, **doc}, indent=1, sort_keys=True))
+                full = {**self.revs, "host": self.host, **doc}
+                tmp.write_text(json.dumps(full, indent=1, sort_keys=True))
                 os.replace(tmp, self.path)
             except OSError:
                 pass
@@ -179,7 +191,7 @@ def index(
     hit = cache.get(name, salt)
     if hit is not None:
         return hit
-    store = store or ExclusionStore(repo)
+    store = store or ExclusionStore(repo, host)
     kind = "nixos" if hm is None else "home"
     known = store.load(kind)
     doc = evaluate(repo, host, hm=hm, values=INDEX_VALUES, exclude=list(known))
@@ -224,9 +236,21 @@ def prefix_query(
     hit = cache.get(name, salt)
     if hit is not None:
         return hit
-    doc = evaluate(repo, host, hm=hm, prefix=prefix, values="all", max_items=PREFIX_MAX_ITEMS)
+    doc = evaluate(
+        repo, host, hm=hm, prefix=prefix, values="all", max_items=PREFIX_MAX_ITEMS, docs=True
+    )
     cache.put(name, doc, salt)
     return doc
+
+
+def literal_text(lit: dict | None) -> str | None:
+    """A default/example from options.nix (`{text, kind}` as the module wrote it, or
+    `{value}` serialised) as text: Nix source, or Markdown for a `literalMD`."""
+    if not lit:
+        return None
+    if "text" in lit:
+        return str(lit["text"]).strip()
+    return nix_text(lit.get("value"))
 
 
 # --- reading an index -------------------------------------------------------------------

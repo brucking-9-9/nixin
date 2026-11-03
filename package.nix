@@ -14,6 +14,9 @@
   nixfmt,
   git,
   nix,
+  # nixpkgs' lib directory, for the test of truth/options.nix on the real module system
+  # (storeless nix-instantiate); null skips that one test (the overlay passes none)
+  nixpkgsLib ? null,
 }:
 let
   project = (lib.importTOML ./pyproject.toml).project;
@@ -62,6 +65,7 @@ buildPythonApplication {
   ];
 
   preCheck = ''
+    ${lib.optionalString (nixpkgsLib != null) "export NIXIN_TEST_NIXPKGS_LIB=${nixpkgsLib}"}
     export QT_QPA_PLATFORM=offscreen
     export QT_PLUGIN_PATH=${qtEnv.QT_PLUGIN_PATH}
     export NIXPKGS_QT6_QML_IMPORT_PATH=${qtEnv.NIXPKGS_QT6_QML_IMPORT_PATH}

@@ -8,6 +8,15 @@
 #   hm       = null | "<user>";            # null: the NixOS tree; a user: that user's HM tree
 #   exclude  = [ "hardware.nvidia.open" ]; # options to skip (see below)
 #   maxItems = 60; maxDepth = 5; maxStr = 400;   # value size caps
+#   docs     = false;                      # true: typeInfo, default, example (and `sub`)
+#
+# With `docs`, each entry also has `typeInfo` (the type as a tree: name, description,
+# enum `values`, `nested` element/left/right/… types), `default` and `example` (each
+# `{ text; kind; }` when the module wrote literal text, else `{ value; }` serialised like
+# values, absent when it does not evaluate), and, for an option whose path is a strict
+# prefix of `prefix` (services.openssh.settings for …settings.X11Forwarding), `sub`: the
+# same fields for the rest of the path, followed through the option's type (a submodule's
+# options, its freeform type, attrsOf elements, nullOr).
 #
 # Why `exclude`: definitionsWithLocations and isDefined force every definition's mkIf
 # condition, and a few nixpkgs modules trip a *type* error there when their service is
@@ -45,6 +54,7 @@ let
   maxItems = args.maxItems or 60;
   maxDepth = args.maxDepth or 5;
   maxStr = args.maxStr or 400;
+  docs = args.docs or false;
 
   # --- value serialisation: JSON-able, size-capped, with placeholders -------------------
   ser =
@@ -116,6 +126,136 @@ let
     in
     substring 0 300 (lib.replaceStrings [ "\n" ] [ " " ] firstPara);
 
+  # --- docs: the type as a tree, default/example, a path below an option -----------------
+  nestedKeys = [
+    "elemType"
+    "left"
+    "right"
+    "coercedType"
+    "finalType"
+    "freeformType"
+  ];
+  typeInfo =
+    depth: t:
+    let
+      n = t.name or "?";
+      nested = t.nestedTypes or { };
+      keys = builtins.filter (k: nested ? ${k}) nestedKeys;
+      payload = t.functor.payload or null;
+      enumValues = if isList payload then payload else payload.values or [ ];
+    in
+    {
+      name = n;
+      description = t.description or n;
+    }
+    // (if n == "enum" then { values = map (ser maxItems 0) enumValues; } else { })
+    // (
+      if depth < 6 && keys != [ ] then
+        { nested = lib.genAttrs keys (k: typeInfo (depth + 1) nested.${k}); }
+      else
+        { }
+    );
+
+  # a default/example: the text a module wrote (literalExpression / literalMD), else the value
+  literal =
+    v:
+    if isAttrs v && v ? _type && v ? text then
+      {
+        inherit (v) text;
+        kind = if v._type == "literalMD" then "markdown" else "expression";
+      }
+    else
+      { value = ser maxItems 0 v; };
+  optField =
+    name: o:
+    let
+      r = safeDeep (
+        if name == "default" && o ? defaultText then
+          (
+            if isString o.defaultText then
+              {
+                text = o.defaultText;
+                kind = "expression";
+              }
+            else
+              literal o.defaultText
+          )
+        else
+          literal o.${name}
+      );
+    in
+    if o ? ${name} && r.ok then { ${name} = r.value; } else { };
+  docsOf =
+    o:
+    let
+      t = safeDeep (typeInfo 0 o.type);
+    in
+    {
+      option = lib.concatStringsSep "." (o.loc or [ ]);
+      description = shortDescription (o.description or "");
+      declarations = o.declarations or [ ];
+    }
+    // (if t.ok then { typeInfo = t.value; } else { })
+    // optField "default" o
+    // optField "example" o;
+
+  # follow `rest` below a value of type `t` (option path `loc`)
+  subOf =
+    t: loc: rest:
+    let
+      n = t.name or "";
+      nested = t.nestedTypes or { };
+      k = lib.head rest;
+      more = lib.tail rest;
+    in
+    if rest == [ ] then
+      { typeInfo = typeInfo 0 t; }
+    else if
+      elem n [
+        "attrsOf"
+        "lazyAttrsOf"
+      ]
+    then
+      subOf nested.elemType (loc ++ [ k ]) more
+    else if
+      elem n [
+        "nullOr"
+        "unique"
+      ]
+    then
+      subOf nested.elemType loc rest
+    else if n == "submodule" then
+      let
+        subs = t.getSubOptions loc;
+        o = subs.${k} or null;
+      in
+      if isOption o then
+        (if more == [ ] then docsOf o else subOf o.type (loc ++ [ k ]) more)
+      else if isAttrs o && !(o ? _type) then
+        subGroup o (loc ++ [ k ]) more
+      else if nested ? freeformType then
+        subOf nested.freeformType loc rest
+      else
+        { missing = k; }
+    else
+      { opaque = n; };
+  # an attrset of options inside a submodule (`settings.foo.bar` where `foo` is no option)
+  subGroup =
+    g: loc: rest:
+    if rest == [ ] then
+      { group = attrNames g; }
+    else
+      let
+        o = g.${lib.head rest} or null;
+        more = lib.tail rest;
+      in
+      if isOption o then
+        (if more == [ ] then docsOf o else subOf o.type (loc ++ [ (lib.head rest) ]) more)
+      else if isAttrs o && !(o ? _type) then
+        subGroup o (loc ++ [ (lib.head rest) ]) more
+      else
+        { missing = lib.head rest; };
+
   describe =
     path: o:
     let
@@ -163,7 +303,26 @@ let
           { definitionValues = defValuesR.value; }
         else
           { };
-      e = base // withValue // withDefValues;
+      rest = lib.drop (length path) prefix;
+      subR = safeDeep (subOf o.type path rest);
+      withDocs =
+        if !docs then
+          { }
+        else
+          (removeAttrs (docsOf o) [
+            "option"
+            "description"
+            "declarations"
+          ])
+          // (
+            if rest == [ ] then
+              { }
+            else
+              {
+                sub = if subR.ok then subR.value else { error = true; };
+              }
+          );
+      e = base // withValue // withDefValues // withDocs;
     in
     addErrorContext "nixin-option ${name}" (deepSeq e e);
 

@@ -8,7 +8,8 @@ in one of them. `tests/test_integration.py` checks the envelope rules and the er
 list against this file.
 
 Status: all four layers are implemented: discovery, truth, writer and apply (`plan`,
-`apply`, `sync`, `history`, `rollback`).
+`apply`, `sync`, `history`, `rollback`), plus `outdated`/`update` and `explain` (which
+joins truth and discovery).
 
 ## Invocation
 
@@ -21,6 +22,7 @@ nixin --version | --help | VERB --help
 |---|---|---|
 | `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
 | `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake) |
+| `explain` | explain | one option or package: the config's side (truth) joined with upstream's docs (discovery) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
 | `plan`, `apply`, `sync` | apply | build + closure diff + boot check; commit, pull into the authoritative tree and switch (root); git sync with the hub |
 | `history`, `rollback` | apply | this machine's system generations with the commits nixin applied; switch back to one (root) and revert the config with it |
@@ -30,9 +32,14 @@ nixin --version | --help | VERB --help
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
 - `--host` names `nixosConfigurations.<H>`. The default is this machine's hostname
-  (`socket.gethostname()`), even when `--config` points at a config that has no such
-  host (see open question 3 in `docs/HANDOFF-integrate.md`). Discovery ignores it but
-  still echoes it in the envelope.
+  (`socket.gethostname()`) when the config (`--config`, else `$NIXIN_CONFIG`, else
+  `/etc/nixos`) has a host of that name. When it has not, and the config has exactly one
+  host, that host is the default. With several hosts and none of them this machine,
+  nixin never picks one: the verb fails with `unknown-host`, whose message lists the
+  hosts and says to pass `--host`. Finding the default costs a text scan of `flake.nix`,
+  plus one `nix eval` of the host names when the scan does not find this machine.
+  Discovery ignores `--host` but still echoes it in the envelope (as this machine's
+  hostname, nothing read).
 - `--config DIR` (truth, writer, apply verbs, `outdated` and `update`; before or after the
   verb, the verb's own wins; discovery ignores it) is the config flake: `--config`, else
   `$NIXIN_CONFIG`, else `/etc/nixos`. Truth and `outdated` only read it. The writer, apply
@@ -60,10 +67,10 @@ unexpected exceptions. The output is indented and key-sorted; do not depend on t
 
 | key | always | meaning |
 |---|---|---|
-| `ok` | yes | `true`: the verb did what was asked (see the writer's `checks` for the one caveat). `false`: `error` says why |
+| `ok` | yes | `true`: the verb did what was asked. `false`: `error` says why (the writer's `eval-failed` after a write is the one failure that also carries the verb's result fields) |
 | `verb` | yes | the verb, or `null` for a usage error where no verb was recognised (`nixin --json`, `nixin --json frobnicate`) |
-| `host` | yes | the `--host` value (default: this machine's hostname) |
-| `error` | when `ok` is false | `code` (a slug from [Error codes](#error-codes)), `message` (one human sentence, may contain newlines from nix), and for some writer codes extra fields: `hints[]`, `candidates[]`, `file`, `line` |
+| `host` | yes | the `--host` value (default: this machine's hostname, or the config's only host; see Invocation) |
+| `error` | when `ok` is false | `code` (a slug from [Error codes](#error-codes)), `message` (one human sentence, may contain newlines from nix), and for some writer codes extra fields: `hints[]`, `candidates[]`, `file`, `line`, `undo[]`, and `type-mismatch`'s `expected`, `type_info`, `default`, `example`, `option`, `value` |
 
 A UI should branch on `ok` and `error.code`, never on `message`.
 
@@ -256,7 +263,18 @@ For an option, `scopes[]`, each with `scope` (`nixos` | `home`), `user`, `mode`,
 `services.openssh.settings.X11Forwarding` inside `services.openssh.settings`; the value
 is dug out of the parent), or `prefix` (NAME is a non-leaf path: the options under it
 that something sets beyond their default). Each option has `name` (as asked), `option`
-(the real option), `type`, `description`, `isDefined`, `highestPrio`, `value` (JSON,
+(the real option), `type` and `description` (the real option's), `type_info`,
+`default`, `example` and, in `sub` mode when NAME is a declared sub-option,
+`sub_description` (these four describe NAME as asked: in `sub` mode the type is followed
+through the option's type, i.e. a submodule's options or freeform type, `attrsOf`
+elements, `nullOr`; `type_info` is null where it cannot be followed). `type_info` is
+the type as a tree: `name` (nixpkgs' type name: `bool`, `str`, `enum`, `listOf`,
+`attrsOf`, `nullOr`, `either`, `submodule`, `unsignedInt16`, …), `description` (the
+manual's wording), `values[]` for an `enum`, `nested` (`elemType`, `left`/`right`,
+`coercedType`/`finalType`, `freeformType`: each again a `type_info`). `default` and
+`example` are text: Nix source (the module's `literalExpression`/`defaultText`, else
+the value rendered as Nix with the placeholders below), or Markdown for a `literalMD`;
+null when there is none or it does not evaluate. Then `isDefined`, `highestPrio`, `value` (JSON,
 size-capped), `value_found` (sub mode), `value_error` (when the value does not
 evaluate), `declarations[]` (`source` = `config` | `nixpkgs` | `home-manager` | another
 input | `inline` | `other`; `file` relative to that source, a directory module mapped to
@@ -328,10 +346,77 @@ Costs: runs nix once per tree change (the package-list eval, shared with `status
 `where`), reads the config's modules, writes the cache file. A few seconds cold, under
 half a second warm.
 
+### `explain`
+
+```
+nixin explain NAME [--kind option|package] [--home USER] [--config DIR] [--channel C]
+                   [--offline] [--refresh]
+```
+
+Everything nixin knows about one option or package, in one document: the config's side
+(truth: this host's eval) joined with upstream's documentation (discovery), both asked
+at the same time. A NAME with a dot (or `--kind option`) is an option; an option name
+that no side knows is tried as a package (`python3Packages.requests`) unless `--kind`
+or `--home` was given. Upstream is search.nixos.org (NixOS options, packages) and the
+Home Manager option index, on `--channel`, else the channel the config's nixpkgs lock
+follows (`nixos-unstable` → `unstable`), else `unstable`. `--offline` skips upstream;
+`--refresh` skips both sides' caches.
+
+Either side may be missing: no config (`config-not-found`), a host the config does not
+have, an eval error, no network. The document then has what the other side knows, and
+says what is missing in `sources` and `view.notes`. Only when neither side can answer is
+it an error: the config's error when upstream was not reached either (or `--offline`),
+else `not-found`.
+
+Result for an option: `name`, `kind: "option"`, `type` (the type's description),
+`type_info` (as in `where`), `default`, `example` (Nix text; the config's eval first, as
+it is exact for the locked nixpkgs, else upstream's), `description` (upstream's full
+text, else the eval's first paragraph), `read_only`, `scopes[]` (every tree of the host
+that has NAME: `nixos`, then each HM user, or only `--home USER`; each `scope`, `user`,
+`mode` (`exact`/`sub`), `option` (the real option), `value` (JSON), `value_found`,
+`value_error`, `declarations[]` (as in `where`, plus `url`: the file on GitHub at the
+locked revision and line, for an input locked as `github:`), `definitions[]` (`source`,
+`file`, `line`, `value`)), `declarations[]` (the first scope's, or upstream's
+`{source, file, url}` without a config), `upstream` (the discovery row, `kind` `opt` or
+`hm`, or null), `sources`, `view`.
+
+Result for a package: `name`, `kind: "package"`, `description`, `homepage`, `license[]`,
+`programs[]` (binaries), `installed[]` (as `where`'s: `scope`, `user`, `name`, `pname`,
+`version`), `channel_version` (search.nixos.org's on the channel), `declared[]` (as
+`where`'s), `enabled_by[]` (the enabled `programs.NAME.enable` that bring it in, shaped
+like `where`'s `programs[]`), `mentions[]` (the first 5), `position` (`file:line` in
+nixpkgs), `source_url` (that line on GitHub at the channel's revision), `upstream`,
+`sources`, `view`.
+
+`sources`: `config` = `{ok, config, error, cache}` (`error` null or `{code, message}`;
+`cache` as in `status`); `upstream` = `{ok, channel, sources: {<source>: {channel, rev,
+cached, error}}}` (or `skipped: "--offline"`).
+
+`view` is the display form, for a help pane: `title`, `subtitle` (`NixOS option`, `Home
+Manager (USER) option`, `NixOS and Home Manager (USER) option`, `package`, `package (not
+installed)`), `rows[]` = `{label, text, url}` in display order (labels: `type`,
+`default`, `example`, `value`, `set in`, `declared`, `installed`, `channel`, `listed
+in`, `via`, `programs`, `homepage`, `license`, `source`; `text` may contain newlines, an
+example attrset keeps its own; `url` null or a link), `about` (the description,
+paragraphs separated by blank lines) and `notes[]` (what could not be asked, one line
+each). The human output is exactly this, wrapped to the terminal width (`NIXIN_WIDTH`).
+
+Errors: `usage` (no NAME, or more than one), `not-found`, `unknown-user` (`--home`),
+and, when no side could answer, the config's own (`config-not-found`, `not-a-flake`,
+`unknown-host`, `eval-failed`, `nix-missing`); `internal`.
+
+Costs: an option: one eval of the host names, one of the HM users (unless `list`/`status`
+cached the package eval), one prefix eval per tree (≈1 s each cold on mbp13, cached by
+the flake fingerprint), and one search.nixos.org query plus the Home Manager option
+index (cached). A package: the package eval (`status`'s, cached), the prefix evals of
+`where PACKAGE`, one search.nixos.org query. Measured on mbp13: 2–4 s for an option,
+about 7 s for an installed package with a cold package eval; a second run is under a
+second. Writes cache files only.
+
 ### `add`
 
 ```
-nixin add PKG... [--home USER] [--config DIR] [--dry-run] [--no-eval]
+nixin add PKG... [--home USER] [--config DIR] [--dry-run] [--no-check]
 ```
 
 Adds packages for the host (or for HM user USER on the host) to the generated module
@@ -347,13 +432,13 @@ imported through an expression (`map`, `readDir`, flake-parts helpers) are invis
 it.
 
 Before writing, one small eval checks that every new PKG exists in the host's `pkgs`
-(skipped with `--no-eval`). A PKG that a hand-written module already lists is reported
+(skipped with `--no-check`). A PKG that a hand-written module already lists is reported
 as `already-declared` and left alone.
 
 ### `rm`
 
 ```
-nixin rm PKG... [--home USER] [--where FILE:LINE]... [--config DIR] [--dry-run] [--no-eval]
+nixin rm PKG... [--home USER] [--where FILE:LINE]... [--config DIR] [--dry-run] [--no-check]
 ```
 
 Removes packages wherever the host's (or user's) modules declare them. A generated entry
@@ -365,25 +450,57 @@ several places is `ambiguous`; repeat with `--where FILE:LINE` (from `candidates
 ### `set`
 
 ```
-nixin set OPTION NIX-EXPR... [--home USER] [--where FILE:LINE] [--config DIR] [--dry-run] [--no-eval]
+nixin set OPTION NIX-EXPR... [--home USER] [--where FILE:LINE] [--config DIR] [--dry-run]
+                             [--no-check] [--force]
+nixin set OPTION [--home USER] [--config DIR]
 ```
 
 Sets OPTION to a Nix expression (the remaining arguments joined with spaces), written
-exactly as given. The value is checked for syntax only (`nix-instantiate --parse` of
-`with { }; VALUE`), so it may name the module's arguments: `pkgs.linuxPackages_7_2`,
-`lib.mkForce true`, `config.networking.hostName`. Whether those names exist where the
-value lands is the parse of the edited file before the write (`invalid-nix` with `file`:
-a hand-written `{ ... }:` module has no `lib`; the generated module binds `config`, `lib`
-and `pkgs`). Whether the value suits the option (type, conflicts) is the eval check after
-the write: `checks.eval`, repeated in `warnings`. If a module already defines OPTION, its
-value is rewritten in place (wrappers like `lib.mkForce`/`lib.mkIf c` kept). Otherwise the
-definition goes into the generated module as an attribute path
-(`services.openssh.settings.X11Forwarding = true;`).
+exactly as given. Before anything is written, three checks:
+
+1. Syntax (`nix-instantiate --parse` of `with { }; VALUE`), so the value may name the
+   module's arguments: `pkgs.linuxPackages_7_2`, `lib.mkForce true`,
+   `config.networking.hostName`. Whether those names exist where the value lands is the
+   parse of the edited file (`invalid-nix` with `file`: a hand-written `{ ... }:` module
+   has no `lib`; the generated module binds `config`, `lib` and `pkgs`).
+2. The option (one prefix eval of the host's or user's option tree, as `where`'s):
+   OPTION must be an option of the scope, or a path inside one (an `attrsOf`/submodule
+   option), else `not-found`.
+3. The type: the value's text is classified (a literal bool, int, float, string, null,
+   path, list, attrset, function; a bare word that is no builtin and no module argument,
+   e.g. `yes`; anything else, a name, a call, `if`, is an expression and not judged),
+   looking through `lib.mkForce`, `mkDefault`, `mkOverride N`, `mkBefore`/`mkAfter`,
+   `mkOrder N`, `mkIf COND` and `mkMerge [ … ]`, and checked against the option's type:
+   `bool`, the integer types (with their range: `port` is 0…65535), `float`, `number`,
+   the string types (a bare word is not a string: quote it, `'"box"'`), `enum`
+   (membership), `listOf X`/`attrsOf X` (the shape, then each element),
+   `nullOr`, `either`/`oneOf`, `coercedTo`, `unique`, `attrs`. Package, path,
+   submodule, function and any other type are not checked. A mismatch is `type-mismatch`
+   with `expected` (the type's description), `type_info`, `default`, `example`, `option`
+   and `value`, and nothing is written.
+
+`--force` skips 2 and 3 (no eval before the write). `--no-check` skips every eval, before
+and after the write (also for `add`, `rm`, `unset`; `--no-eval` is the old name).
+
+If a module already defines OPTION, its value is rewritten in place (wrappers like
+`lib.mkForce`/`lib.mkIf c` kept). Otherwise the definition goes into the generated module
+as an attribute path (`services.openssh.settings.X11Forwarding = true;`). The eval after
+the write (`checks.eval`) then shows the option's new value.
+
+Without a value, `set OPTION` writes nothing and describes the option for the scope:
+`option`, `real_option` (the option NAME is inside, in `sub` mode), `mode`, `type` (the
+description of NAME's type), `type_info`, `default`, `example`, `description`,
+`sub_description`, `value`, `declarations[]`, `definitions[]` (where it is set, as in
+`where`), `target` (where `set OPTION VALUE` would write: `{file, line, in_place}`, or
+`{candidates[]}` when several hand-written definitions match), `scope`, `user`,
+`config`, `warnings[]`. For a path with only options below it, `mode: "prefix"` and
+`options[]` (their names). Errors: `not-found` (no such option) and the writer's.
+Costs: one prefix eval (cached like `where`'s).
 
 ### `unset`
 
 ```
-nixin unset OPTION [--home USER] [--where FILE:LINE] [--config DIR] [--dry-run] [--no-eval]
+nixin unset OPTION [--home USER] [--where FILE:LINE] [--config DIR] [--dry-run] [--no-check]
 ```
 
 Removes OPTION's definition: from state.json, or in place from a hand-written module.
@@ -401,12 +518,22 @@ Removes OPTION's definition: from state.json, or in place from a hand-written mo
 | `changes[]` | `file` (repo-relative), `kind` (`created`, `modified`, `deleted`), `diff` (unified). Empty when nothing changed |
 | `imports_added[]` | `{file, import}` |
 | `imports_removed[]` | `{file, line, restored}` (`restored`: a one-line list put back exactly) |
-| `checks` | `parse[]` = `{file, ok, error}` per written `.nix` file; `eval` = null (dry run, `--no-eval`, nothing changed) or the eval proof. For packages: `ok`, `attr`, `command` (to rerun it by hand), `packages` (count), `present{attr: name}`, `absent[]`, and `missing[]`/`still_installed{}` when it did not work; for options: `ok`, `attr`, `value` or `defined: false`, `note`; in `value`, functions, derivations, package sets (anything with `callPackage`) and parts past depth 5 or 60 items are the strings `<function>`, `<derivation NAME>`, `<package set>`, `<…>`. When the eval itself fails: `ok: false`, `code`, `message`, `attr` |
+| `checks` | `type` (`set`) = null (`--no-check`, other verbs), or `{ok, option, expected, note}`: `ok` true (the value fits, or is an expression the eval judges: see `note`) or null (not checked: `--force`, a type nixin cannot follow, a failed option query; `note` says which); `parse[]` = `{file, ok, error}` per written `.nix` file; `eval` = null (dry run, `--no-check`, nothing changed) or the eval proof. For packages: `ok`, `attr`, `command` (to rerun it by hand), `packages` (count), `present{attr: name}`, `absent[]`, and `missing[]`/`still_installed{}` when it did not work; for options: `ok`, `attr`, `value` or `defined: false`, `note`; in `value`, functions, derivations, package sets (anything with `callPackage`) and parts past depth 5 or 60 items are the strings `<function>`, `<derivation NAME>`, `<package set>`, `<…>`. When the eval itself fails: `ok: false`, `code`, `message`, `attr` |
 | `warnings[]` | strings, always present: a conditional list, a kept wrapper, a hand-edited generated file, an eval failure, … |
 
-`checks.eval.ok: false` does not make the verb fail. The text change stands, `ok` stays
-true, exit 0, and the failure is repeated in `warnings` (open question 1 in
-`docs/HANDOFF-integrate.md`). A UI must look at `checks.eval.ok`.
+When the eval after a write fails (`checks.eval` has `code` `eval-failed` or
+`eval-timeout`), the verb fails: `ok: false`, exit 1, `error.code` is that code. The
+write stays: the document still has every result field (`changes[]` lists what was
+written, `actions[]`, `checks`), and `error.undo[]` holds the shell commands that take it
+back: the inverse nixin command where that restores exactly (`rm` what `add` added,
+`unset` what `set` newly set, `set OPTION OLD [--where FILE:LINE]` for a changed value,
+`add` what `rm` dropped from the generated module), else `git -C WORKSPACE checkout --
+FILE` for a hand-written file an element or binding was removed from (it also drops any
+other uncommitted change in that file). The message says the same, and that
+`--no-check` skips the eval. An eval that runs but does not show the wanted state
+(`still_installed`, `missing`) is not a failure: `ok` stays true and `warnings` says it.
+The eval proves only the list or option it reads, not that the host builds (that is
+`plan`).
 
 Errors (an error writes nothing): `usage`, `config-not-found`, `not-a-workspace`,
 `unknown-host`, `unknown-user` (the message names the hosts where USER exists),
@@ -414,14 +541,16 @@ Errors (an error writes nothing): `usage`, `config-not-found`, `not-a-workspace`
 name, or a file that would not parse after the edit, e.g. a variable it does not bind;
 then `file`), `not-found` (`rm`/`unset`: with `hints[]`, e.g.
 `programs.kitty.enable is set at …`, or `candidates[]` when `--where` matched nothing),
-`ambiguous` (with `candidates[]` = `{file, line, option, text}`),
+`ambiguous` (with `candidates[]` = `{file, line, option, text}`), `type-mismatch`
+(`set`, see above),
 `import-site-missing` (with the exact `line` to add, and `file`), `file-conflict` (an
 `installer/` file nixin did not generate), `invalid-state` (unreadable state.json),
-`eval-failed` (only when listing the flake's hosts needs an eval), `nix-missing`,
-`internal`.
+`eval-failed`/`eval-timeout` (listing the flake's hosts needed an eval and it failed,
+or the eval after a write failed: see above), `nix-missing`, `internal`.
 
 Costs: reads the workspace, runs `nix-instantiate --parse` and nixfmt, and (unless
-`--no-eval`) runs nix: one eval before an `add` and one after every write. Without
+`--no-check`) runs nix: one eval before an `add` or a `set` (the package names; the
+option's type, ≈1 s cold, plus `nix flake metadata`) and one after every write. Without
 `--dry-run` it writes in the workspace (`installer/*`, the edited modules) and in its git
 index (`git add --intent-to-add` for created files, `git rm --cached` for deleted
 never-committed ones). It never commits. The writer keeps no cache. Evals time out after
@@ -970,19 +1099,20 @@ mode, as under `tui`, so their logs stream into the window.
 | `network` | discovery, outdated | a source is unreachable, timed out, answered 5xx after retries, or sent non-JSON; `update`: nix could not fetch the new commit |
 | `http-<status>` | discovery, outdated | a 4xx the caller may act on (`http-400`, …) |
 | `bad-channel` | discovery, outdated | unknown `--channel`, or a bare-rev `--nixpkgs` for a channel-based source; `outdated`, `update`: a target ref GitHub does not know |
-| `not-found` | discovery, truth, writer, outdated | `info`/`versions`: no such name. `where`: no such option. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
+| `not-found` | discovery, truth, writer, explain, outdated | `info`/`versions`: no such name. `where`: no such option. `explain`: neither the config nor upstream has NAME. `rm`/`unset`: not declared in any module nixin can edit (`hints[]`). `set`: OPTION is not an option of the host (or HM user); `--force` writes it anyway. `outdated`: no `flake.lock`, or no nixpkgs input in it; `update`: also no such `--input` |
 | `nix-missing` | all | `nix` (or `nix-instantiate`) is not on PATH |
 | `nix-failed` | discovery, outdated | `nix search`/`nix eval`/`nix flake metadata` on `--nixpkgs` failed or printed non-JSON; `outdated`: `nix flake metadata` on the target; `update`: `nix flake update`/`lock` failed |
 | `nix-timeout` | discovery | `nix flake metadata` > 120 s, `nix search` > 900 s, `nix eval` > 300 s |
-| `config-not-found` | truth, writer, outdated | no `flake.nix` in the config dir |
+| `config-not-found` | truth, writer, explain, outdated | no `flake.nix` in the config dir (`explain`: only when upstream was not reached either) |
 | `not-a-flake` | truth, outdated | `nix flake metadata`/`nix flake archive` failed on the config |
-| `unknown-host` | truth, writer, outdated | `--host` is not in `nixosConfigurations` |
-| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it) |
-| `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit) |
+| `unknown-host` | truth, writer, explain, outdated | `--host` is not in `nixosConfigurations`; when `--host` was not given (this machine's name, and the config has several hosts) the message says to pass it |
+| `eval-failed` | truth, writer, outdated | the host does not evaluate (assertions, syntax, an untracked file the config imports); `outdated`: or not with the target nixpkgs (the update would break it). Writer: the eval after a write failed; the write stays (the document still has `changes[]`, `actions[]`, `checks`) and `error.undo[]` has the commands that take it back |
+| `eval-timeout` | writer, apply | a writer eval or plan's toplevel eval took longer than 900 s (truth evals have no limit); after a write, as `eval-failed` (the write stays, `undo[]`) |
 | `not-a-workspace` | writer, apply, outdated (`update`) | `--config` is `/etc/nixos` (also the default without `$NIXIN_CONFIG`), is not writable, or an edit would leave the tree; apply also: not the top of a git checkout, HEAD detached, or the authoritative tree itself |
-| `unknown-user` | truth, writer, outdated | `--home USER` is not an HM user of the host |
+| `unknown-user` | truth, writer, explain, outdated | `--home USER` is not an HM user of the host |
 | `unknown-package` | writer | `add`: not an attribute of the host's `pkgs` |
 | `invalid-nix` | writer | the value is not well-formed Nix (syntax only) or a name does not parse, or an edited file would not parse (e.g. a variable it does not bind; then `file`) |
+| `type-mismatch` | writer | `set`: the value's text does not fit the option's type (`expected`, `type_info`, `default`, `example`, `option`, `value`); nothing written; `--force` writes it anyway |
 | `ambiguous` | writer | several declarations match; `candidates[]`, repeat with `--where` |
 | `import-site-missing` | writer | no module or no `imports = [ … ];` to import the generated file from; `line` to add |
 | `file-conflict` | writer | an `installer/` file exists that nixin did not generate |
@@ -1076,8 +1206,8 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `nixhub/<sha1>.json` | NixHub version history | 6 h |
 | `noogle/<sha1>.json` | noogle function data | 1 day |
 | `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers | 30 days, keyed by resolved rev |
-| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where` and `list`), `prefix-<scope>-<hash>`, `options-<scope>` (the index, ~10 MB), `options-<scope>-summary`; `outdated`'s `outdated-lock` and `outdated-target` (the target's key also has the target commit) | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
-| `truth/exclude-<nixpkgs12>-<hm12>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev), seeded | until deleted; delete it to re-learn |
+| `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where`, `list` and `explain`), `prefix-<scope>-<hash>` (shared by `where`, `explain` and `set`'s type check), `hm-users` (`explain`, when there is no `packages` entry), `options-<scope>` (the index, ~10 MB), `options-<scope>-summary`; `outdated`'s `outdated-lock` and `outdated-target` (the target's key also has the target commit) | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
+| `truth/exclude-<nixpkgs12>-<hm12>-<host>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev, host), seeded; files without the host (`exclude-<nixpkgs12>-<hm12>.json`, before 2026-11-02) are ignored | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree, by `apply`, and by `rollback` for the authoritative HEAD it leaves); `status.pending`, `nothing-to-apply` and rollback's commit lookup read it without nix | last 40 per host |
 | `apply/apply.lock` | `flock` held while `apply` or `rollback` runs (`busy`) | — |

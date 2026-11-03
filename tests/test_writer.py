@@ -18,7 +18,7 @@ import pytest
 from nixin import writer
 from nixin.cli import main
 from nixin.configrepo import NixinError
-from nixin.writer import edits
+from nixin.writer import edits, typecheck
 from nixin.writer.nixtext import NixFile, NixSyntaxError, lex, parse_attrpath
 from nixin.writer.state import Tools, render
 from nixin.writer.workspace import HEADER, Workspace
@@ -46,10 +46,22 @@ class FakeTools:
 
 
 class FakeNix:
-    """Answers the writer's eval checks from a canned package set."""
+    """Answers the writer's eval checks from a canned package set; with `options`, also
+    truth's option queries (flake metadata/archive, options.nix by prefix). `fail` fails
+    every call, `fail_check` only the checks after a write."""
 
-    def __init__(self, installed: list[str], pkgs: dict[str, str], fail: str | None = None):
+    def __init__(
+        self,
+        installed: list[str],
+        pkgs: dict[str, str],
+        fail: str | None = None,
+        *,
+        options: dict[str, dict] | None = None,
+        fail_check: str | None = None,
+        bad_value: str | None = None,
+    ):
         self.installed, self.pkgs, self.fail = installed, pkgs, fail
+        self.options, self.fail_check, self.bad_value = options or {}, fail_check, bad_value
         self.calls: list[list[str]] = []
 
     def __call__(self, args: list[str], **kw) -> str:
@@ -57,6 +69,20 @@ class FakeNix:
         apply = args[args.index("--apply") + 1] if "--apply" in args else ""
         if self.fail:
             raise NixinError("eval-failed", self.fail)
+        if args[:2] == ["flake", "metadata"]:  # a new fingerprint each time: no cache hits
+            return json.dumps({"path": STORE, "fingerprint": f"fp-{len(self.calls)}"})
+        if args[:2] == ["flake", "archive"]:
+            return json.dumps({"path": STORE, "inputs": {"nixpkgs": {"path": NIXPKGS}}})
+        if "nixin-option" in apply:  # truth's options.nix: entries by prefix
+            spec = apply[apply.rindex("{ prefix = ") :]
+            prefix = re.findall(r'"([^"]*)"', re.search(r"prefix = \[([^\]]*)\]", spec).group(1))
+            return json.dumps(_option_entries(self.options, prefix))
+        if self.fail_check and ("installed" in apply or "__nixinUnset" in apply):
+            raise NixinError("eval-failed", self.fail_check)
+        if self.bad_value and "__nixinUnset" in apply:  # the option's value throws
+            return json.dumps({"__nixinError": True})
+        if self.bad_value and "builtins.deepSeq" in apply:  # … and why, without tryEval
+            raise NixinError("eval-failed", self.bad_value)
         if "hasAttrByPath" in apply:
             wanted = _lists(apply)
             return json.dumps([".".join(a) in self.pkgs for a in wanted])
@@ -71,6 +97,90 @@ class FakeNix:
         if "__nixinUnset" in apply:
             return "true"
         raise AssertionError(f"unexpected nix call {args}")
+
+
+STORE = "/nix/store/0000000000000000000000000000000-source"
+NIXPKGS = "/nix/store/6nwzgfvznah5rg192x0hnl5ykchdgi59-source"
+SSHD = f"{NIXPKGS}/nixos/modules/services/networking/ssh/sshd.nix"
+BOOL = {"name": "bool", "description": "boolean"}
+U16 = {
+    "name": "unsignedInt16",
+    "description": "16 bit unsigned integer; between 0 and 65535 (both inclusive)",
+}
+PERMIT = {
+    "name": "nullOr",
+    "description": 'null or one of "yes", "no"',
+    "nested": {
+        "elemType": {"name": "enum", "description": 'one of "yes", "no"', "values": ["yes", "no"]}
+    },
+}
+# options.nix entries (docs mode) for the mbp13 fixture host
+OPTIONS = {
+    "services.openssh.enable": {
+        "type": "boolean",
+        "typeInfo": BOOL,
+        "default": {"value": False},
+        "description": "Whether to enable the OpenSSH secure shell daemon. ",
+        "declarations": [SSHD],
+        "definitions": [f"{STORE}/hosts/mbp13/default.nix"],
+        "definitionValues": [{"file": f"{STORE}/hosts/mbp13/default.nix", "value": True}],
+        "isDefined": True,
+        "value": True,
+    },
+    "services.openssh.settings": {
+        "type": "open submodule of attribute set of (atom)",
+        "typeInfo": {
+            "name": "submodule",
+            "description": "open submodule of attribute set of (atom)",
+        },
+        "default": {"value": {}},
+        "declarations": [SSHD],
+        "definitions": [f"{STORE}/hosts/mbp13/default.nix"],
+        "isDefined": True,
+        "value": {"PermitRootLogin": "no"},
+        "sub:PermitRootLogin": {
+            "option": "services.openssh.settings.PermitRootLogin",
+            "description": "Whether the root user can login using ssh. ",
+            "typeInfo": PERMIT,
+            "default": {"value": "prohibit-password"},
+        },
+    },
+    "networking.firewall.allowedTCPPorts": {
+        "type": "list of 16 bit unsigned integer",
+        "typeInfo": {"name": "listOf", "description": "list of port", "nested": {"elemType": U16}},
+        "default": {"value": []},
+        "example": {"value": [22, 80]},
+        "declarations": [f"{NIXPKGS}/nixos/modules/services/networking/firewall.nix"],
+        "definitions": [],
+        "isDefined": True,
+        "value": [],
+    },
+    "networking.hostName": {
+        "type": "string",
+        "typeInfo": {"name": "str", "description": "string"},
+        "default": {"value": "nixos"},
+        "declarations": [f"{NIXPKGS}/nixos/modules/tasks/network-interfaces.nix"],
+        "definitions": [],
+        "isDefined": True,
+        "value": "nixos",
+    },
+}
+
+
+def _option_entries(options: dict[str, dict], prefix: list[str]) -> list[dict]:
+    """What options.nix answers for a prefix: the options under it, or the option above it
+    (with `sub` for the rest of the path when the test's table has one)."""
+    out = []
+    for name, spec in options.items():
+        parts = name.split(".")
+        if parts[: len(prefix)] != prefix and prefix[: len(parts)] != parts:
+            continue
+        entry = {"name": name, **{k: v for k, v in spec.items() if not k.startswith("sub:")}}
+        rest = prefix[len(parts) :]
+        if rest:
+            entry["sub"] = spec.get("sub:" + ".".join(rest), {"opaque": "submodule"})
+        out.append(entry)
+    return out
 
 
 def _lists(apply: str) -> list[list[str]]:
@@ -428,10 +538,25 @@ def test_eval_checks_with_a_fake_nix(cfg, monkeypatch):
     rc, d = run(cfg, "add", "nosuch", nix=True)
     assert d["error"]["code"] == "unknown-package"
     monkeypatch.setattr(writer, "NIX", FakeNix([], {}, fail="Scripted initrd has been removed."))
+    before = (cfg / "hosts/mbp13/default.nix").read_text()
     rc, d = run(cfg, "rm", "kitty", nix=True)
-    assert rc == 0 and d["ok"]  # the text change happened and is reported
+    # the eval after the write failed: the verb fails, the change stays and is listed
+    assert rc == 1 and d["ok"] is False and d["error"]["code"] == "eval-failed"
     assert d["checks"]["eval"]["code"] == "eval-failed"
-    assert any("Scripted initrd" in w for w in d["warnings"])
+    assert [c["file"] for c in d["changes"]] == ["hosts/mbp13/default.nix"]
+    assert (cfg / "hosts/mbp13/default.nix").read_text() != before
+    assert "Scripted initrd" in d["error"]["message"] and "--no-check" in d["error"]["message"]
+    assert d["error"]["undo"] == [f"git -C {cfg} checkout -- hosts/mbp13/default.nix"]
+    rc, d = run(cfg, "add", "jq", "hello", nix=True)  # the pre-check fails too: a warning
+    assert d["error"]["code"] == "eval-failed" and d["error"]["undo"] == [
+        f"nixin --host mbp13 rm jq hello --config {cfg}"
+    ]
+    assert any("could not check the package names" in w for w in d["warnings"])
+    assert "pkgs.jq" in (cfg / "installer/mbp13.nix").read_text()
+    nix_calls = len(writer.NIX.calls)
+    rc, d = run(cfg, "rm", "jq", "hello", "--no-check", nix=True)  # --no-check: no eval at all
+    assert rc == 0 and d["ok"] and d["checks"]["eval"] is None
+    assert len(writer.NIX.calls) == nix_calls
 
 
 def test_human_output_is_the_diff_and_one_summary_line(cfg, capsys):
@@ -544,6 +669,276 @@ def test_option_check_shows_package_sets_and_functions_as_json(storeless_nix):
     assert got["kernel"] == "<package set>" and got["p"] == "/no/such/file" and got["n"] == 1
     assert got["l"][:2] == [0, 1] and got["l"][60:] == ["<… 1 more>"]
     assert got["deep"]["a"]["b"]["c"]["d"] == "<…>"
+
+
+# --- the type check before `set` ---------------------------------------------------------
+
+STR = {"name": "str", "description": "string"}
+ENUM = {"name": "enum", "description": 'one of "fast", "slow", 1', "values": ["fast", "slow", 1]}
+
+
+def listof(t: dict) -> dict:
+    return {
+        "name": "listOf",
+        "description": f"list of {t['description']}",
+        "nested": {"elemType": t},
+    }
+
+
+def wrap(name: str, **nested: dict) -> dict:
+    return {"name": name, "description": name, "nested": nested}
+
+
+TYPE_CASES = [
+    # (type, value, None when it fits / is not judged, else a piece of the reason)
+    (BOOL, "true", None),
+    (BOOL, "lib.mkForce false", None),
+    (BOOL, "lib.mkOverride 50 true", None),
+    (BOOL, "mkIf config.x.enable true", None),
+    (BOOL, "a == b", None),
+    (BOOL, "!x", None),
+    (BOOL, "config.services.x.enable", None),  # an expression: the eval judges it
+    (BOOL, "if x then true else false", None),
+    (BOOL, "yes", "yes is a bare word (Nix reads it as a variable), not boolean"),
+    (BOOL, '"yes"', '"yes" is a string, not boolean'),
+    (BOOL, "1", "1 is an integer, not boolean"),
+    (BOOL, "null", "null is null, not boolean"),
+    (BOOL, "lib.mkDefault [ true ]", "is a list, not boolean"),
+    (BOOL, "x: true", "is a function, not boolean"),
+    (BOOL, "with lib; yes", None),  # under `with` a bare name may be bound
+    (BOOL, "let yes = true; in yes", None),
+    ({"name": "int", "description": "signed integer"}, "-3", None),
+    ({"name": "int", "description": "signed integer"}, "1.5", "1.5 is a float"),
+    (U16, "22", None),
+    (U16, "70000", "70000 is out of range (0…65535)"),
+    (U16, "-1", "-1 is out of range (0…65535)"),
+    ({"name": "positiveInt", "description": "positive integer, meaning >0"}, "0", "at least 1"),
+    (
+        {"name": "intBetween", "description": "integer between 1 and 9 (both inclusive)"},
+        "10",
+        "(1…9)",
+    ),
+    ({"name": "float", "description": "floating point number"}, "1", "1 is an integer"),
+    ({"name": "float", "description": "floating point number"}, "1.0", None),
+    ({"name": "number", "description": "number"}, "1", None),
+    (STR, '"box"', None),
+    (STR, "''\n  multi\n''", None),
+    (STR, '"${config.networking.domain}"', None),
+    (STR, "https://example.org", None),  # a URI literal is a string
+    (STR, "box", "box is a bare word, not string: quote it for Nix, '\"box\"'"),
+    (STR, "./file", "./file is a path, not string"),
+    (STR, '"a" + "b"', None),
+    ({"name": "nonEmptyStr", "description": "non-empty string"}, '""', '"" is empty'),
+    (
+        {
+            "name": "singleLineStr",
+            "description": "(optionally newline-terminated) single-line string",
+        },
+        '"a\nb"',
+        "more than one line",
+    ),
+    (
+        {"name": 'strMatching "[a-z]+"', "description": "string matching the pattern [a-z]+"},
+        "3",
+        "is an integer",
+    ),
+    (
+        {"name": "separatedString", "description": 'strings concatenated with "\\n"'},
+        "[ ]",
+        "is a list",
+    ),
+    (ENUM, '"fast"', None),
+    (ENUM, "1", None),
+    (ENUM, '"medium"', '"medium" is not one of "fast", "slow", 1'),
+    (ENUM, "true", "true is a boolean, not one of"),
+    (ENUM, "medium", 'medium is a bare word, not one of "fast", "slow", 1: quote it'),
+    (ENUM, '"${x}"', None),
+    (listof(U16), "[ 22 80 ]", None),
+    (listof(U16), '[ 22 "80" ]', 'element 2: "80" is a string, not 16 bit unsigned integer'),
+    (listof(U16), "[ 22 ] ++ config.x.ports", None),
+    (listof(U16), "[ 22 ] ++ [ 99999 ]", "element 2: 99999 is out of range"),
+    (listof(U16), "22", "22 is an integer, not list of"),
+    (listof(U16), "lib.mkAfter [ 8080 ]", None),
+    (listof(STR), "with pkgs; [ hello ]", None),
+    (listof({"name": "package", "description": "package"}), "[ pkgs.hello ]", None),
+    (listof({"name": "package", "description": "package"}), "[ hello ]", None),  # not judged
+    (
+        wrap("attrsOf", elemType=STR),
+        '{ a = "x"; b.c = "y"; }',
+        "b: { b = … } is an attribute set, not string",
+    ),
+    (wrap("attrsOf", elemType=STR), '{ a = "x"; } // config.y', None),
+    (wrap("attrsOf", elemType=STR), "{ a = 1; }", "a: 1 is an integer, not string"),
+    (wrap("attrsOf", elemType=STR), "[ ]", "is a list, not attrsOf"),
+    (wrap("nullOr", elemType=STR), "null", None),
+    (wrap("nullOr", elemType=STR), "true", "true is a boolean, not string"),
+    (wrap("either", left=BOOL, right=STR), '"x"', None),
+    (wrap("either", left=BOOL, right=STR), "1", "1 is an integer, not either"),
+    (wrap("either", left=BOOL, right={"name": "package", "description": "package"}), "1", None),
+    (wrap("coercedTo", coercedType=STR, finalType=listof(STR)), '"a"', None),
+    (wrap("coercedTo", coercedType=STR, finalType=listof(STR)), "1", "1 is an integer"),
+    (wrap("unique", elemType=BOOL), '"x"', "is a string, not boolean"),
+    ({"name": "attrs", "description": "attribute set"}, "{ }", None),
+    ({"name": "attrs", "description": "attribute set"}, "1", "1 is an integer"),
+    # not judged: package, path, submodule, function, anything, a type nixin does not know
+    ({"name": "package", "description": "package"}, '"hello"', None),
+    ({"name": "path", "description": "path"}, "1", None),
+    ({"name": "submodule", "description": "submodule"}, "true", None),
+    ({"name": "functionTo", "description": "function that evaluates to a(n) str"}, "1", None),
+    ({"name": "anything", "description": "anything"}, "1", None),
+    ({"name": "hm.types.dagOf", "description": "DAG of string"}, "1", None),
+    (None, "1", None),
+]
+
+
+@pytest.mark.parametrize(("t", "value", "why"), TYPE_CASES, ids=lambda x: str(x)[:40])
+def test_type_check_per_type(t, value, why):
+    got = typecheck.check(t, typecheck.literal(value))
+    if why is None:
+        assert got is None, got
+    else:
+        assert got is not None and why in got, got
+
+
+def _options_nix(monkeypatch, **kw) -> FakeNix:
+    nix = FakeNix([], {"cowsay": "cowsay-3.8.4"}, options=OPTIONS, **kw)
+    monkeypatch.setattr(writer, "NIX", nix)
+    return nix
+
+
+def test_set_type_mismatch_writes_nothing_and_says_what_fits(cfg, monkeypatch, cache_dir):
+    _options_nix(monkeypatch)
+    before = snapshot(cfg)
+    rc, d = run(cfg, "set", "services.openssh.enable", "yes", nix=True)
+    assert rc == 1 and d["error"]["code"] == "type-mismatch", d
+    err = d["error"]
+    assert err["expected"] == "boolean" and err["type_info"] == BOOL
+    assert err["default"] == "false" and err["example"] is None
+    assert err["option"] == "services.openssh.enable" and err["value"] == "yes"
+    assert "yes is a bare word" in err["message"] and "--force" in err["message"]
+    assert "default false" in err["message"]
+    rc, d = run(cfg, "set", "networking.firewall.allowedTCPPorts", '[ 22 "80" ]', nix=True)
+    assert d["error"]["code"] == "type-mismatch" and d["error"]["example"] == "[ 22 80 ]"
+    assert 'element 2: "80" is a string' in d["error"]["message"]
+    rc, d = run(cfg, "set", "services.openssh.settings.PermitRootLogin", '"maybe"', nix=True)
+    assert d["error"]["code"] == "type-mismatch", d
+    assert d["error"]["default"] == '"prohibit-password"'
+    assert '"maybe" is not one of "yes", "no"' in d["error"]["message"]
+    rc, d = run(cfg, "set", "networking.hostName", "box", nix=True)
+    assert "quote it for Nix, '\"box\"'" in d["error"]["message"]
+    assert snapshot(cfg) == before
+
+
+def test_set_value_that_fits_is_written_with_checks_type(cfg, monkeypatch, cache_dir):
+    _options_nix(monkeypatch)
+    rc, d = run(cfg, "set", "services.openssh.settings.PermitRootLogin", '"yes"', nix=True)
+    assert rc == 0 and d["ok"], d
+    assert d["checks"]["type"] == {
+        "ok": True,
+        "option": "services.openssh.settings",
+        "expected": 'null or one of "yes", "no"',
+        "note": "fits",
+    }
+    assert 'settings.PermitRootLogin = "yes";' in (cfg / "hosts/mbp13/default.nix").read_text()
+    rc, d = run(cfg, "set", "networking.firewall.allowedTCPPorts", "config.x.ports", nix=True)
+    assert rc == 0 and d["checks"]["type"]["note"] == "an expression the eval judges"
+    rc, d = run(cfg, "set", "services.openssh.settings.Ciphers", '[ "x" ]', nix=True)
+    assert rc == 0 and d["checks"]["type"]["ok"] is None  # the freeform part: type unknown
+
+
+def test_set_force_and_unknown_options(cfg, monkeypatch, cache_dir):
+    nix = _options_nix(monkeypatch)
+    rc, d = run(cfg, "set", "services.nosuch.enable", "true", nix=True)
+    assert rc == 1 and d["error"]["code"] == "not-found", d
+    assert "not an option of mbp13" in d["error"]["message"] and "--force" in d["error"]["message"]
+    rc, d = run(cfg, "set", "services.nosuch.enable", "true", "--force", nix=True)
+    assert rc == 0 and d["checks"]["type"] == {"ok": None, "note": "not checked (--force)"}
+    calls = len(nix.calls)
+    rc, d = run(cfg, "set", "services.openssh.enable", "yes", "--force", nix=True)
+    assert rc == 0 and "enable = yes;" in (cfg / "hosts/mbp13/default.nix").read_text()
+    assert not any("nixin-option" in " ".join(c) for c in nix.calls[calls:])  # no type query
+    rc, d = run(cfg, "set", "services.openssh", "true", nix=True)  # a group of options
+    assert d["error"]["code"] == "type-mismatch"
+    assert d["error"]["expected"] == "an attribute set (of the 2 options under it)"
+    calls = len(nix.calls)
+    rc, d = run(cfg, "set", "services.openssh.enable", "maybe", "--no-check", nix=True)
+    assert rc == 0 and d["checks"]["type"] is None and len(nix.calls) == calls
+
+
+def test_set_without_a_value_describes_the_option(cfg, monkeypatch, cache_dir, capsys):
+    _options_nix(monkeypatch)
+    before = snapshot(cfg)
+    rc, d = run(cfg, "set", "services.openssh.enable", nix=True)
+    assert rc == 0 and d["ok"], d
+    assert d["option"] == "services.openssh.enable" and d["mode"] == "exact"
+    assert (d["type"], d["default"], d["example"], d["value"]) == ("boolean", "false", None, True)
+    assert d["type_info"] == BOOL and d["scope"] == "nixos" and d["user"] is None
+    assert d["definitions"][0]["file"] == "hosts/mbp13/default.nix"
+    assert d["declarations"][0]["source"] == "nixpkgs"
+    assert d["target"] == {"file": "hosts/mbp13/default.nix", "line": 22, "in_place": True}
+    rc, d = run(cfg, "set", "networking.hostName", nix=True)
+    assert d["target"] == {"file": "installer/mbp13.nix", "line": None, "in_place": False}
+    assert d["definitions"] == [] and d["value"] == "nixos"
+    rc, d = run(cfg, "set", "services.openssh.settings.PermitRootLogin", nix=True)
+    assert d["mode"] == "sub" and d["type"] == 'null or one of "yes", "no"'
+    assert d["real_option"] == "services.openssh.settings" and d["value"] == "no"
+    rc, d = run(cfg, "set", "services.nosuch", nix=True)
+    assert d["error"]["code"] == "not-found" and "--force" not in d["error"]["message"]
+    assert snapshot(cfg) == before
+
+    args = ["--host", "mbp13", "set", "services.openssh.enable", "--config", str(cfg)]
+    assert main(args) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == "services.openssh.enable = true  [nixos mbp13]"
+    assert "  type      boolean" in out and "  default   false" in out
+    assert "  set in    hosts/mbp13/default.nix:22" in out
+    assert out[-1] == "  writes    hosts/mbp13/default.nix:22 (in place)"
+
+
+def test_eval_failure_after_a_write_says_how_to_undo(cfg, monkeypatch, cache_dir):
+    _options_nix(monkeypatch, fail_check="error: boom")
+    rc, d = run(cfg, "set", "networking.hostName", '"box"', nix=True)
+    assert rc == 1 and d["error"]["code"] == "eval-failed", d
+    assert d["error"]["undo"] == [f"nixin --host mbp13 unset networking.hostName --config {cfg}"]
+    assert 'networking.hostName = "box";' in (cfg / "installer/mbp13.nix").read_text()
+    assert {c["file"] for c in d["changes"]} == {
+        "installer/mbp13.nix",
+        "installer/state.json",
+        "hosts/mbp13/default.nix",
+    }
+    msg = d["error"]["message"]
+    assert msg.startswith('set networking.hostName = "box" for mbp13 in installer/mbp13.nix — ')
+    assert "the change is kept, but the eval after the write failed: error: boom" in msg
+    rc, d = run(cfg, "set", "networking.hostName", '"other"', nix=True)
+    assert d["error"]["undo"] == [
+        f"nixin --host mbp13 set networking.hostName '\"box\"' --config {cfg}"
+    ]
+    rc, d = run(cfg, "unset", "networking.hostName", nix=True)
+    assert d["error"]["undo"] == [
+        f"nixin --host mbp13 set networking.hostName '\"other\"' --config {cfg}"
+    ]
+    rc, d = run(cfg, "set", "services.openssh.enable", "false", nix=True)
+    where = "--where hosts/mbp13/default.nix:22"
+    assert d["error"]["undo"] == [
+        f"nixin --host mbp13 set services.openssh.enable true {where} --config {cfg}"
+    ]
+    rc, d = run(cfg, "unset", "services.openssh.enable", nix=True)
+    assert d["error"]["undo"] == [f"git -C {cfg} checkout -- hosts/mbp13/default.nix"]
+    rc, d = run(cfg, "rm", "--home", "alice", "fd", host="19BK", nix=True)
+    assert d["error"]["undo"] == [f"git -C {cfg} checkout -- home/modules/packages.nix"]
+    rc, d = run(cfg, "add", "--home", "alice", "cowsay", host="19BK", nix=True)
+    assert d["error"]["undo"] == [f"nixin --host 19BK rm cowsay --home alice --config {cfg}"]
+    rc, d = run(cfg, "rm", "--home", "alice", "cowsay", host="19BK", nix=True)
+    assert d["error"]["undo"] == [f"nixin --host 19BK add cowsay --home alice --config {cfg}"]
+
+
+def test_a_value_that_does_not_evaluate_says_why(cfg, monkeypatch, cache_dir):
+    why = "error: A definition for option `services.openssh.enable' is not of type `boolean'."
+    _options_nix(monkeypatch, bad_value=why)
+    rc, d = run(cfg, "set", "services.openssh.enable", '"yes"', "--force", nix=True)
+    assert rc == 1 and d["error"]["code"] == "eval-failed"
+    assert d["checks"]["eval"]["message"] == f"services.openssh.enable does not evaluate:\n{why}"
+    assert why in d["error"]["message"] and d["error"]["undo"]
 
 
 # --- live -----------------------------------------------------------------------------
