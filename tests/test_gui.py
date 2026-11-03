@@ -29,7 +29,7 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
-from tui_fake import COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load
+from tui_fake import BROWSE, COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load
 
 from nixin.cli import main
 from nixin.gui import app as gui_app
@@ -833,8 +833,12 @@ def test_every_page_and_dialog_grabs(ui, tmp_path):
     u = ui()
     open_details(u)
     sizes = []
-    for step in ("details", "diff", "pending", "status", "packages", "updates", "update"):
-        if step == "packages":
+    for step in ("details", "diff", "pending", "status", "packages", "updates", "update", "browse"):
+        if step == "browse":
+            u.gui.packages.cancelUpdate()
+            u.fake.routes |= {k: [v] for k, v in browse_routes().items() if k.startswith("browse")}
+            u.gui.go("browse")
+        elif step == "packages":
             u.fake.routes |= {k: [v] for k, v in PACKAGES.items() if k not in u.fake.routes}
             u.gui.go("packages")
         elif step == "updates":
@@ -854,6 +858,117 @@ def test_every_page_and_dialog_grabs(ui, tmp_path):
         assert img.save(str(path), "PNG", 0)
         sizes.append(path.stat().st_size)
     assert all(2_000 < s < 200_000 for s in sizes), sizes
+
+
+# --- browse, and the details' app block ------------------------------------------------------
+
+ICONS = Path(__file__).parent / "fixtures" / "appstream" / "icons"
+
+
+def browse_routes() -> dict:
+    """BROWSE with machine-independent icon paths: prismlauncher's is the fixture icon,
+    every other one is missing (a letter tile)."""
+    docs = {}
+    for key in ("browse Game", "browse AudioVideo"):
+        doc = load(BROWSE[key])
+        for r in doc["results"]:
+            icon = (r.get("appstream") or {}).get("icon")
+            if icon:
+                ours = r["name"] == "prismlauncher"
+                icon["path"] = str(ICONS / "demo.svg") if ours else "/nonexistent/icon.svg"
+        docs[key] = doc
+    return {**BROWSE, **docs}
+
+
+def test_browse_categories_apps_and_details(ui):
+    u = ui(browse_routes())
+    fetched: list[str] = []
+
+    def fetcher(url: str) -> str:
+        fetched.append(url)
+        return str(ICONS / "demo.png")
+
+    u.gui.image_fetcher = fetcher
+    keys(u, Qt.Key.Key_B, mods=Qt.KeyboardModifier.ControlModifier)
+    vm = u.gui.browse
+    assert u.gui["page"] == "browse" and prop(u, "browseApps", "activeFocus")
+    assert prop(u, "browseCategories", "count") == 11
+    assert vm["category"] == "AudioVideo" and prop(u, "browseApps", "count") == 6  # the first
+    click(u, "cat-Game")
+    assert vm["category"] == "Game" and vm["label"] == "Games"
+    assert prop(u, "browseApps", "count") == 9
+    assert vm["footer"].startswith("9 app(s) · 5 installed · search.nixos.org unstable@")
+    assert fetched == []  # the list fetches nothing, not even icons
+    assert u.fake.verbs() == [
+        ["browse", "--channel", "unstable"],
+        ["browse", "AudioVideo", "--channel", "unstable"],
+        ["browse", "Game", "--channel", "unstable"],
+    ]
+
+    names = [r.target for r in vm.shown]
+    vm.select(names.index("prismlauncher"))
+    settle(u)
+    d = u.gui.details
+    assert d["owner"] == "browse" and d["hasApp"]
+    assert d["appName"] == "Prism Launcher" and d["chips"][0] == "Game"
+    assert d["appSource"] == "installed output (master) · an application"
+    assert d["iconUrl"].endswith("/fixtures/appstream/icons/demo.svg")  # the output's own
+    icon = item(u, "appIcon")
+    assert icon.property("source").endswith("demo.svg")
+    img = icon.findChild(QObject, "appIconImage")
+    # visible once the file is loaded (status Ready): the SVG drew, the letter tile went
+    u.qtbot.waitUntil(lambda: img.property("visible"), timeout=5000)
+    assert img.property("paintedWidth") > 0
+    # the screenshots: fetched now, search.nixos.org's copies, three, once
+    shots = [x for x in fetched if "/screenshots/" in x]
+    assert len(shots) == 3 and fetched == shots
+    assert all(x.endswith(".webp") for x in shots)
+    assert prop(u, "shots", "count") == 3 and not d["shotsLoading"]
+    captions = [d.rows("shots").get(i)["caption"] for i in range(3)]
+    assert captions[0] == "The main Prism Launcher window"  # AppStream's order, default first
+    assert ["info", "prismlauncher", "--kind", "pkg", "--channel", "unstable"] in u.fake.verbs()
+    assert d["infoLoading"] is False and len(fetched) == 3  # info's answer fetched nothing again
+
+    vm.select(names.index("steam"))  # no desktop data upstream, a missing icon file
+    settle(u)
+    assert d["appName"] == "Steam" and d["iconUrl"] == ""
+    img = item(u, "appIcon").findChild(QObject, "appIconImage")
+    assert not img.property("visible")  # the letter tile instead
+
+
+def test_qt_reads_the_screenshot_formats(qapp):
+    """search.nixos.org's screenshot copies are WebP: package.nix brings qtimageformats."""
+    from PySide6.QtGui import QImageReader
+
+    formats = {bytes(f).decode() for f in QImageReader.supportedImageFormats()}
+    assert {"png", "jpeg", "svg", "webp"} <= formats
+
+
+def test_screenshot_failures_are_a_note(ui):
+    u = ui(browse_routes())
+
+    def fetcher(url: str) -> str:
+        from nixin.appstream.images import ImageError
+
+        raise ImageError("too-large", f"{url} is larger than 4194304 bytes")
+
+    u.gui.image_fetcher = fetcher
+    u.gui.go("browse")
+    settle(u)
+    u.gui.browse.setCategory("Game")
+    settle(u)
+    u.gui.browse.select([r.target for r in u.gui.browse.shown].index("prismlauncher"))
+    settle(u)
+    d = u.gui.details
+    assert d["shotsNote"].startswith("3 screenshot(s) not shown: too-large: https://")
+    assert prop(u, "shots", "count") == 0 and not shown(u, "shots")
+    assert shown(u, "shotsNote")
+
+
+def test_search_details_without_appstream_hide_the_app_block(ui):
+    u = ui()
+    open_details(u)
+    assert not u.gui.details["hasApp"] and not shown(u, "appBlock")
 
 
 # --- the verb -------------------------------------------------------------------------------

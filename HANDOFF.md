@@ -117,3 +117,14 @@ on merge it moves here.
   -e`, else kitty, …). Live on mbp13: cowsay, figlet on a pty, `--shell`, gnome-calculator
   built (detached `--version` only: no window on the kiosk screen), lolcat built from
   source. Nothing switched, no sudo, `~/nixos` only read.
+- **appstream-categories** — branch `appstream-categories`: a package as an application
+  (AppStream metainfo + desktop entries) in `info` (`appstream`, `--appstream
+  local|fetch|hint|off`), `search --appstream` (GUI-app mark), the `browse` verb
+  (freedesktop categories: installed, a shipped well-known list, search.nixos.org's most
+  popular), the GUI's Browse page (`Ctrl+B`) and the details pane's icon, chips and lazily
+  fetched screenshots; the TUI shows it as text. search.nixos.org's index generation 52
+  turned out to carry desktop entries, categories, icons and screenshot copies (not for
+  unfree packages or wrappers: the shipped list covers those). Live on mbp13, read-only.
+  Gates at 55c5e5a: `nix build` 657 passed, 25 skipped, self-test ok; ruff, nix fmt clean.
+  State, findings, judgement calls, merge notes, how to test: the "AppStream and Browse" section of
+  [HANDOFF-gui](docs/HANDOFF-gui.md).

@@ -1,0 +1,43 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "zlib",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Lossless data-compression library",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://zlib.net"
+     ],
+     "package_license_set": [
+      "Zlib"
+     ],
+     "package_mainProgram": null,
+     "package_outputs": [
+      "out",
+      "dev",
+      "static"
+     ],
+     "package_platforms": [
+      "aarch64-genode",
+      "powerpc-netbsd"
+     ],
+     "package_pname": "zlib",
+     "package_position": "pkgs/development/libraries/zlib/default.nix:162",
+     "package_programs": [],
+     "package_pversion": "1.3.2",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 11.52513,
+  "total": {
+   "relation": "eq",
+   "value": 1
+  }
+ }
+}

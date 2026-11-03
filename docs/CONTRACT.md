@@ -9,7 +9,8 @@ list against this file.
 
 Status: all four layers are implemented: discovery, truth, writer and apply (`plan`,
 `apply`, `sync`, `history`, `rollback`), plus `outdated`/`update`, `explain` (which
-joins truth and discovery) and `try`.
+joins truth and discovery), `try`, and the AppStream layer (`info`'s `appstream`, `search
+--appstream`, `browse`).
 
 ## Invocation
 
@@ -20,7 +21,8 @@ nixin --version | --help | VERB --help
 
 | verb | layer | does |
 |---|---|---|
-| `search`, `info`, `versions` | discovery | what exists upstream, in which versions |
+| `search`, `info`, `versions` | discovery | what exists upstream, in which versions; `info` adds a package's AppStream data (`appstream`), `search --appstream` marks GUI apps |
+| `browse` | appstream | applications by freedesktop category: installed, a shipped list of well-known ones, search.nixos.org's most popular |
 | `status`, `where`, `list` | truth | what this config gives a host (it evaluates the config flake); `list --diff A B`: two hosts compared |
 | `explain` | explain | one option or package: the config's side (truth) joined with upstream's docs (discovery) |
 | `add`, `rm`, `set`, `unset` | writer | edit a user-owned workspace clone of the config |
@@ -186,7 +188,7 @@ also make nix fetch flake inputs that are not in the store yet. Timings are in
 
 ```
 nixin search QUERY [--kind pkg|opt|hm|program|fn|all] [--channel C] [--limit N]
-                   [--nixpkgs FLAKEREF] [--no-index] [--refresh | --no-cache]
+                   [--nixpkgs FLAKEREF] [--no-index] [--appstream] [--refresh | --no-cache]
 ```
 
 | argument | meaning |
@@ -197,6 +199,7 @@ nixin search QUERY [--kind pkg|opt|hm|program|fn|all] [--channel C] [--limit N]
 | `--limit` | rows per kind, default 20, at least 1 |
 | `--nixpkgs` | packages come from `nix search --json` on that exact nixpkgs (the `local-nix` source), typically the host's locked rev. A branch-named ref also picks the channel for options; a bare rev does not (pass `--channel`, else options and HM fail with `bad-channel` while packages still answer) |
 | `--no-index` | options (`opt`, `hm`) from upstream even when this machine has an [option index](#option-indexes) for `--host`. `--channel` and `--nixpkgs` imply it |
+| `--appstream` | every `pkg` row gets an `appstream` object (see [`info`](#info)) from search.nixos.org's desktop data, asked for in the same request, else nixin's shipped list of well-known apps; no nix, no other request. Its `gui` marks GUI apps: `true` (a listed desktop entry, or the shipped list), `false` (no programs at all: nothing to launch), `null` (unknown) |
 
 **The option index first.** When this machine has an index for `--host` (`opt`: the
 system's; `hm`: the user's), `opt` and `hm` are answered from it: source `index`,
@@ -241,12 +244,22 @@ Errors: `usage`, `bad-channel`, `network`, `http-<status>`, `nix-missing`, `nix-
 Costs: network (search.nixos.org, the HM option JSON, noogle) except `--kind pkg
 --nixpkgs`, which runs nix only (`nix flake metadata`, `nix search`), and options the
 option index answers (no network, no nix). Writes cache files only.
+`--appstream` adds no request (search.nixos.org returns the desktop fields with the
+rest; a few KiB more per row).
+
+Why `gui` is often `null`: search.nixos.org (index generation 52 and later; 51 and older
+have no desktop data at all) has desktop entries only for packages whose outputs its
+indexer read. Unfree packages and wrappers come back empty: firefox, chromium,
+thunderbird, steam, lutris, heroic, discord, spotify, vscode, obsidian, zotero, bottles,
+kicad (checked 2026-11-02). nixin's shipped list (`appstream/curated.py`, about a hundred
+well-known apps) covers the best known of those; anything else without desktop data is
+`null`, and "has binaries" is not taken to mean "has a GUI".
 
 ### `info`
 
 ```
 nixin info NAME [--kind pkg|opt|hm|fn|all] [--channel C] [--nixpkgs FLAKEREF] [--no-index]
-                [--refresh | --no-cache]
+                [--appstream local|fetch|hint|off] [--config DIR] [--refresh | --no-cache]
 ```
 
 Exact-name lookup. `--kind` defaults to `all` = pkg + opt + hm (no `program`; `fn` only
@@ -256,6 +269,41 @@ else from upstream. With `--nixpkgs`, the
 package comes from `nix eval` on that rev (about 0.5 s once the rev is in the store) and
 gains `broken`, and `unfree` becomes a bool.
 
+Package rows carry `appstream`: the package as an application, from the AppStream
+metainfo (`share/metainfo/*.xml`, `share/appdata/*.xml`) and desktop entries
+(`share/applications/*.desktop`) its output ships. Where nixin looks, by `--appstream`:
+
+| mode | looks at |
+|---|---|
+| `local` (default) | 1. an installed output: a store path named after the package (`pname`, or `pname-unwrapped`, where wrappers keep their metainfo) that a profile links desktop entries or metainfo from (`/run/current-system/sw`, `/etc/profiles/per-user/*`, `~/.nix-profile`, `~/.local/state/nix/profile`); no nix. 2. the package's outputs in the locked nixpkgs (`--nixpkgs`, else the nixpkgs input of the config's `flake.lock`: `--config`, `$NIXIN_CONFIG`, `/etc/nixos`): `nix eval` of their out paths (unfree, insecure and broken packages again with `--impure` and `NIXPKGS_ALLOW_*`: the paths do not depend on it), read if they are in the store. Nothing is downloaded or built. 3. search.nixos.org's desktop data for the row (the hint) |
+| `fetch` | as `local`, and when the outputs are not in the store: `nix build --dry-run` first; if nothing has to be built and the download is at most 50 MiB, `nix build --no-link --print-out-paths --max-jobs 0 --builders ''` substitutes them from the binary cache and they are read (they stay in the store, unrooted, until the next GC) |
+| `hint` | search.nixos.org's desktop data only; no nix, no profiles |
+| `off` | no `appstream` field (`info` as before this field existed) |
+
+`appstream` (the files win over the hint field by field; the hint adds the icon URL and
+search.nixos.org's screenshot copies):
+
+| field | meaning |
+|---|---|
+| `source` | `installed`, `store` (read from an output), `search.nixos.org` (its desktop data), `curated` (only nixin's list of well-known apps knows it), or null (nothing) |
+| `gui` | `true`: a desktop entry a launcher lists (or a `desktop-application` component, or the shipped list); `false`: the outputs read have neither, or the package has no programs; `null`: unknown |
+| `store_path` | the output read (null for the hint) |
+| `installed_for` | `installed` only: the profiles that link it (`system`, user names) |
+| `id`, `name`, `summary`, `description` | the AppStream component id (else the desktop file's name), its name and summary (else the desktop entry's `Name`, `Comment`), the description as plain text (paragraphs, `• ` list items) |
+| `categories[]` | AppStream `<categories>` then the desktop entry's `Categories=`, as written (main and additional categories, toolkit names included) |
+| `icon` | null or `{name, path, url}`: the icon name; `path` an SVG or PNG in the output's `share/icons` (hicolor first, scalable then the largest) or `share/pixmaps`, null when the output has none (a theme icon); `url` search.nixos.org's copy (`https://search.nixos.org/icons/…`) or null |
+| `screenshots[]` | `{url, caption, default, thumbnail, large}`: the upstream URL from the metainfo, and search.nixos.org's small WebP copies when it has them (null otherwise); the default one first |
+| `license` | the metainfo's `project_license` (SPDX expression), or null |
+| `launchable` | the desktop file id (`org.kde.konsole.desktop`) |
+| `homepage` | the metainfo's homepage URL |
+| `desktop_ids[]` | the listed desktop entries in the output |
+| `files[]` | the files read, relative to `store_path` |
+| `notes[]` | why there is not more: `not in the local store (…)`, `no locked nixpkgs to look in (…)`, `the out paths: nix-failed: …`, `not fetched: 6 path(s), 690.9 MiB to download (the cap is 50.0 MiB)`, `fetched 1 path(s), 323.2 KiB, from the binary cache`, `this search.nixos.org index has no desktop data …` |
+
+AppStream problems never fail `info`: they end up in `notes`. nixpkgs' kitty ships a
+desktop entry and icons but no metainfo, so `info kitty` has no description, license or
+screenshots there; konsole, steam, gnome-mines and others have them.
+
 Result: `name`, `kind`, `results[]` (usually one; a name can be both a package and an
 option), `count`, `source`, `channel`, `rev`, `cached`, `sources`. Package rows add
 `matched_by` (`attr` or `pname`). With `pname`, rows also get `alternatives[]` (the other
@@ -264,7 +312,11 @@ attrs with that pname); an `attr` match leaves that field out.
 Errors: `not-found` (none of the asked kinds has NAME; the message also lists the kinds
 whose sources failed), and the `search` codes.
 
-Costs: as `search`.
+Costs: as `search`, plus for `--appstream local` (the default) a scan of the profiles'
+desktop entries (~50 ms) and, unless an installed output answers, one `nix eval` of the
+package's out paths on the locked nixpkgs (about 3 s, 380 MiB, then cached 30 days);
+`fetch` adds `nix build --dry-run` and the substitution (seconds to tens of seconds). See
+[Costs](#costs-measured).
 
 ### `versions`
 
@@ -283,6 +335,53 @@ release's `summary`, `homepage`, `license`, `programs`; plus `source` (`nixhub.i
 Errors: `not-found`, `usage`, `network`, `http-<status>`, `internal`.
 
 Costs: network (search.devbox.sh). Writes cache files only.
+
+### `browse`
+
+```
+nixin browse [CATEGORY] [--channel C] [--limit N] [--refresh | --no-cache]
+```
+
+Applications by freedesktop main category. CATEGORY is a key (`AudioVideo`, `Development`,
+`Education`, `Game`, `Graphics`, `Network`, `Office`, `Science`, `Settings`, `System`,
+`Utility`), its label (`Games`, `Internet`, `Utilities`, …) or an alias (`audio`, `video`,
+`games`, `dev`), any case. `AudioVideo` also takes the `Audio` and `Video` categories.
+
+Without CATEGORY: `category` (null), `categories[]` = `{key, label, matches[], installed,
+curated, published}` (apps installed on this machine in it, by pname; how many the
+shipped list names; how many packages search.nixos.org has in it, null when it could not
+say), `installed` (installed apps in all), and `source`, `channel`, `rev`, `cached`,
+`sources`.
+
+With CATEGORY: `category` = `{key, label, matches[]}`, `results[]`, `count`, `limit`, and
+`source`, `channel`, `rev`, `cached`, `sources`. The rows are `pkg` rows (the
+search.nixos.org fields, so `info`/`add` take their `name`) with `appstream` (the hint, or
+for installed apps their desktop entry and its icon file), `installed`, `installed_for[]`,
+`curated` (on the shipped list) and `listed_by[]` (`installed`, `curated`,
+`search.nixos.org`, in the order they found it). Order: the installed apps (by name, the
+attribute of the wrapper when the desktop entry comes from `x-unwrapped`), then the
+shipped list's in its order, then search.nixos.org's packages in the category, most
+popular first (repology), at most `--limit` (default 30). One row per application: a row
+whose attribute, pname, AppStream id or app name is already listed only adds to
+`listed_by` (so `firefox-esr`, `nethack-qt` do not repeat their app).
+
+`sources` has `search.nixos.org` (`{kinds, channel, rev, cached, count, error}`),
+`installed` (`{count}`, and `profiles[]` without CATEGORY) and `curated` (`{count}`). Without
+the network `ok` stays true: the installed apps and the shipped names (no version, no
+summary) answer, and `sources["search.nixos.org"].error` says why.
+
+Limitation, stated plainly: search.nixos.org's categories come from the desktop entries
+its indexer read, which it does not have for unfree packages and wrappers (see `search
+--appstream`). The shipped list exists for those; it is about ten names per category,
+checked against nixpkgs on 2026-11-02, and a name that leaves nixpkgs drops out (it is
+looked up, not trusted).
+
+Errors: `usage` (unknown category, `--limit` below 1), `bad-channel`, `internal`; network
+failures only in `sources`.
+
+Costs: no nix. The profiles' desktop entries (~50 ms); one search.nixos.org request without
+CATEGORY (an aggregation), two with one (the shipped and installed names; the category).
+Cached as searches (1 h). 0.6–0.8 s cold, 0.3 s warm.
 
 ### `status`
 
@@ -1507,8 +1606,13 @@ Costs: whatever the verbs it calls cost. It loads nothing on start (no `status`)
 and its details (`info`, `versions`, `where`) when asked, `status` when Pending or
 Status is opened or the Home Manager users are needed, `list` when Packages is opened,
 `outdated` when its Updates tab is, `search` and `where` on the Options page when typed
-and selected. `plan`, `apply` and `try` run in human mode, as under `tui`, so their logs
-stream into the window.
+and selected, `browse` when Browse is opened (then `browse CATEGORY` per category). It
+passes `--config` to `info` (the lock its AppStream lookup evaluates). Images are not a
+verb: when a package's details open, the details pane fetches its icon (when the output
+has no icon file) and its first three screenshots (search.nixos.org's WebP copies when
+there are some, 2–20 KiB each, else the upstream URL), each once, into `images/` in the
+cache; the Browse list fetches nothing. `plan`, `apply` and `try` run in human mode, as
+under `tui`, so their logs stream into the window.
 
 ## `nixin-state`
 
@@ -1614,6 +1718,11 @@ The `try` rows are from 2026-11-02 on mbp13, quiet (load 0.5–0.8), from the tr
 `--json` against `~/nixos`'s lock (nixpkgs 3ec6363, its source in the store), nix's eval
 cache warm for that commit. Peak RSS is the largest of nixin and its nix children.
 
+The AppStream rows (`info`'s `appstream`, `search --appstream`, `browse`) are from
+2026-11-02 late evening on mbp13 (load 1.0), `$NIXIN_CONFIG` unset (so `/etc/nixos`'s lock:
+nixpkgs 3ec6363), nixin's cache cold by `--no-cache`, nix's caches warm. The profiles hold
+51 listed desktop entries from 90 store paths: the scan takes 43 ms plus 14 ms.
+
 The `outdated` rows are from 2026-11-02 on mbp13, quiet (load 0.4–0.7), against `~/nixos`
 (lock nixpkgs 3ec6363, target nixos-unstable 0bb2eed): nixin's cache empty, nix's own
 fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too (load 2.4).
@@ -1627,6 +1736,14 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `search --nixpkgs REV` | — | `nix search` | cache | **204 s** (first search on a rev builds nix's eval cache; 46 s on a quiet box) | a few s for another query, 0.2 s cached | **4.6 GiB** |
 | `info` | yes | — | cache | 1.2–1.9 s | 0.2 s | 40–50 MiB |
 | `info --kind pkg --nixpkgs REV` | — | `nix eval` | cache | 1.2 s | 0.2 s | 105 MiB |
+| `info --kind pkg` (`--appstream local`), installed app (kitty) | yes | — | cache | 0.71 s (0.67 s with `--appstream off`) | 0.25 s | 42 MiB |
+| `info --kind pkg`, an app not installed (luanti) | yes | `nix eval` of the out paths (locked nixpkgs) | cache | 3.4 s | 0.25 s | 380 MiB |
+| `info --kind all` (kitty) | yes | — | cache | 1.5 s | — | 72 MiB |
+| `info --appstream fetch` (gnome-mines, 323 KiB substituted) | yes | `nix eval`, `nix build --dry-run`, `nix build` (impure) | cache, nix store | 26 s | 0.25 s | 380 MiB |
+| `info --appstream fetch`, over the cap (supertuxkart: 690.9 MiB) | yes | `nix eval`, `nix build --dry-run` | cache | 6.2 s (nothing fetched) | — | 380 MiB |
+| `search --appstream` | yes | — | cache | 0.58 s | 0.4 s | 42 MiB |
+| `browse` | yes (1 request) | — | cache | 0.60 s | 0.3 s | 43 MiB |
+| `browse CATEGORY` | yes (2 requests) | — | cache | 0.76 s | 0.28 s | 43 MiB |
 | `versions` | yes | — | cache | 1.3 s | 0.2 s | 40 MiB |
 | `status` | — | yes | cache | **77 s** (toplevel 68 s, packages 7 s) | 0.8 s under load; 0.2 s quiet (one `nix flake metadata`, no eval) | 1.4 GiB |
 | `status --full` | — | yes | cache | **92 s** more (NixOS index 61 s, HM 29 s) | 1.1 s | 1.7 GiB |
@@ -1685,7 +1802,9 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `hm/<sha1>.json` | the Home Manager option JSON per release | 1 day |
 | `nixhub/<sha1>.json` | NixHub version history | 6 h |
 | `noogle/<sha1>.json` | noogle function data | 1 day |
-| `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers | 30 days, keyed by resolved rev |
+| `local/<sha1>.json` | `--nixpkgs`: flake metadata (1 h per flakeref string), search and eval answers; `info`'s AppStream lookup: a package's out paths per (flakeref, attribute) | 30 days, keyed by resolved rev (the lock's flakeref names a commit) |
+| `appstream/<sha1>.json` | what one output ships (the parsed metainfo, desktop entry, icon path), per store path | 1 year: a store path never changes; a path not in the store is not cached |
+| `images/<sha1>.<ext>` | the GUI's screenshots and icons, fetched when a package's details open (never ahead) | at most 4 MiB each (larger ones are refused), 64 MiB in all, least recently used pruned first |
 | `truth/<host>-<key>-<name>.json` | truth evals: `toplevel`, `packages` (shared by `status`, `where`, `list` and `explain`), `prefix-<scope>-<hash>` (shared by `where`, `explain` and `set`'s type check), `hm-users` (`explain`, when there is no `packages` entry), `options-<scope>` (the index, ~10 MB), `options-<scope>-summary`; `outdated`'s `outdated-lock` and `outdated-target` (the target's key also has the target commit) | keyed by nix's flake fingerprint (tracked tree + lock) and host: any tracked edit misses; older copies of the same name are pruned |
 | `truth/exclude-<nixpkgs12>-<hm12>-<host>.json` | options the full index skips (their definitions throw), per (nixpkgs rev, home-manager rev, host), seeded; files without the host (`exclude-<nixpkgs12>-<hm12>.json`, before 2026-11-02) are ignored | until deleted; delete it to re-learn |
 | `apply/out-<host>-<source-hash>.json` | plan's build: `{out, drv}` per flake source store path (a content hash of the tracked tree as nix copies it, dirty edits included) | last 40 per host; an entry whose `out` was garbage-collected counts as a miss |

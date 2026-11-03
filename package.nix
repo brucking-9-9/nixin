@@ -20,12 +20,14 @@
 }:
 let
   project = (lib.importTOML ./pyproject.toml).project;
-  # The GUI (PySide6 + QML): Qt Quick and its Controls, the Wayland platform plugin, SVG.
+  # The GUI (PySide6 + QML): Qt Quick and its Controls, the Wayland platform plugin, SVG,
+  # and the WebP reader (search.nixos.org's screenshot copies are WebP).
   qtModules = with qt6; [
     qtbase
     qtdeclarative
     qtwayland
     qtsvg
+    qtimageformats
   ];
   # What Qt needs to find its plugins and QML modules outside a wrapper: the tests (headless)
   # and the dev shell. The installed programs get the same from wrapQtAppsHook.

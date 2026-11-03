@@ -286,6 +286,7 @@ def info_fields(rec: dict[str, Any]) -> list[Field]:
         add("position", rec.get("position"), "dim")
         if rec.get("alternatives"):
             add("also", _join(rec.get("alternatives")), "dim")
+        out += appstream_fields(rec.get("appstream"))
     elif kind in ("opt", "hm"):
         add("type", rec.get("type"), "option")
         add("default", rec.get("default"), "option")
@@ -1570,3 +1571,163 @@ def try_programs(doc: Doc) -> list[str]:
         if err.get("code") == "ambiguous-program"
         else []
     )
+
+
+# --- AppStream: details and Browse ------------------------------------------------------------
+
+# toolkit and desktop names that say nothing about what an app does (kept out of the chips)
+NOISE_CATEGORIES = frozenset({"Qt", "KDE", "GTK", "GNOME", "XFCE", "LXQt", "Java", "ConsoleOnly"})
+APP_FROM = {
+    "installed": "installed output",
+    "store": "store (locked nixpkgs)",
+    "search.nixos.org": "search.nixos.org",
+    "curated": "nixin's list",
+}
+
+
+def chips(a: dict[str, Any] | None, n: int = 6) -> list[str]:
+    """An app's categories for chips: the freedesktop main ones first, then the others,
+    without toolkit names and X- extensions."""
+    from ..appstream.parse import main_categories
+
+    cats = [str(c) for c in (a or {}).get("categories") or []]
+    main = main_categories(cats)
+    rest = [
+        c for c in cats if c not in main and c not in NOISE_CATEGORIES and not c.startswith("X-")
+    ]
+    return (main + rest)[:n]
+
+
+def app_source(a: dict[str, Any] | None) -> str:
+    """`installed output · an application`, `search.nixos.org · unknown`, …"""
+    if not a:
+        return ""
+    gui = {True: "an application", False: "nothing to launch", None: "not known to be an app"}
+    where = APP_FROM.get(str(a.get("source") or ""), "nothing found")
+    if a.get("installed_for"):
+        where += f" ({', '.join(a['installed_for'])})"  # the profiles that have it
+    return f"{where} · {gui[a.get('gui')]}"
+
+
+def appstream_fields(a: dict[str, Any] | None) -> list[Field]:
+    """A package's `appstream` object as text lines (the TUI's details: no images)."""
+    if not a or (a.get("source") is None and a.get("gui") is None and not a.get("notes")):
+        return []
+    out: list[Field] = []
+
+    def add(label: str, value: Any, style: str = "") -> None:
+        if value not in (None, "", [], {}):
+            out.append(Field(label, str(value), style))
+
+    add("app", a.get("name"), "accent")
+    add("summary", a.get("summary"))
+    add("category", ", ".join(chips(a)))  # labels fit the TUI's 9 cells
+    add("app id", a.get("id"), "dim")
+    shots = a.get("screenshots") or []
+    add("shots", f"{len(shots)} screenshot(s) (the GUI shows them)" if shots else "", "dim")
+    add("appstream", app_source(a), "dim")
+    add("details", a.get("description"))
+    for n in a.get("notes") or []:
+        add("note", n, "dim")
+    return out
+
+
+def icon_path(a: dict[str, Any] | None) -> str:
+    """The app's icon as a local file, "" when there is none (the URL is fetched lazily)."""
+    icon = (a or {}).get("icon") or {}
+    path = icon.get("path")
+    return str(path) if path else ""
+
+
+def screenshot_urls(a: dict[str, Any] | None, n: int = 3) -> list[tuple[str, str]]:
+    """(url, caption) of the first `n` screenshots, search.nixos.org's small copy when it
+    has one, else the upstream URL."""
+    out = []
+    for s in ((a or {}).get("screenshots") or [])[:n]:
+        url = s.get("large") or s.get("thumbnail") or s.get("url")
+        if url:
+            out.append((str(url), str(s.get("caption") or "")))
+    return out
+
+
+@dataclass(frozen=True)
+class BrowseCategory:
+    key: str
+    label: str
+    count: str  # `5 installed · 498` or `5 installed`
+    installed: int
+
+
+def browse_categories(doc: Doc) -> list[BrowseCategory]:
+    out = []
+    for c in doc.get("categories") or []:
+        bits = []
+        if c.get("installed"):
+            bits.append(f"{c['installed']} installed")
+        if c.get("published") is not None:
+            bits.append(str(c["published"]))
+        out.append(
+            BrowseCategory(
+                str(c.get("key")),
+                str(c.get("label")),
+                " · ".join(bits),
+                int(c.get("installed") or 0),
+            )
+        )
+    return out
+
+
+@dataclass(frozen=True)
+class AppRow:
+    """One `browse CATEGORY` row."""
+
+    name: str  # the app's name (desktop entry / AppStream), else the attribute
+    target: str  # the attribute
+    version: str
+    summary: str
+    icon: str  # a local file, or ""
+    installed: bool
+    curated: bool
+    record: dict[str, Any] = field(compare=False, hash=False, repr=False)
+
+    @property
+    def marks(self) -> str:
+        return ("●" if self.installed else "") + ("★" if self.curated else "")
+
+
+def app_rows(doc: Doc) -> list[AppRow]:
+    rows = []
+    for r in doc.get("results") or []:
+        a = r.get("appstream") or {}
+        rows.append(
+            AppRow(
+                name=str(a.get("name") or r.get("name") or "?"),
+                target=str(r.get("name") or ""),
+                version=str(r.get("version") or ""),
+                summary=str(a.get("summary") or r.get("description") or ""),
+                icon=icon_path(a),
+                installed=bool(r.get("installed")),
+                curated=bool(r.get("curated")),
+                record=r,
+            )
+        )
+    return rows
+
+
+def app_hit(r: AppRow) -> Hit:
+    """A Browse row as a search hit for the details pane (its record keeps `appstream`)."""
+    return Hit("pkg", r.target, r.target, r.version, r.summary, r.record)
+
+
+def browse_footer(doc: Doc) -> str:
+    """`21 app(s) · 5 installed · search.nixos.org unstable@0bb2eedc`, and why not more."""
+    rows = doc.get("results") or []
+    s = (doc.get("sources") or {}).get("search.nixos.org") or {}
+    bits = [f"{len(rows)} app(s)", f"{sum(1 for r in rows if r.get('installed'))} installed"]
+    tag = "search.nixos.org" + (f" {s['channel']}" if s.get("channel") else "")
+    tag += f"@{short(s.get('rev'), 8)}" if s.get("rev") else ""
+    if s.get("error"):
+        tag += f" failed: {s['error'].get('code')}"
+    elif s.get("cached"):
+        tag += " (cached)"
+    return " · ".join([*bits, tag])

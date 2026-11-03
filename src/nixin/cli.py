@@ -24,7 +24,19 @@ import os
 import socket
 import sys
 
-from . import __version__, apply, discovery, explain, gui, outdated, truth, tryout, tui, writer
+from . import (
+    __version__,
+    apply,
+    appstream,
+    discovery,
+    explain,
+    gui,
+    outdated,
+    truth,
+    tryout,
+    tui,
+    writer,
+)
 from .configrepo import default_host
 
 VERBS: dict[str, tuple[str, str]] = {
@@ -32,6 +44,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "search": ("discovery", "search packages / options / programs; --kind filters"),
     "info": ("discovery", "details for one package or option"),
     "versions": ("discovery", "version history of a package (which nixpkgs rev shipped what)"),
+    "browse": ("appstream", appstream.VERBS["browse"]),
     "status": ("truth", "this host: lock rev, generation, counts, pending (unapplied) changes"),
     "where": ("truth", "where a package / option is declared in the config, with its value"),
     "list": ("truth", "the installed packages (system, Home Manager), where each is listed"),
@@ -87,6 +100,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="verb", metavar="VERB")
     discovery.register(sub)
+    appstream.register(sub)
     tryout.register(sub)  # before the stubs: its own positionals (PKG, then ARGS after --)
     for verb, (_layer, help_) in VERBS.items():
         if verb in sub.choices:  # a layer registered it with its own arguments

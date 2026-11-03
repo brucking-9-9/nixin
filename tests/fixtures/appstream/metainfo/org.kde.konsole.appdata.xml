@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component type="desktop-application">
+  <id>org.kde.konsole.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0+</project_license>
+  <name>Konsole</name>
+  <name xml:lang="de">Konsole</name>
+  <summary>Use the command line interface</summary>
+  <summary xml:lang="de">Befehlszeilenschnittstelle verwenden</summary>
+  <developer id="kde.org">
+    <name translate="no">KDE</name>
+  </developer>
+  <description>
+    <p>Konsole is a terminal to run a command shell. It provides a command line interface for directly controlling your computer.</p>
+    <p xml:lang="de">Konsole ist ein Terminal zum Ausführen einer Befehls-Shell. Es stellt eine Befehlszeile-Schnittstelle zur direkten Steuerung Ihres Rechner zur Verfügung.</p>
+    <p>Features:</p>
+    <p xml:lang="de">Funktionen:</p>
+    <ul>
+      <li>Tabs</li>
+      <li xml:lang="de">Unterfenster</li>
+      <li>Multiple profiles</li>
+      <li xml:lang="de">Mehrere Profile</li>
+      <li>Silence and Activity monitoring</li>
+      <li xml:lang="de">Überwachung auf Aktivität und Inaktivität</li>
+      <li>Bookmark support</li>
+      <li xml:lang="de">Lesezeichen-Unterstützung</li>
+      <li>Searching</li>
+      <li xml:lang="de">Suchen</li>
+      <li>Saving output</li>
+      <li xml:lang="de">Speicherung der Ausgabe</li>
+    </ul>
+  </description>
+  <keywords>
+    <keyword>terminal</keyword>
+    <keyword>console</keyword>
+    <keyword>shell</keyword>
+    <keyword>command line</keyword>
+    <keyword>command prompt</keyword>
+    <keyword>cmd</keyword>
+    <keyword>cli</keyword>
+    <keyword>bash</keyword>
+    <keyword>zsh</keyword>
+    <keyword>fish</keyword>
+    <keyword>xterm</keyword>
+    <keyword>tty</keyword>
+  </keywords>
+  <launchable type="desktop-id">org.kde.konsole.desktop</launchable>
+  <url type="homepage">https://konsole.kde.org/</url>
+  <url type="bugtracker">https://bugs.kde.org/enter_bug.cgi?format=guided&amp;product=konsole</url>
+  <url type="help">https://docs.kde.org/?application=konsole</url>
+  <url type="donation">https://www.kde.org/community/donations/?app=konsole&amp;source=appdata</url>
+  <url type="vcs-browser">https://invent.kde.org/utilities/konsole</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://cdn.kde.org/screenshots/konsole/konsole.png</image>
+      <caption>Konsole being used as a terminal emulator</caption>
+      <caption xml:lang="de">Konsole wird als Terminal-Emulator verwendet</caption>
+    </screenshot>
+  </screenshots>
+  <project_group>KDE</project_group>
+  <provides>
+    <binary>konsole</binary>
+  </provides>
+  <update_contact>konsole-devel_AT_kde.org</update_contact>
+  <releases>
+    <release version="26.08.2" date="2026-10-08"/>
+    <release version="26.08.1" date="2026-09-10"/>
+    <release version="26.08.0" date="2026-08-20"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

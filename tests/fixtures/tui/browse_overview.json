@@ -1,0 +1,143 @@
+{
+ "cached": true,
+ "categories": [
+  {
+   "curated": 10,
+   "installed": 2,
+   "key": "AudioVideo",
+   "label": "Audio & Video",
+   "matches": [
+    "AudioVideo",
+    "Audio",
+    "Video"
+   ],
+   "published": 451
+  },
+  {
+   "curated": 10,
+   "installed": 2,
+   "key": "Development",
+   "label": "Development",
+   "matches": [
+    "Development"
+   ],
+   "published": 397
+  },
+  {
+   "curated": 6,
+   "installed": 0,
+   "key": "Education",
+   "label": "Education",
+   "matches": [
+    "Education"
+   ],
+   "published": 153
+  },
+  {
+   "curated": 10,
+   "installed": 5,
+   "key": "Game",
+   "label": "Games",
+   "matches": [
+    "Game"
+   ],
+   "published": 498
+  },
+  {
+   "curated": 10,
+   "installed": 3,
+   "key": "Graphics",
+   "label": "Graphics",
+   "matches": [
+    "Graphics"
+   ],
+   "published": 266
+  },
+  {
+   "curated": 11,
+   "installed": 5,
+   "key": "Network",
+   "label": "Internet",
+   "matches": [
+    "Network"
+   ],
+   "published": 350
+  },
+  {
+   "curated": 10,
+   "installed": 5,
+   "key": "Office",
+   "label": "Office",
+   "matches": [
+    "Office"
+   ],
+   "published": 221
+  },
+  {
+   "curated": 6,
+   "installed": 0,
+   "key": "Science",
+   "label": "Science",
+   "matches": [
+    "Science"
+   ],
+   "published": 120
+  },
+  {
+   "curated": 8,
+   "installed": 4,
+   "key": "Settings",
+   "label": "Settings",
+   "matches": [
+    "Settings"
+   ],
+   "published": 172
+  },
+  {
+   "curated": 10,
+   "installed": 16,
+   "key": "System",
+   "label": "System",
+   "matches": [
+    "System"
+   ],
+   "published": 316
+  },
+  {
+   "curated": 10,
+   "installed": 11,
+   "key": "Utility",
+   "label": "Utilities",
+   "matches": [
+    "Utility"
+   ],
+   "published": 771
+  }
+ ],
+ "category": null,
+ "channel": "unstable",
+ "installed": 46,
+ "ok": true,
+ "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+ "source": "search.nixos.org",
+ "sources": {
+  "installed": {
+   "count": 51,
+   "profiles": [
+    "/run/current-system/sw",
+    "/etc/profiles/per-user/master",
+    "/home/master/.nix-profile"
+   ]
+  },
+  "search.nixos.org": {
+   "cached": true,
+   "channel": "unstable",
+   "count": 3715,
+   "error": null,
+   "kinds": [
+    "app"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+  }
+ }
+}

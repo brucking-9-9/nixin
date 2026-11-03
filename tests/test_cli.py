@@ -7,7 +7,9 @@ from nixin.cli import VERBS, main
 from nixin.discovery import VERBS as DISCOVERY_VERBS
 
 STUB_VERBS = sorted(
-    v for v in VERBS if v not in DISCOVERY_VERBS and v not in ("tui", "gui", "explain", "try")
+    v
+    for v in VERBS
+    if v not in DISCOVERY_VERBS and v not in ("tui", "gui", "explain", "try", "browse")
 )  # own tests
 
 

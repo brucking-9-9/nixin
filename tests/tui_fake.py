@@ -130,3 +130,14 @@ def screen_text(app) -> str:
         app.screen._compositor.render_update(full=True, screen_stack=app._background_screens)
     )
     return console.export_text()
+
+
+# Browse and the details' app block, on mbp13's documents (recorded 2026-11-02, trimmed)
+BROWSE = {
+    "browse": "browse_overview",
+    "browse AudioVideo": "browse_audiovideo",
+    "browse Game": "browse_game",
+    "info": "info_prismlauncher",
+    "versions": {"ok": True, "results": [], "count": 0, "total": 0, "package": "?"},
+    "where": "where_cowsay",
+}

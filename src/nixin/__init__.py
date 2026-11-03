@@ -12,6 +12,9 @@ Layers (each a subpackage, each usable without the ones above it):
                 edits of hand-written modules when removing/changing what they declare
     apply       plan (build + diff-closures), apply (commit into the root-owned
                 authoritative config + switch, the one privileged step), sync (hub repo)
+    appstream   a package as an application: AppStream metainfo and desktop entries from
+                its output (installed, or in the store), search.nixos.org's desktop data;
+                `info`'s `appstream`, `search --appstream`, `browse` by category
     cli         the contract: every verb takes --json; the TUI and GUI consume it
 """
 

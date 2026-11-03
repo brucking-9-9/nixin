@@ -1,0 +1,814 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "supertuxkart-server",
+     "package_categories_set": [
+      "ArcadeGame",
+      "Game"
+     ],
+     "package_component_ids": [
+      "net.supertuxkart.SuperTuxKart"
+     ],
+     "package_description": "3D open-source arcade racer",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ArcadeGame"
+       ],
+       "comment": null,
+       "desktopName": "SuperTuxKart",
+       "genericName": "A 3D open-source kart racing game",
+       "icon": "supertuxkart",
+       "keywords": [
+        "tux",
+        "game",
+        "race"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "supertuxkart": "4eaee546a33ed30bdd96224057e204d0.png"
+     },
+     "package_homepage": [
+      "https://supertuxkart.net/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "supertuxkart",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "i686-none",
+      "armv6l-netbsd"
+     ],
+     "package_pname": "supertuxkart-server",
+     "package_position": "pkgs/by-name/su/supertuxkart/package.nix:184",
+     "package_programs": [
+      "supertuxkart"
+     ],
+     "package_pversion": "1.5",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "supertuxkart",
+     "package_categories_set": [
+      "ArcadeGame",
+      "Game"
+     ],
+     "package_component_ids": [
+      "net.supertuxkart.SuperTuxKart"
+     ],
+     "package_description": "3D open-source arcade racer",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ArcadeGame"
+       ],
+       "comment": null,
+       "desktopName": "SuperTuxKart",
+       "genericName": "A 3D open-source kart racing game",
+       "icon": "supertuxkart",
+       "keywords": [
+        "tux",
+        "game",
+        "race"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "supertuxkart": "4eaee546a33ed30bdd96224057e204d0.png"
+     },
+     "package_homepage": [
+      "https://supertuxkart.net/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "supertuxkart",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "riscv32-netbsd",
+      "armv7l-linux"
+     ],
+     "package_pname": "supertuxkart",
+     "package_position": "pkgs/by-name/su/supertuxkart/package.nix:184",
+     "package_programs": [
+      "supertuxkart"
+     ],
+     "package_pversion": "1.5",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.blinken",
+     "package_categories_set": [
+      "Education",
+      "Game",
+      "KDE",
+      "KidsGame",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.blinken"
+     ],
+     "package_description": "Memory Enhancement Game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Education",
+        "Game",
+        "KidsGame"
+       ],
+       "comment": "A memory enhancement game",
+       "desktopName": "Blinken",
+       "genericName": "Memory Enhancement Game",
+       "icon": "blinken",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "blinken": "2252d7765917d83a54c5288d8fa8391b.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/education/blinken"
+     ],
+     "package_license_set": [
+      "CC0-1.0",
+      "Font-exception-2.0",
+      "GFDL-1.2-only",
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "blinken",
+     "package_outputs": [
+      "devtools",
+      "dev",
+      "debug",
+      "out"
+     ],
+     "package_platforms": [
+      "sh4-linux",
+      "arc-linux"
+     ],
+     "package_pname": "blinken",
+     "package_position": "pkgs/kde/gear/blinken/default.nix:7",
+     "package_programs": [
+      "blinken"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": "Playing Blinken",
+       "file": "78e2c62aa90b09408eaf018cbd8c39f7.webp",
+       "largeFile": "24f64e6ac0b2f091fba2856266deccf1.webp",
+       "url": "https://cdn.kde.org/screenshots/blinken/blinken.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.bovo",
+     "package_categories_set": [
+      "BoardGame",
+      "Game",
+      "KDE",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.bovo"
+     ],
+     "package_description": "Bovo is a Gomoku like game for two players",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "BoardGame"
+       ],
+       "comment": null,
+       "desktopName": "Bovo",
+       "genericName": "Five-in-a-row Board Game",
+       "icon": "bovo",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "bovo": "0106de80d676a449cff42a0285e77639.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/bovo"
+     ],
+     "package_license_set": [
+      "BSD-3-Clause",
+      "CC0-1.0"
+     ],
+     "package_mainProgram": "bovo",
+     "package_outputs": [
+      "debug",
+      "dev",
+      "devtools",
+      "out"
+     ],
+     "package_platforms": [
+      "armv7l-linux",
+      "aarch64-linux"
+     ],
+     "package_pname": "bovo",
+     "package_position": "pkgs/kde/gear/bovo/default.nix:7",
+     "package_programs": [
+      "bovo"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "39dab271384a49ba56ff9b16aa774ba3.webp",
+       "largeFile": "c737dbfda0b35ab0bce8a75e2b01d78e.webp",
+       "url": "https://cdn.kde.org/screenshots/bovo/bovo.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.kpat",
+     "package_categories_set": [
+      "CardGame",
+      "Game",
+      "KDE",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.kpat"
+     ],
+     "package_description": "KPatience offers a selection of solitaire card games",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "CardGame"
+       ],
+       "comment": "Solitaire card game",
+       "desktopName": "KPatience",
+       "genericName": "Patience Card Game",
+       "icon": "kpat",
+       "keywords": [
+        "Aces up",
+        "baker's dozen",
+        "castle",
+        "forty and eight",
+        "forty-eight",
+        "freecell",
+        "gold",
+        "grandfather",
+        "grandfather's clock",
+        "normandy",
+        "klondike",
+        "mod3",
+        "simple simon",
+        "spider",
+        "yukon"
+       ],
+       "mimeTypes": [
+        "application/vnd.kde.kpatience.savedstate"
+       ],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kpat": "7470b2eff5955f69ba7b477a2e4805b1.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/kpat"
+     ],
+     "package_license_set": [
+      "BSD-2-Clause",
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "kpat",
+     "package_outputs": [
+      "devtools",
+      "out",
+      "dev",
+      "debug"
+     ],
+     "package_platforms": [
+      "s390x-linux",
+      "i686-linux"
+     ],
+     "package_pname": "kpat",
+     "package_position": "pkgs/kde/gear/kpat/default.nix:11",
+     "package_programs": [
+      "kpat"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": "Solitaire selection screen",
+       "file": "295ddee97c8ed0eb7cd160b2bb6116fa.webp",
+       "largeFile": "785cf167f300a810fc50f00c1ac15be2.webp",
+       "url": "https://cdn.kde.org/screenshots/kpatience/kpatience.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "nethack-x11",
+     "package_categories_set": [
+      "ActionGame",
+      "Game"
+     ],
+     "package_component_ids": [],
+     "package_description": "Rogue-like game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ActionGame"
+       ],
+       "comment": "NetHack is a single player dungeon exploration game",
+       "desktopName": "NetHack",
+       "genericName": null,
+       "icon": "nethack",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://nethack.org/"
+     ],
+     "package_license_set": [
+      "NGPL"
+     ],
+     "package_mainProgram": "nethack-x11",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "armv7l-netbsd",
+      "riscv32-netbsd"
+     ],
+     "package_pname": "nethack-x11",
+     "package_position": "pkgs/by-name/ne/nethack/package.nix:275",
+     "package_programs": [
+      "nethack-x11"
+     ],
+     "package_pversion": "5.0.0",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.kigo",
+     "package_categories_set": [
+      "BoardGame",
+      "Game",
+      "KDE",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.kigo"
+     ],
+     "package_description": "Kigo is an open-source implementation of the popular Go game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "BoardGame"
+       ],
+       "comment": null,
+       "desktopName": "Kigo",
+       "genericName": "Go Board Game",
+       "icon": "kigo",
+       "keywords": [],
+       "mimeTypes": [
+        "application/x-go-sgf"
+       ],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kigo": "bde044d7e92da3250f1e8e86ef9da3e2.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/kigo"
+     ],
+     "package_license_set": [
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "GPL-2.0-only",
+      "GPL-3.0-only",
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "kigo",
+     "package_outputs": [
+      "dev",
+      "debug",
+      "devtools",
+      "out"
+     ],
+     "package_platforms": [
+      "arc-linux",
+      "mips64-linux"
+     ],
+     "package_pname": "kigo",
+     "package_position": "pkgs/kde/gear/kigo/default.nix:7",
+     "package_programs": [
+      "kigo"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "475906d1f832991cca8fc33bbce0749e.webp",
+       "largeFile": "1c1aff174eb49028691917cd71822c6e.webp",
+       "url": "https://kde.org/images/screenshots/kigo.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "nethack-qt",
+     "package_categories_set": [
+      "ActionGame",
+      "Game"
+     ],
+     "package_component_ids": [],
+     "package_description": "Rogue-like game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ActionGame"
+       ],
+       "comment": "NetHack is a single player dungeon exploration game",
+       "desktopName": "NetHack",
+       "genericName": null,
+       "icon": "nethack",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "http://nethack.org/"
+     ],
+     "package_license_set": [
+      "NGPL"
+     ],
+     "package_mainProgram": "nethack-qt",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "riscv64-netbsd",
+      "powerpc-netbsd"
+     ],
+     "package_pname": "nethack-qt",
+     "package_position": "pkgs/by-name/ne/nethack/package.nix:275",
+     "package_programs": [
+      "nethack-qt"
+     ],
+     "package_pversion": "5.0.0",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.katomic",
+     "package_categories_set": [
+      "Game",
+      "KDE",
+      "Qt",
+      "StrategyGame"
+     ],
+     "package_component_ids": [
+      "org.kde.katomic"
+     ],
+     "package_description": "Katomic is a fun and educational game built around molecular geometry",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "StrategyGame"
+       ],
+       "comment": null,
+       "desktopName": "KAtomic",
+       "genericName": "Sokoban-like Logic Game",
+       "icon": "katomic",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "katomic": "ef284ee07db610fb8005a062584d3ae1.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/katomic"
+     ],
+     "package_license_set": [
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "katomic",
+     "package_outputs": [
+      "dev",
+      "devtools",
+      "out",
+      "debug"
+     ],
+     "package_platforms": [
+      "x86_64-linux",
+      "x86_64-freebsd"
+     ],
+     "package_pname": "katomic",
+     "package_position": "pkgs/kde/gear/katomic/default.nix:6",
+     "package_programs": [
+      "katomic"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "4cdb3e0650cd67a1a4f28efc09b6ab2c.webp",
+       "largeFile": "78b87d976b3fcf2e1c406dcdc59454f4.webp",
+       "url": "https://cdn.kde.org/screenshots/katomic/katomic.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.kblocks",
+     "package_categories_set": [
+      "ArcadeGame",
+      "Game",
+      "KDE",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.kblocks"
+     ],
+     "package_description": "KBlocks is the classic falling blocks game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "ArcadeGame"
+       ],
+       "comment": null,
+       "desktopName": "KBlocks",
+       "genericName": "Falling Blocks Game",
+       "icon": "kblocks",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kblocks": "e6188dd8fa6fbf2ebaca17bb1bdc23e2.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/kblocks"
+     ],
+     "package_license_set": [
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "kblocks",
+     "package_outputs": [
+      "debug",
+      "devtools",
+      "out",
+      "dev"
+     ],
+     "package_platforms": [
+      "armv5tel-linux",
+      "armv7a-linux"
+     ],
+     "package_pname": "kblocks",
+     "package_position": "pkgs/kde/gear/kblocks/default.nix:6",
+     "package_programs": [
+      "kblocks"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "20e45df7132189cc34fce049e85f607c.webp",
+       "largeFile": "3ab065fa30f47478e44dbb773f04f5b4.webp",
+       "url": "https://cdn.kde.org/screenshots/kblocks/kblocks.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.kbounce",
+     "package_categories_set": [
+      "ArcadeGame",
+      "Game",
+      "KDE",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.kbounce"
+     ],
+     "package_description": "KBounce is a single player arcade game with the elements of puzzle",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Game",
+        "ArcadeGame"
+       ],
+       "comment": "Ball Bouncing Game",
+       "desktopName": "KBounce",
+       "genericName": "Ball Bouncing Game",
+       "icon": "kbounce",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kbounce": "929463d302e376a86f9f23ad68db9c71.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/games/kbounce"
+     ],
+     "package_license_set": [
+      "BSD-3-Clause",
+      "CC0-1.0",
+      "LGPL-2.0-or-later"
+     ],
+     "package_mainProgram": "kbounce",
+     "package_outputs": [
+      "devtools",
+      "out",
+      "dev",
+      "debug"
+     ],
+     "package_platforms": [
+      "mips64-linux",
+      "i686-linux"
+     ],
+     "package_pname": "kbounce",
+     "package_position": "pkgs/kde/gear/kbounce/default.nix:7",
+     "package_programs": [
+      "kbounce"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": "Playing KBounce",
+       "file": "39fd2eabf3b406497426a0676205787a.webp",
+       "largeFile": "06c85462d95b1a20d93c41931c37b263.webp",
+       "url": "https://kde.org/images/screenshots/kbounce.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "kdePackages.kanagram",
+     "package_categories_set": [
+      "Education",
+      "Game",
+      "KDE",
+      "KidsGame",
+      "Languages",
+      "Qt"
+     ],
+     "package_component_ids": [
+      "org.kde.kanagram"
+     ],
+     "package_description": "Letter Order Game",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Qt",
+        "KDE",
+        "Education",
+        "Languages",
+        "Game",
+        "KidsGame"
+       ],
+       "comment": "KDE Letter Order Game",
+       "desktopName": "Kanagram",
+       "genericName": "Letter Order Game",
+       "icon": "kanagram",
+       "keywords": [],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "kanagram": "a9dcc19a18d898d20bb1bdf057f014d8.png"
+     },
+     "package_homepage": [
+      "https://invent.kde.org/education/kanagram"
+     ],
+     "package_license_set": [
+      "CC0-1.0"
+     ],
+     "package_mainProgram": "kanagram",
+     "package_outputs": [
+      "devtools",
+      "dev",
+      "out",
+      "debug"
+     ],
+     "package_platforms": [
+      "aarch64-freebsd",
+      "armv7l-linux"
+     ],
+     "package_pname": "kanagram",
+     "package_position": "pkgs/kde/gear/kanagram/default.nix:6",
+     "package_programs": [
+      "kanagram"
+     ],
+     "package_pversion": "26.08.2",
+     "package_screenshots": [
+      {
+       "caption": "Playing Kanagram",
+       "file": "78626cc034d9eca8c709515ae6c498c5.webp",
+       "largeFile": "a9f502d132b0d8594959112160e17ab4.webp",
+       "url": "https://cdn.kde.org/screenshots/kanagram/kanagram.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 4.2366414,
+  "total": {
+   "relation": "eq",
+   "value": 498
+  }
+ }
+}

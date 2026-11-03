@@ -1,0 +1,817 @@
+{
+ "hits": {
+  "hits": [
+   {
+    "_source": {
+     "package_attr_name": "steam",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Digital distribution platform",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://store.steampowered.com/"
+     ],
+     "package_license_set": [
+      "unfreeRedistributable"
+     ],
+     "package_mainProgram": "steam",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [],
+     "package_pname": "steam",
+     "package_position": "pkgs/by-name/st/steam-unwrapped/package.nix:47",
+     "package_programs": [],
+     "package_pversion": "1.0.0.87",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "prismlauncher",
+     "package_categories_set": [
+      "ActionGame",
+      "AdventureGame",
+      "Game",
+      "PackageManager",
+      "Simulation"
+     ],
+     "package_component_ids": [
+      "org.prismlauncher.PrismLauncher"
+     ],
+     "package_description": "Free, open source launcher for Minecraft",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ActionGame",
+        "AdventureGame",
+        "Simulation",
+        "PackageManager"
+       ],
+       "comment": "Discover, manage, and play Minecraft instances",
+       "desktopName": "Prism Launcher",
+       "genericName": null,
+       "icon": "org.prismlauncher.PrismLauncher",
+       "keywords": [
+        "game",
+        "minecraft",
+        "mc"
+       ],
+       "mimeTypes": [
+        "application/zip",
+        "application/x-modrinth-modpack+zip"
+       ],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "org.prismlauncher.PrismLauncher": "2aa61eb4041e301366fad368b6d8507b.svg"
+     },
+     "package_homepage": [
+      "https://prismlauncher.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-only"
+     ],
+     "package_mainProgram": "prismlauncher",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "powerpc64-linux",
+      "riscv64-linux"
+     ],
+     "package_pname": "prismlauncher",
+     "package_position": "pkgs/by-name/pr/prismlauncher/package.nix:140",
+     "package_programs": [
+      "prismlauncher"
+     ],
+     "package_pversion": "11.1.1",
+     "package_screenshots": [
+      {
+       "caption": "The main Prism Launcher window",
+       "file": "0df8636836ad514ead4de81141f6272f.webp",
+       "largeFile": "438cc90ce0c9112e255eded6eeaba225.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherDark.png"
+      },
+      {
+       "caption": "Modpack installation",
+       "file": "e3c23d3dd3a8c01ddc6c196298bcc612.webp",
+       "largeFile": "672e4c6d0c9bcc79936c51ed85167255.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackInstallDark.png"
+      },
+      {
+       "caption": "Modpack updating",
+       "file": "397bf5cb095697c91278892127675ad5.webp",
+       "largeFile": "3942f926ed00581d34c6c9d2f8823dea.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackUpdateDark.png"
+      },
+      {
+       "caption": "Mod installation",
+       "file": "591354530713e5385f16e563425df8a5.webp",
+       "largeFile": "cad9e98a49b53e6443648165f64ccab8.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModInstallDark.png"
+      },
+      {
+       "caption": "Mod updating",
+       "file": "8085297181ce5ef5f71322eb02d7d112.webp",
+       "largeFile": "f8ebb45028cec5ef17c513cd9794c461.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModUpdateDark.png"
+      },
+      {
+       "caption": "Instance management",
+       "file": "eb0f2db2167fbce1c9c1ddc47194fd81.webp",
+       "largeFile": "2a76ecc3cacfbf8c78e0f35130d4968f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/PropertiesDark.png"
+      },
+      {
+       "caption": "Cat :3",
+       "file": "e71e193008e191c2e3b109113b36eead.webp",
+       "largeFile": "3f0c66797250cb72845627fdd3ffde4f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherCatDark.png"
+      },
+      {
+       "caption": "Customization",
+       "file": "e51e1a87faa6e7eaafccbc9025f632f8.webp",
+       "largeFile": "f92fdd2772aca65101c54d409e051c44.webp",
+       "url": "https://prismlauncher.org/img/screenshots/CustomizeDark.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "heroic",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Native GOG, Epic, and Amazon Games Launcher for Linux, Windows and Mac",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher"
+     ],
+     "package_license_set": [
+      "GPL-3.0-only"
+     ],
+     "package_mainProgram": "heroic",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "x86_64-linux",
+      "aarch64-linux"
+     ],
+     "package_pname": "heroic",
+     "package_position": "pkgs/by-name/he/heroic-unwrapped/package.nix:143",
+     "package_programs": [
+      "heroic"
+     ],
+     "package_pversion": "2.22.4",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "python314Packages.steam",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Python package for interacting with Steam",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://github.com/ValvePython/steam"
+     ],
+     "package_license_set": [
+      "MIT"
+     ],
+     "package_mainProgram": null,
+     "package_outputs": [
+      "out",
+      "dist"
+     ],
+     "package_platforms": [
+      "riscv32-linux",
+      "mips-linux"
+     ],
+     "package_pname": "steam",
+     "package_position": "pkgs/development/python-modules/steam/default.nix:44",
+     "package_programs": [],
+     "package_pversion": "1.4.4",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "python313Packages.steam",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Python package for interacting with Steam",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://github.com/ValvePython/steam"
+     ],
+     "package_license_set": [
+      "MIT"
+     ],
+     "package_mainProgram": null,
+     "package_outputs": [
+      "dist",
+      "out"
+     ],
+     "package_platforms": [
+      "armv5tel-linux",
+      "powerpc64-linux"
+     ],
+     "package_pname": "steam",
+     "package_position": "pkgs/development/python-modules/steam/default.nix:44",
+     "package_programs": [],
+     "package_pversion": "1.4.4",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "xonotic",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Free fast-paced first-person shooter",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://www.xonotic.org/"
+     ],
+     "package_license_set": [
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "xonotic",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "i686-linux",
+      "m68k-linux"
+     ],
+     "package_pname": "xonotic-sdl",
+     "package_position": "pkgs/games/xonotic/default.nix:54",
+     "package_programs": [],
+     "package_pversion": "0.8.6",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "prismlauncher-unwrapped",
+     "package_categories_set": [
+      "ActionGame",
+      "AdventureGame",
+      "Game",
+      "PackageManager",
+      "Simulation"
+     ],
+     "package_component_ids": [
+      "org.prismlauncher.PrismLauncher"
+     ],
+     "package_description": "Free, open source launcher for Minecraft",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ActionGame",
+        "AdventureGame",
+        "Simulation",
+        "PackageManager"
+       ],
+       "comment": "Discover, manage, and play Minecraft instances",
+       "desktopName": "Prism Launcher",
+       "genericName": null,
+       "icon": "org.prismlauncher.PrismLauncher",
+       "keywords": [
+        "game",
+        "minecraft",
+        "mc"
+       ],
+       "mimeTypes": [
+        "application/zip",
+        "application/x-modrinth-modpack+zip"
+       ],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "org.prismlauncher.PrismLauncher": "2aa61eb4041e301366fad368b6d8507b.svg"
+     },
+     "package_homepage": [
+      "https://prismlauncher.org/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-only"
+     ],
+     "package_mainProgram": "prismlauncher",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "mipsel-linux",
+      "arc-linux"
+     ],
+     "package_pname": "prismlauncher-unwrapped",
+     "package_position": "pkgs/by-name/pr/prismlauncher-unwrapped/package.nix:96",
+     "package_programs": [
+      "prismlauncher"
+     ],
+     "package_pversion": "11.1.1",
+     "package_screenshots": [
+      {
+       "caption": "The main Prism Launcher window",
+       "file": "0df8636836ad514ead4de81141f6272f.webp",
+       "largeFile": "438cc90ce0c9112e255eded6eeaba225.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherDark.png"
+      },
+      {
+       "caption": "Modpack installation",
+       "file": "e3c23d3dd3a8c01ddc6c196298bcc612.webp",
+       "largeFile": "672e4c6d0c9bcc79936c51ed85167255.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackInstallDark.png"
+      },
+      {
+       "caption": "Modpack updating",
+       "file": "397bf5cb095697c91278892127675ad5.webp",
+       "largeFile": "3942f926ed00581d34c6c9d2f8823dea.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModpackUpdateDark.png"
+      },
+      {
+       "caption": "Mod installation",
+       "file": "591354530713e5385f16e563425df8a5.webp",
+       "largeFile": "cad9e98a49b53e6443648165f64ccab8.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModInstallDark.png"
+      },
+      {
+       "caption": "Mod updating",
+       "file": "8085297181ce5ef5f71322eb02d7d112.webp",
+       "largeFile": "f8ebb45028cec5ef17c513cd9794c461.webp",
+       "url": "https://prismlauncher.org/img/screenshots/ModUpdateDark.png"
+      },
+      {
+       "caption": "Instance management",
+       "file": "eb0f2db2167fbce1c9c1ddc47194fd81.webp",
+       "largeFile": "2a76ecc3cacfbf8c78e0f35130d4968f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/PropertiesDark.png"
+      },
+      {
+       "caption": "Cat :3",
+       "file": "e71e193008e191c2e3b109113b36eead.webp",
+       "largeFile": "3f0c66797250cb72845627fdd3ffde4f.webp",
+       "url": "https://prismlauncher.org/img/screenshots/LauncherCatDark.png"
+      },
+      {
+       "caption": "Customization",
+       "file": "e51e1a87faa6e7eaafccbc9025f632f8.webp",
+       "largeFile": "f92fdd2772aca65101c54d409e051c44.webp",
+       "url": "https://prismlauncher.org/img/screenshots/CustomizeDark.png"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "openttd",
+     "package_categories_set": [
+      "Game",
+      "Simulation"
+     ],
+     "package_component_ids": [],
+     "package_description": "Open source clone of the Microprose game \"Transport Tycoon Deluxe\"",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "Simulation"
+       ],
+       "comment": "A simulation game based on Transport Tycoon Deluxe",
+       "desktopName": "OpenTTD",
+       "genericName": null,
+       "icon": "openttd",
+       "keywords": [
+        "game",
+        "simulation",
+        "transport",
+        "tycoon",
+        "deluxe",
+        "economics",
+        "multiplayer",
+        "money",
+        "train",
+        "ship",
+        "bus",
+        "truck",
+        "aircraft",
+        "cargo"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "openttd": "ad0046f2c3968532b6b0d012487acf36.png"
+     },
+     "package_homepage": [
+      "https://www.openttd.org/"
+     ],
+     "package_license_set": [
+      "GPL-2.0-only"
+     ],
+     "package_mainProgram": "openttd",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "microblaze-linux",
+      "arc-linux"
+     ],
+     "package_pname": "openttd",
+     "package_position": "pkgs/by-name/op/openttd/package.nix:138",
+     "package_programs": [
+      "openttd"
+     ],
+     "package_pversion": "15.3",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "zeroad",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Free, open-source game of ancient warfare",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://play0ad.com/"
+     ],
+     "package_license_set": [
+      "GPL-2.0-or-later",
+      "LGPL-2.1",
+      "MIT",
+      "CC-BY-SA-3.0",
+      "Zlib"
+     ],
+     "package_mainProgram": "0ad",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "armv6l-linux",
+      "s390-linux"
+     ],
+     "package_pname": "zeroad",
+     "package_position": "pkgs/by-name/ze/zeroad-unwrapped/package.nix:184",
+     "package_programs": [],
+     "package_pversion": "0.28.0",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "emacsPackages.steam",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": null,
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://github.com/Kungsgeten/steam.el"
+     ],
+     "package_license_set": [],
+     "package_mainProgram": null,
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "x86_64-uefi",
+      "aarch64-freebsd"
+     ],
+     "package_pname": "steam",
+     "package_position": "pkgs/applications/editors/emacs/elisp-packages/libgenerated.nix:139",
+     "package_programs": [],
+     "package_pversion": "20220218.1707",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "luanti",
+     "package_categories_set": [
+      "Game",
+      "Simulation"
+     ],
+     "package_component_ids": [
+      "org.luanti.luanti"
+     ],
+     "package_description": "Open source voxel game engine (formerly Minetest)",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "Simulation"
+       ],
+       "comment": "Block-based multiplayer game platform",
+       "desktopName": "Luanti",
+       "genericName": "Luanti",
+       "icon": "luanti",
+       "keywords": [
+        "sandbox",
+        "world",
+        "mining",
+        "crafting",
+        "blocks",
+        "nodes",
+        "multiplayer",
+        "roleplaying",
+        "minetest"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "luanti": "f477da1794825580b5768fbbce28e6fe.svg"
+     },
+     "package_homepage": [
+      "https://www.luanti.org/"
+     ],
+     "package_license_set": [
+      "LGPL-2.1-or-later"
+     ],
+     "package_mainProgram": "luanti",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "mips64el-linux",
+      "i686-linux"
+     ],
+     "package_pname": "luanti",
+     "package_position": "pkgs/by-name/lu/luanti/package.nix:142",
+     "package_programs": [
+      "luanti",
+      "minetestserver",
+      "minetest",
+      "luantiserver"
+     ],
+     "package_pversion": "5.17.0",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "b88047debb42c5825aaa9139878f2889.webp",
+       "largeFile": "1ce26fb9802638bef8e45a5eb8a266d9.webp",
+       "url": "https://www.luanti.org/media/gallery/1.jpg"
+      },
+      {
+       "caption": null,
+       "file": "056251525dd43e490d5eee4a70a5f15e.webp",
+       "largeFile": "fbd5c9abb707225a551e1a6da784d5d7.webp",
+       "url": "https://www.luanti.org/media/gallery/3.jpg"
+      },
+      {
+       "caption": null,
+       "file": "f8d68369bda886537f5ec2498a280110.webp",
+       "largeFile": "b3e7690a94e4e6d4e8b10ce4e1cfb828.webp",
+       "url": "https://www.luanti.org/media/gallery/5.jpg"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "wesnoth",
+     "package_categories_set": [
+      "Game",
+      "StrategyGame"
+     ],
+     "package_component_ids": [
+      "org.wesnoth.Wesnoth"
+     ],
+     "package_description": "Battle for Wesnoth, a free, turn-based strategy game with a fantasy theme",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "StrategyGame"
+       ],
+       "comment": "A fantasy turn-based strategy game",
+       "desktopName": "Battle for Wesnoth",
+       "genericName": "Strategy Game",
+       "icon": "wesnoth-icon",
+       "keywords": [
+        "singleplayer",
+        "multiplayer",
+        "dark age",
+        "middle ages",
+        "medieval",
+        "mediaeval"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "wesnoth-icon": "4a27f0d743f4d1484e1e57b494129e13.svg"
+     },
+     "package_homepage": [
+      "https://www.wesnoth.org/"
+     ],
+     "package_license_set": [
+      "GPL-2.0-or-later"
+     ],
+     "package_mainProgram": "wesnoth",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "x86_64-cygwin",
+      "loongarch64-linux"
+     ],
+     "package_pname": "wesnoth",
+     "package_position": "pkgs/by-name/we/wesnoth/package.nix:170",
+     "package_programs": [
+      "wesnoth",
+      "wesnothd"
+     ],
+     "package_pversion": "1.18.8",
+     "package_screenshots": [
+      {
+       "caption": null,
+       "file": "7a2fe993a292e28cdfb8f42c45391a8c.webp",
+       "largeFile": "bab466fd06e541d5696095c54527d2f3.webp",
+       "url": "https://www.wesnoth.org/images/sshots/wesnoth-1.18.0-1.jpg"
+      },
+      {
+       "caption": null,
+       "file": "a582362c014dffe5f623edd9cd5839e4.webp",
+       "largeFile": "12c6148680fdde3c4c24f1e9d957b540.webp",
+       "url": "https://www.wesnoth.org/images/sshots/wesnoth-1.18.0-2.jpg"
+      },
+      {
+       "caption": null,
+       "file": "6cddd3fee0e01f1ce0bc72612f058e04.webp",
+       "largeFile": "8e2aabf66daea25bd3c280d61da259e0.webp",
+       "url": "https://www.wesnoth.org/images/sshots/wesnoth-1.18.0-3.jpg"
+      },
+      {
+       "caption": null,
+       "file": "cff953fc9e7b7fbdf8abe75eb9dcc508.webp",
+       "largeFile": "40886d6c2f1709eed2de40022cd02090.webp",
+       "url": "https://www.wesnoth.org/images/sshots/wesnoth-1.18.0-4.jpg"
+      },
+      {
+       "caption": null,
+       "file": "7db76a5d0c53382c72cff5441136afe1.webp",
+       "largeFile": "e1369bb869c078b6b5325297bd3ea985.webp",
+       "url": "https://www.wesnoth.org/images/sshots/wesnoth-1.18.0-5.jpg"
+      }
+     ]
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "steam-unwrapped",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Digital distribution platform",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://store.steampowered.com/"
+     ],
+     "package_license_set": [
+      "unfreeRedistributable"
+     ],
+     "package_mainProgram": "steam",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [],
+     "package_pname": "steam-unwrapped",
+     "package_position": "pkgs/by-name/st/steam-unwrapped/package.nix:47",
+     "package_programs": [],
+     "package_pversion": "1.0.0.87",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "lutris",
+     "package_categories_set": [],
+     "package_component_ids": [],
+     "package_description": "Open Source gaming platform for GNU/Linux",
+     "package_desktop_entries": [],
+     "package_desktop_icons": {},
+     "package_homepage": [
+      "https://lutris.net"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "lutris",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "loongarch64-linux",
+      "x86_64-linux"
+     ],
+     "package_pname": "lutris",
+     "package_position": "pkgs/by-name/lu/lutris/package.nix:314",
+     "package_programs": [],
+     "package_pversion": "0.5.22",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   },
+   {
+    "_source": {
+     "package_attr_name": "supertuxkart",
+     "package_categories_set": [
+      "ArcadeGame",
+      "Game"
+     ],
+     "package_component_ids": [
+      "net.supertuxkart.SuperTuxKart"
+     ],
+     "package_description": "3D open-source arcade racer",
+     "package_desktop_entries": [
+      {
+       "categories": [
+        "Game",
+        "ArcadeGame"
+       ],
+       "comment": null,
+       "desktopName": "SuperTuxKart",
+       "genericName": "A 3D open-source kart racing game",
+       "icon": "supertuxkart",
+       "keywords": [
+        "tux",
+        "game",
+        "race"
+       ],
+       "mimeTypes": [],
+       "noDisplay": false,
+       "type": "Application"
+      }
+     ],
+     "package_desktop_icons": {
+      "supertuxkart": "4eaee546a33ed30bdd96224057e204d0.png"
+     },
+     "package_homepage": [
+      "https://supertuxkart.net/"
+     ],
+     "package_license_set": [
+      "GPL-3.0-or-later"
+     ],
+     "package_mainProgram": "supertuxkart",
+     "package_outputs": [
+      "out"
+     ],
+     "package_platforms": [
+      "riscv32-netbsd",
+      "armv7l-linux"
+     ],
+     "package_pname": "supertuxkart",
+     "package_position": "pkgs/by-name/su/supertuxkart/package.nix:184",
+     "package_programs": [
+      "supertuxkart"
+     ],
+     "package_pversion": "1.5",
+     "package_screenshots": []
+    },
+    "_type": "_doc"
+   }
+  ],
+  "max_score": 2.0,
+  "total": {
+   "relation": "eq",
+   "value": 15
+  }
+ }
+}

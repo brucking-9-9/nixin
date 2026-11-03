@@ -21,6 +21,7 @@ talks to the first few and borrows the local-eval idea from NüschtOS.
 | **discovery** | what exists, in which versions | search.nixos.org (packages, NixOS options, programs), Home Manager options, NixHub version history, noogle; `nix search` on the host's *locked* nixpkgs as the exact-rev fallback |
 | **truth** | what *this* host has | `nix eval` of the config flake: installed packages, every option's current value and `declarations` (file:line), lock rev, generation |
 | **writer** | how to change it | new things go to generated `installer/*.nix` (nixfmt'd, from `state.json`); removing or changing something a hand-written module declares edits that module in place |
+| **appstream** | what a package is as an application | the AppStream metainfo and desktop entries its output ships (installed, or the locked nixpkgs' output in the store), search.nixos.org's desktop data, a shipped list of well-known apps per category |
 | **apply** | make it so | `plan` = build the workspace + `nix store diff-closures` + a boot check (reboot needed? fits on /boot?); `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo; `history` = the system generations with the commits nixin applied; `rollback` = back to a generation, the config reverted with it; `generations` = each generation's closure size, boot entry and whether `gc` would drop it; `gc` = delete old generations, rewrite the boot menu, collect the garbage |
 
 Why two kinds of search: search.nixos.org indexes channel-*latest*, so a hit can
@@ -33,7 +34,8 @@ search box — it knows what would actually change.
 ```
 nixin [--json] [--host H] VERB [ARGS...]
 
-search info versions        discovery   what exists upstream, in which versions
+search info versions        discovery   what exists upstream, in which versions (info: + AppStream; search --appstream)
+browse                      appstream   applications by category: installed, well-known, search.nixos.org's
 status where list           truth       what this config gives a host (evaluates the flake); list --diff A B
 explain                     explain     one option or package: the config's side and upstream's docs together
 add rm set unset            writer      edit a user-owned workspace clone of the config
@@ -63,6 +65,20 @@ which touch the network, run nix or write files, and the cache locations.
   Options come from this machine's option index instead when the [modules](#modules)
   wrote one for `--host` (`source: "index"`; `--no-index` asks upstream).
   Every result carries `kind`, `source`, `channel` and `rev`.
+- **appstream** (borrowed from nix-software-center and GNOME Software): `info` gives
+  package rows an `appstream` object: name, summary, description, categories, icon (a
+  file in the output's `share/icons`, and search.nixos.org's copy), screenshots, license,
+  the desktop id. It reads the AppStream metainfo and desktop entries of an installed
+  output (the profiles' links into the store, no nix), else of the locked nixpkgs' output
+  if it is in the store (`nix eval` of the out paths on the config's `flake.lock`
+  nixpkgs, about 3 s once, then cached), else it keeps search.nixos.org's desktop data
+  (index generation 52 has desktop entries, categories, icons and screenshot copies; not
+  for unfree packages or wrappers such as firefox and steam). `--appstream fetch` also
+  substitutes the output when nothing has to be built and it is at most 50 MiB; `hint`
+  asks search.nixos.org only; `off` leaves the field out. `search --appstream` marks GUI
+  apps from search.nixos.org's data alone. `browse` lists the freedesktop main categories
+  and, per category, the installed apps, a shipped list of well-known ones and
+  search.nixos.org's most popular. Nothing scrapes an AppStream pool.
 - **truth** evaluates the config flake (`--config`, else `$NIXIN_CONFIG`, else
   `/etc/nixos`) with the host's own `nix`. `status` reports the lock, the running
   generation, package/program counts, and with `--full` the option index. `where NAME`
@@ -195,8 +211,9 @@ and the example under it; for a template like `users.users.<name>.shell` the nam
 → the `set --dry-run` diff → write; Unset the same; both land on Pending. Try (Details,
 `t`) builds the package with nix's output streaming (nothing is installed), then starts a
 graphical app detached (`setsid`) or shows the exact `nix run` / `nix shell` lines to
-copy; several programs and no mainProgram: pick one. Error documents show as `code` +
-message.
+copy; several programs and no mainProgram: pick one. A package's details list its
+AppStream data as text (app name, summary, categories, the number of screenshots; no
+images). Error documents show as `code` + message.
 
 Keys: `/` search, `i` packages (`ctrl+4`), `o` options (`ctrl+5`), `p` pending, `s` status,
 `?` all keys, `ctrl+p` command palette, `esc` back, `q` quit (`ctrl+q` while typing or
@@ -241,10 +258,17 @@ type over) and Unset go through the diff dialog and on to Pending. **Try** (next
 builds the package in a dialog with nix's output streaming, then launches a graphical app
 detached or opens a CLI program in your terminal (`$TERMINAL -e …`, else kitty, foot, …)
 running the `nix run` line; Shell in terminal, Copy command, and a program picker when
-there are several. Error documents appear as a notice over the page (`code` + message, the
-candidates to pick for an ambiguous write, commands to copy).
+there are several. **Browse** (`Ctrl+B`) lists the categories (installed and
+search.nixos.org counts), a category's apps (● installed, ★ well-known, then the most
+popular; icons only for installed apps, nothing is fetched for the list) and the selected
+app in the details pane. The details pane shows a package's AppStream data when it has
+some: the icon, name, summary, categories as chips, and up to three screenshots, fetched
+when the details open (search.nixos.org's small WebP copies when it has them), cached
+under `images/` in the nixin cache, at most 4 MiB each. Error documents appear as a notice
+over the page (`code` + message, the candidates to pick for an ambiguous write, commands
+to copy).
 
-Keys: `/` search, `Ctrl+1/2/3/4/5` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
+Keys: `/` search, `Ctrl+1/2/3/4/5` the pages, `Ctrl+B` Browse, `Esc` closes a dialog, `Ctrl+Enter` writes
 in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).
 The palette is the quickshell one (`src/nixin/gui/qml/Nixin/Theme.qml`: background
 `#120B10`, cyan accent, pink for errors and destructive actions, purple for options), and

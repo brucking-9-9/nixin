@@ -1,9 +1,9 @@
 """The GUI's state and flows, as Qt objects the QML binds to.
 
 `Gui` is the root; Main.qml gets it as its required `backend` property. It owns one
-object per area (search, packages, options, details, writer, pending, apply, status,
-notice), each a `VM`: state in a dict that QML reads through properties notifying on the
-object's own `changed` signal, and slots QML calls. Lists are `models.Rows`.
+object per area (search, packages, options, browse, details, writer, pending, apply, status,
+trying, notice), each a `VM`: state in a dict that QML reads through properties notifying
+on the object's own `changed` signal, and slots QML calls. Lists are `models.Rows`.
 
 Every document comes from `Gui.fetch` (a Job on the thread pool running the backend's
 verb handler in-process) and becomes rows through nixin.ui.view, as in the TUI. The flows
@@ -28,7 +28,7 @@ from PySide6.QtGui import QGuiApplication
 from ..ui import view
 from ..ui.backend import Backend, shell
 from . import models
-from .jobs import Job, JobSignals, install_router, uninstall_router
+from .jobs import CallJob, Job, JobSignals, install_router, uninstall_router
 from .models import LogModel, Rows
 
 Doc = dict[str, Any]
@@ -303,6 +303,14 @@ class SearchVM(VM):
 # --- details --------------------------------------------------------------------------------
 
 
+_FROM_FILES = ("installed", "store")  # an `appstream` read from an output, not a hint
+
+
+def _info_fields(rec: dict[str, Any]) -> list[view.Field]:
+    """The info section without the AppStream lines: the pane draws those (icon, chips)."""
+    return view.info_fields({k: v for k, v in rec.items() if k != "appstream"})
+
+
 class DetailsVM(VM):
     """The selected row: discovery's record (refreshed by `info`), `versions`, and `where`
     on this host; Add / Remove / Set / Unset, and the Home Manager user to do them for."""
@@ -310,7 +318,7 @@ class DetailsVM(VM):
     changed = Signal()
     defaults: ClassVar = {
         "present": False,
-        "owner": "",  # the page whose row this is: search | packages (each pane shows its own)
+        "owner": "",  # the page whose row this is: search | packages | browse (each pane its own)
         "kind": "",
         "badge": "",
         "name": "",
@@ -334,8 +342,23 @@ class DetailsVM(VM):
         "homeKnown": False,  # the host's HM users are known (status or where)
         "homeLoading": False,
         "currentValue": "",
+        # the package as an application (its `appstream` object): icon, summary, chips,
+        # screenshots; images are fetched when the details open, never before
+        "hasApp": False,
+        "appName": "",
+        "appSummary": "",
+        "appSource": "",
+        "iconUrl": "",
+        "chips": [],
+        "shotsLoading": False,
+        "shotsNote": "",
     }
-    lists: ClassVar = {"info": models.FIELD, "versions": models.FIELD, "where": models.FIELD}
+    lists: ClassVar = {
+        "info": models.FIELD,
+        "versions": models.FIELD,
+        "where": models.FIELD,
+        "shots": models.SHOT,
+    }
     present = state(bool, "present", changed)
     owner = state(str, "owner", changed)
     kind = state(str, "kind", changed)
@@ -361,15 +384,26 @@ class DetailsVM(VM):
     homeKnown = state(bool, "homeKnown", changed)
     homeLoading = state(bool, "homeLoading", changed)
     currentValue = state(str, "currentValue", changed)
+    hasApp = state(bool, "hasApp", changed)
+    appName = state(str, "appName", changed)
+    appSummary = state(str, "appSummary", changed)
+    appSource = state(str, "appSource", changed)
+    iconUrl = state(str, "iconUrl", changed)
+    chips = state("QVariantList", "chips", changed)
+    shotsLoading = state(bool, "shotsLoading", changed)
+    shotsNote = state(str, "shotsNote", changed)
     info = model("info")
     versions = model("versions")
     where = model("where")
+    shots = model("shots")
 
     def __init__(self, gui: Gui) -> None:
         super().__init__(gui)
         self.hit: view.Hit | None = None
         self.record: dict[str, Any] = {}
         self.where_doc: Doc | None = None
+        self._images: set[str] = set()  # asked for this row already (icon, screenshots)
+        self._shots: list[list[Any]] = []  # [url, caption, file or None, error], in order
 
     def show(self, hit: view.Hit, *, user: str = "", owner: str = "search") -> None:
         """`user`: the Home Manager user to start with (an installed row's own)."""
@@ -395,9 +429,20 @@ class DetailsVM(VM):
             canHome=hit.is_package or hit.kind == "hm",
             homeUser=user,
             currentValue="",
+            hasApp=False,
+            appName="",
+            appSummary="",
+            appSource="",
+            iconUrl="",
+            chips=[],
+            shotsLoading=False,
+            shotsNote="",
         )
+        self._images, self._shots = set(), []
+        self.rows("shots").reset([])
         self._home_choices()
-        self.rows("info").reset(models.fields(view.info_fields(self.record)))
+        self.rows("info").reset(models.fields(_info_fields(self.record)))
+        self._app(hit, self.record.get("appstream"))
         self.rows("versions").reset([])
         self.rows("where").reset([])
         if hit.kind in INFO_KIND:
@@ -409,6 +454,10 @@ class DetailsVM(VM):
                 group="info",
                 exclusive=True,
                 label=f"info {hit.target}",
+                hint="a second; about 3 s more once when the package is not installed "
+                "(AppStream: its out paths are evaluated)"
+                if hit.is_package
+                else "",
             )
         else:
             self.set(infoLoading=False)
@@ -438,8 +487,62 @@ class DetailsVM(VM):
         if rec is not None:
             if hit.kind == "program":  # keep the binary in view
                 rec = {**rec, "kind": "program", "package": hit.target, "name": hit.name}
+            had = self.record.get("appstream") or {}
+            if (
+                had.get("source") in _FROM_FILES
+                and (rec.get("appstream") or {}).get("source") not in _FROM_FILES
+            ):
+                rec = {**rec, "appstream": had}  # Browse read the files; info only hints
             self.record = rec
-        self.rows("info").reset(models.fields(view.info_fields(self.record)))
+        self.rows("info").reset(models.fields(_info_fields(self.record)))
+        self._app(hit, self.record.get("appstream"))
+
+    # --- the package as an application
+
+    def _app(self, hit: view.Hit, a: dict[str, Any] | None) -> None:
+        """Show what `appstream` says; fetch its icon (when not a local file) and its
+        screenshots now that the details are open, each once per row."""
+        if not a or not (a.get("gui") or a.get("name") or a.get("summary")):
+            return
+        icon = models.file_url(view.icon_path(a))
+        self.set(
+            hasApp=True,
+            appName=str(a.get("name") or ""),
+            appSummary=str(a.get("summary") or ""),
+            appSource=view.app_source(a),
+            chips=view.chips(a),
+            iconUrl=icon or self["iconUrl"],
+        )
+        remote = str((a.get("icon") or {}).get("url") or "")
+        if not icon and remote and remote not in self._images:
+            self._images.add(remote)
+            self.gui.fetch_image(remote, lambda path, err, h=hit: self._icon(h, path))
+        for url, caption in view.screenshot_urls(a):
+            if url in self._images:
+                continue
+            self._images.add(url)
+            slot: list[Any] = [url, caption, None, ""]
+            self._shots.append(slot)
+            self.set(shotsLoading=True)
+            self.gui.fetch_image(url, lambda path, err, h=hit, s=slot: self._shot(h, s, path, err))
+
+    def _icon(self, hit: view.Hit, path: str | None) -> None:
+        if hit is self.hit and path:
+            self.set(iconUrl=models.file_url(path))
+
+    def _shot(self, hit: view.Hit, slot: list[Any], path: str | None, err: str) -> None:
+        """One screenshot arrived (or failed): the strip keeps the AppStream order, the
+        default one first, whatever order the downloads finish in."""
+        if hit is not self.hit:
+            return
+        slot[2], slot[3] = path, (err or "") if not path else ""
+        if path:
+            done = [s for s in self._shots if s[2]]
+            self.rows("shots").reset({"url": models.file_url(s[2]), "caption": s[1]} for s in done)
+        failed = [s[3] for s in self._shots if s[3]]
+        note = f"{len(failed)} screenshot(s) not shown: {failed[0]}" if failed else ""
+        pending = any(not s[2] and not s[3] for s in self._shots)
+        self.set(shotsLoading=pending, shotsNote=note)
 
     def _versions(self, hit: view.Hit, doc: Doc) -> None:
         if hit is not self.hit:
@@ -1764,6 +1867,134 @@ class OptionsVM(VM):
         )
 
 
+# --- browse ---------------------------------------------------------------------------------
+
+
+class BrowseVM(VM):
+    """Applications by category (`browse`): the categories with their counts, then one
+    category's apps (installed, well-known, search.nixos.org's most popular). A selected
+    app opens in the details pane with its icon, chips and screenshots. The list draws only
+    local icons (installed apps); nothing is fetched until a row's details open."""
+
+    changed = Signal()
+    defaults: ClassVar = {
+        "loading": False,
+        "note": "",
+        "noteStyle": "",
+        "category": "",
+        "label": "",
+        "appsLoading": False,
+        "appsNote": "",
+        "appsNoteStyle": "",
+        "footer": "",
+        "selected": -1,
+    }
+    lists: ClassVar = {"categories": models.CATEGORY, "apps": models.APP}
+    loading = state(bool, "loading", changed)
+    note = state(str, "note", changed)
+    noteStyle = state(str, "noteStyle", changed)
+    category = state(str, "category", changed)
+    label = state(str, "label", changed)
+    appsLoading = state(bool, "appsLoading", changed)
+    appsNote = state(str, "appsNote", changed)
+    appsNoteStyle = state(str, "appsNoteStyle", changed)
+    footer = state(str, "footer", changed)
+    selected = state(int, "selected", changed)
+    categories = model("categories")
+    apps = model("apps")
+
+    def __init__(self, gui: Gui) -> None:
+        super().__init__(gui)
+        self.overview: Doc | None = None
+        self.cats: list[view.BrowseCategory] = []
+        self.shown: list[view.AppRow] = []
+        self._channel = ""
+
+    def visit(self) -> None:
+        if self.overview is None or self._channel != self.gui["channel"]:
+            self.load()
+
+    @Slot()
+    def load(self, refresh: bool = False) -> None:
+        self._channel = self.gui["channel"]
+        self.set(loading=True, note="")
+        self.gui.fetch(
+            "browse",
+            *("--channel", self._channel, *(["--refresh"] if refresh else [])),
+            done=lambda doc, r=refresh: self._overview(doc, r),
+            group="browse-overview",
+            exclusive=True,
+            label="browse: the categories",
+            hint="the installed apps, one search.nixos.org request",
+        )
+
+    def _overview(self, doc: Doc, refresh: bool) -> None:
+        self.set(loading=False)
+        n = view.notice(doc)
+        if n is not None:
+            self.set(note=f"browse: {n.code}: {n.message}", noteStyle="error")
+            return
+        self.overview = doc
+        self.cats = view.browse_categories(doc)
+        self.rows("categories").reset(models.categories(self.cats))
+        err = ((doc.get("sources") or {}).get("search.nixos.org") or {}).get("error")
+        note = f"search.nixos.org: {err['code']}: {err['message']}" if err else ""
+        self.set(note=" · ".join([note, *(doc.get("notes") or [])]).strip(" ·"), noteStyle="dim")
+        key = self["category"] or (self.cats[0].key if self.cats else "")
+        if key:
+            self.setCategory(key, force=True, refresh=refresh)
+
+    @Slot(str)
+    def setCategory(self, key: str, force: bool = False, refresh: bool = False) -> None:
+        cat = next((c for c in self.cats if c.key == key), None)
+        if cat is None or (key == self["category"] and not force):
+            return
+        self.set(category=key, label=cat.label, appsLoading=True, appsNote="", selected=-1)
+        self.gui.fetch(
+            "browse",
+            *(key, "--channel", self.gui["channel"], *(["--refresh"] if refresh else [])),
+            done=lambda doc, k=key: self._apps(k, doc),
+            group="browse",
+            exclusive=True,
+            label=f"browse {key}",
+            hint="the installed apps, two search.nixos.org requests",
+        )
+
+    def _apps(self, key: str, doc: Doc) -> None:
+        if key != self["category"]:
+            return
+        n = view.notice(doc)
+        if n is not None:
+            self.shown = []
+            self.rows("apps").reset([])
+            self.set(
+                appsLoading=False,
+                appsNote=f"browse: {n.code}: {n.message}",
+                appsNoteStyle="error",
+                footer="",
+            )
+            return
+        self.shown = view.app_rows(doc)
+        self.rows("apps").reset(models.apps(self.shown))
+        notes = list(doc.get("notes") or [])
+        self.set(
+            appsLoading=False,
+            appsNote=" · ".join(notes) if notes or self.shown else "no applications here",
+            appsNoteStyle="dim",
+            footer=view.browse_footer(doc),
+        )
+
+    @Slot(int)
+    def select(self, i: int) -> None:
+        if 0 <= i < len(self.shown):
+            self.set(selected=i)
+            self.gui.details.show(view.app_hit(self.shown[i]), owner="browse")
+
+    @Slot()
+    def refresh(self) -> None:
+        self.load(refresh=True)
+
+
 # --- status ---------------------------------------------------------------------------------
 
 
@@ -1809,6 +2040,12 @@ class StatusVM(VM):
 
 
 # --- the root -------------------------------------------------------------------------------
+
+
+def _fetch_image(url: str) -> str:
+    from ..appstream import images
+
+    return str(images.fetch(url))
 
 
 @dataclass
@@ -1875,10 +2112,12 @@ class Gui(VM):
             "pending": PendingVM(self),
             "apply": ApplyVM(self),
             "status": StatusVM(self),
+            "browse": BrowseVM(self),
         }
         from .trying import TryVM  # it subclasses VM, from this module
 
         self._areas["trying"] = TryVM(self)
+        self.image_fetcher: Callable[[str], Any] = _fetch_image  # tests swap it
         chan = channel if channel in view.CHANNELS else view.CHANNELS[0]
         self.set(host=backend.host, configLabel=backend.config_label, channel=chan)
 
@@ -1892,6 +2131,7 @@ class Gui(VM):
     apply = area("apply")
     status = area("status")
     trying = area("trying")
+    browse = area("browse")
 
     # --- running verbs
 
@@ -1945,6 +2185,21 @@ class Gui(VM):
         self._jobs.add(signals)
         self.pool.start(job)
         return True
+
+    def fetch_image(self, url: str, done: Callable[[str | None, str], None]) -> None:
+        """A screenshot or an icon, off the UI thread: `done(path, "")` or `done(None,
+        "code: message")` on the UI thread. Not in the activity bar: it is not a verb."""
+        job = CallJob(self.image_fetcher, url)
+        signals = job.signals
+
+        def finished(result: tuple[Any, str]) -> None:
+            self._jobs.discard(signals)
+            path, err = result
+            done(str(path) if path else None, err)
+
+        signals.done.connect(finished)
+        self._jobs.add(signals)
+        self.pool.start(job)
 
     @property
     def idle(self) -> bool:
@@ -2036,10 +2291,12 @@ class Gui(VM):
 
     @Slot(str)
     def go(self, page: str) -> None:
-        if page not in ("search", "packages", "options", "pending", "status"):
+        if page not in ("search", "packages", "options", "pending", "status", "browse"):
             return
         self.set(page=page)
-        if page == "packages":
+        if page == "browse":
+            self.browse.visit()
+        elif page == "packages":
             self.packages.visit()
         elif page == "pending":
             self.pending.visit()
@@ -2052,6 +2309,8 @@ class Gui(VM):
             self.set(channel=channel)
             self.search.rerun()
             self.options.rerun()
+            if self["page"] == "browse":
+                self.browse.visit()
 
     @Slot(str)
     def copy(self, text: str) -> None:
