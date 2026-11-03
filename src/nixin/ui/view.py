@@ -1292,6 +1292,8 @@ def app_source(a: dict[str, Any] | None) -> str:
         return ""
     gui = {True: "an application", False: "nothing to launch", None: "not known to be an app"}
     where = APP_FROM.get(str(a.get("source") or ""), "nothing found")
+    if a.get("installed_for"):
+        where += f" ({', '.join(a['installed_for'])})"  # the profiles that have it
     return f"{where} · {gui[a.get('gui')]}"
 
 

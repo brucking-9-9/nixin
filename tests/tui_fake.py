@@ -118,6 +118,6 @@ BROWSE = {
     "browse AudioVideo": "browse_audiovideo",
     "browse Game": "browse_game",
     "info": "info_prismlauncher",
-    "versions": "versions_cowsay",
+    "versions": {"ok": True, "results": [], "count": 0, "total": 0, "package": "?"},
     "where": "where_cowsay",
 }

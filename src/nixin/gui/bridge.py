@@ -404,8 +404,7 @@ class DetailsVM(VM):
         self.record: dict[str, Any] = {}
         self.where_doc: Doc | None = None
         self._images: set[str] = set()  # asked for this row already (icon, screenshots)
-        self._shots_pending = 0
-        self._shots_failed: list[str] = []
+        self._shots: list[list[Any]] = []  # [url, caption, file or None, error], in order
 
     def show(self, hit: view.Hit, *, user: str = "", owner: str = "search") -> None:
         """`user`: the Home Manager user to start with (an installed row's own)."""
@@ -440,7 +439,7 @@ class DetailsVM(VM):
             shotsLoading=False,
             shotsNote="",
         )
-        self._images, self._shots_pending, self._shots_failed = set(), 0, []
+        self._images, self._shots = set(), []
         self.rows("shots").reset([])
         self._home_choices()
         self.rows("info").reset(models.fields(_info_fields(self.record)))
@@ -519,28 +518,28 @@ class DetailsVM(VM):
             if url in self._images:
                 continue
             self._images.add(url)
-            self._shots_pending += 1
+            slot: list[Any] = [url, caption, None, ""]
+            self._shots.append(slot)
             self.set(shotsLoading=True)
-            self.gui.fetch_image(
-                url, lambda path, err, h=hit, c=caption: self._shot(h, path, err, c)
-            )
+            self.gui.fetch_image(url, lambda path, err, h=hit, s=slot: self._shot(h, s, path, err))
 
     def _icon(self, hit: view.Hit, path: str | None) -> None:
         if hit is self.hit and path:
             self.set(iconUrl=models.file_url(path))
 
-    def _shot(self, hit: view.Hit, path: str | None, err: str, caption: str) -> None:
+    def _shot(self, hit: view.Hit, slot: list[Any], path: str | None, err: str) -> None:
+        """One screenshot arrived (or failed): the strip keeps the AppStream order, the
+        default one first, whatever order the downloads finish in."""
         if hit is not self.hit:
             return
-        self._shots_pending -= 1
+        slot[2], slot[3] = path, (err or "") if not path else ""
         if path:
-            self.rows("shots").append([{"url": models.file_url(path), "caption": caption}])
-        else:
-            self._shots_failed.append(err)
-        note = ""
-        if self._shots_failed:
-            note = f"{len(self._shots_failed)} screenshot(s) not shown: {self._shots_failed[0]}"
-        self.set(shotsLoading=self._shots_pending > 0, shotsNote=note)
+            done = [s for s in self._shots if s[2]]
+            self.rows("shots").reset({"url": models.file_url(s[2]), "caption": s[1]} for s in done)
+        failed = [s[3] for s in self._shots if s[3]]
+        note = f"{len(failed)} screenshot(s) not shown: {failed[0]}" if failed else ""
+        pending = any(not s[2] and not s[3] for s in self._shots)
+        self.set(shotsLoading=pending, shotsNote=note)
 
     def _versions(self, hit: view.Hit, doc: Doc) -> None:
         if hit is not self.hit:

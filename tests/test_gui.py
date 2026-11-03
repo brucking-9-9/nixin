@@ -730,7 +730,7 @@ def test_browse_categories_apps_and_details(ui):
     d = u.gui.details
     assert d["owner"] == "browse" and d["hasApp"]
     assert d["appName"] == "Prism Launcher" and d["chips"][0] == "Game"
-    assert d["appSource"] == "installed output · an application"
+    assert d["appSource"] == "installed output (master) · an application"
     assert d["iconUrl"].endswith("/fixtures/appstream/icons/demo.svg")  # the output's own
     icon = item(u, "appIcon")
     assert icon.property("source").endswith("demo.svg")
@@ -743,6 +743,8 @@ def test_browse_categories_apps_and_details(ui):
     assert len(shots) == 3 and fetched == shots
     assert all(x.endswith(".webp") for x in shots)
     assert prop(u, "shots", "count") == 3 and not d["shotsLoading"]
+    captions = [d.rows("shots").get(i)["caption"] for i in range(3)]
+    assert captions[0] == "The main Prism Launcher window"  # AppStream's order, default first
     assert ["info", "prismlauncher", "--kind", "pkg", "--channel", "unstable"] in u.fake.verbs()
     assert d["infoLoading"] is False and len(fetched) == 3  # info's answer fetched nothing again
 

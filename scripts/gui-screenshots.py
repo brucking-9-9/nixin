@@ -8,11 +8,14 @@ Default: the cowsay flow on the recorded documents in tests/fixtures/tui (offlin
 reproducible): search, details, the add preview, plan, the apply confirmation,
 `needs-sudo`, status, an option with the Set dialog, an error notice; then Packages on
 19BK's documents: installed with a row in details, updates (lock, --published), the
-update confirmation. --live drives the real verb handlers instead (network for
-discovery, nix against --config): search, details with `where`, the `add --dry-run`
-preview, an option's details and Set dialog, Packages (`list`, `outdated`); it writes
-nothing (the dialogs are cancelled, `update` is never run). OUTDIR defaults to docs/gui.
-Files are named <n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
+update confirmation; then Browse on mbp13's documents (the fixture icon stands in for
+every image). --live drives the real verb handlers instead (network for discovery, nix
+against --config): search, details with `where`, the `add --dry-run` preview, an option's
+details and Set dialog, Packages (`list`, `outdated`), Browse (an installed game and one
+that is not, their screenshots fetched from search.nixos.org); it writes nothing (the
+dialogs are cancelled, `update` is never run). `--only SECTION` draws one section
+(main, packages, browse). OUTDIR defaults to docs/gui. Files are named <n>-<step>.png
+(live-<n>-<step>.png with --live), 1200x780.
 """
 
 from __future__ import annotations
@@ -125,7 +128,6 @@ def fixtures(outdir: Path) -> None:
     g.details.remove()  # rm's preview answers `ambiguous`: the notice with candidates
     s.shot("9-notice")
     s.done()
-    packages(outdir)
 
 
 def packages(outdir: Path) -> None:
@@ -149,6 +151,51 @@ def packages(outdir: Path) -> None:
     g.packages.startUpdate()
     s.shot("13-update-confirm")
     g.packages.cancelUpdate()
+    s.done()
+
+
+def browse(outdir: Path) -> None:
+    from test_gui import ICONS, browse_routes
+    from tui_fake import FakeBackend
+
+    gui = Gui(FakeBackend(browse_routes()))
+    gui.image_fetcher = lambda url: str(ICONS / "demo.png")
+    s = Shooter(gui, outdir)
+    g = gui
+    g.go("browse")
+    s.settle()
+    g.browse.setCategory("Game")
+    s.shot("14-browse")
+    g.browse.select([r.target for r in g.browse.shown].index("prismlauncher"))
+    s.shot("15-browse-details")
+    s.done()
+
+
+def live_browse(outdir: Path, host: str, config: str) -> None:
+    gui = Gui(Backend(host=host, config=config))
+    s = Shooter(gui, outdir, "live-")
+    g = gui
+    g.go("browse")
+    s.settle()
+    g.browse.setCategory("Game")
+    s.settle()
+    s.shot("10-browse")
+    names = [r.target for r in g.browse.shown]
+    mine = [
+        r.target for r in g.browse.shown if r.installed and r.record["appstream"].get("screenshots")
+    ]
+    g.browse.select(names.index(mine[0]) if mine else 0)
+    s.settle(1.5)
+    s.shot("11-browse-installed")
+    other = [
+        r.target
+        for r in g.browse.shown
+        if not r.installed and r.record["appstream"].get("screenshots")
+    ]
+    if other:
+        g.browse.select(names.index(other[0]))
+        s.settle(1.5)
+        s.shot("12-browse-not-installed")
     s.done()
 
 
@@ -191,13 +238,23 @@ def main() -> int:
     ap.add_argument("--query", default="cowsay")
     ap.add_argument("--package", default="cowsay")
     ap.add_argument("--option", default="services.openssh.enable")
+    ap.add_argument("--only", choices=("main", "packages", "browse"))
     a = ap.parse_args()
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
+    want = {a.only} if a.only else {"main", "packages", "browse"}
     if a.live:
-        live(out, a.host, a.config, a.query, a.package, a.option)
-    else:
+        if want & {"main", "packages"}:
+            live(out, a.host, a.config, a.query, a.package, a.option)
+        if "browse" in want:
+            live_browse(out, a.host, a.config)
+        return 0
+    if "main" in want:
         fixtures(out)
+    if "packages" in want:
+        packages(out)
+    if "browse" in want:
+        browse(out)
     return 0
 
 
