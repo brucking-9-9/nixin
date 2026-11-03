@@ -8,10 +8,13 @@ Default: the cowsay flow on the recorded documents in tests/fixtures/tui (offlin
 reproducible): search, details, the add preview, plan, the apply confirmation,
 `needs-sudo`, status, an option with the Set dialog, an error notice; then Packages on
 19BK's documents: installed with a row in details, updates (lock, --published), the
-update confirmation. --live drives the real verb handlers instead (network for
-discovery, nix against --config): search, details with `where`, the `add --dry-run`
-preview, an option's details and Set dialog, Packages (`list`, `outdated`); it writes
-nothing (the dialogs are cancelled, `update` is never run). OUTDIR defaults to docs/gui.
+update confirmation; then Options: mbp13's openssh options with one in full, the Set
+dialog, its diff, and a Home Manager option on 19BK. --live drives the real verb handlers
+instead (network for discovery, nix against --config): search, details with `where`, the
+`add --dry-run` preview, an option's details and Set dialog, Packages (`list`,
+`outdated`), the Options page (an option, Set, the `set --dry-run` diff; with --hm-host a
+Home Manager option there); it writes nothing (the dialogs are cancelled, `update` is
+never run). `--only options` takes only the Options part. OUTDIR defaults to docs/gui.
 Files are named <n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
 """
 
@@ -61,6 +64,13 @@ class Shooter:
         assert field is not None
         field.setProperty("text", query)
         self.gui.search.search(query)
+        self.settle()
+
+    def option_search(self, query: str) -> None:
+        field = self.win.find("opQuery")
+        assert field is not None
+        field.setProperty("text", query)
+        self.gui.options.search(query)
         self.settle()
 
     def shot(self, name: str) -> None:
@@ -152,6 +162,66 @@ def packages(outdir: Path) -> None:
     s.done()
 
 
+def options(outdir: Path) -> None:
+    from tui_fake import HM_OPTIONS, OPTIONS, FakeBackend
+
+    gui = Gui(FakeBackend(dict(OPTIONS)))
+    s = Shooter(gui, outdir)
+    g = gui
+    g.go("options")
+    s.option_search("openssh")
+    g.options.select([h.target for h in g.options.hits].index("services.openssh.enable"))
+    s.shot("14-options")
+    g.options.editOption()
+    s.shot("15-option-set")
+    g.writer.previewSet("false")
+    s.shot("16-option-diff")
+    g.writer.cancel()
+    s.done()
+    gui = Gui(FakeBackend(dict(HM_OPTIONS), host="19BK"))
+    s = Shooter(gui, outdir)
+    g = gui
+    g.go("options")
+    g.options.setKind("hm")
+    s.option_search("git")
+    g.options.select([h.target for h in g.options.hits].index("programs.git.lfs.enable"))
+    s.shot("17-options-hm")
+    s.done()
+
+
+def live_options(
+    outdir: Path, host: str, config: str, query: str, option: str, value: str, hm: tuple | None
+) -> None:
+    """The Options page against the real config; the Set preview is cancelled."""
+    gui = Gui(Backend(host=host, config=config))
+    s = Shooter(gui, outdir, "live-")
+    g = gui
+    g.go("options")
+    s.option_search(query)
+    rows = [h.target for h in g.options.hits]
+    g.options.select(rows.index(option) if option in rows else 0)
+    s.shot("10-options")
+    g.options.editOption()
+    s.shot("11-option-set")
+    g.writer.previewSet(value)
+    s.shot("12-option-diff")
+    g.writer.cancel()  # nothing is written
+    s.done()
+    if hm is None:
+        return
+    hm_host, hm_query, hm_option = hm
+    gui = Gui(Backend(host=hm_host, config=config))
+    s = Shooter(gui, outdir, "live-")
+    g = gui
+    g.go("options")
+    g.options.setKind("hm")
+    s.option_search(hm_query)
+    rows = [h.target for h in g.options.hits]
+    g.options.select(rows.index(hm_option) if hm_option in rows else 0)
+    s.shot("13-options-hm")
+    s.done()
+
+
 def live(outdir: Path, host: str, config: str, query: str, pkg: str, option: str) -> None:
     gui = Gui(Backend(host=host, config=config))
     s = Shooter(gui, outdir, "live-")
@@ -191,13 +261,24 @@ def main() -> int:
     ap.add_argument("--query", default="cowsay")
     ap.add_argument("--package", default="cowsay")
     ap.add_argument("--option", default="services.openssh.enable")
+    ap.add_argument("--option-query", default="openssh")
+    ap.add_argument("--value", default="false", help="the Set value previewed (never written)")
+    ap.add_argument("--hm-host", help="also a Home Manager option on this host (--live)")
+    ap.add_argument("--hm-query", default="git lfs")
+    ap.add_argument("--hm-option", default="programs.git.lfs.enable")
+    ap.add_argument("--only", choices=["all", "options"], default="all")
     a = ap.parse_args()
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
     if a.live:
-        live(out, a.host, a.config, a.query, a.package, a.option)
+        if a.only == "all":
+            live(out, a.host, a.config, a.query, a.package, a.option)
+        hm = (a.hm_host, a.hm_query, a.hm_option) if a.hm_host else None
+        live_options(out, a.host, a.config, a.option_query, a.option, a.value, hm)
     else:
-        fixtures(out)
+        if a.only == "all":
+            fixtures(out)
+        options(out)
     return 0
 
 
