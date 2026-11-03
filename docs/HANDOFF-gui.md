@@ -428,8 +428,10 @@ of the stub-verb test (it has its own).
   the out path from the first eval to `nix build` would save one.
 - The overlay case in judgement call 2; reading the config's own `pkgs` (as `where` does)
   would fix it at the cost of a config eval.
-- Screenshots 1–13 in `docs/gui/` predate the Browse rail entry (not redrawn, to keep the
-  diff small); `scripts/gui-screenshots.py` redraws them all without `--only`.
+- Screenshots: the fixture ones (`docs/gui/1…22-*`, `docs/tui/*-1…21-*`) were redrawn on
+  `integrate-night` (all six rail entries, Try next to Add); the `live-*` ones are as each
+  branch's live run left them. `scripts/gui-screenshots.py` redraws them all without
+  `--only`.
 - Left behind (agent runs cannot `rm -rf`): `/tmp/appstream-run` (71 MiB: logs, the
   recorder scripts, raw recordings, and a nix fetcher cache from one run with
   `XDG_CACHE_HOME` pointed there): `rm -rf /tmp/appstream-run`. `~/.cache/nixin/images/`
