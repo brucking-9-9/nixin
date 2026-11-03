@@ -476,6 +476,19 @@ def test_status_json_contract(repo, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "unknown-host"
 
 
+def test_the_hosts_list_is_cached_by_the_flake_fingerprint(repo):
+    from nixin import truth
+
+    def evals() -> int:
+        return sum(1 for c in repo.nix.calls if c[-1] == "builtins.attrNames")
+
+    assert truth.hosts(repo) == ["19BK", "mbp13"] and evals() == 1
+    assert truth.hosts(repo) == ["19BK", "mbp13"] and evals() == 1  # warm: no eval
+    assert truth.hosts(repo, refresh=True) == ["19BK", "mbp13"] and evals() == 2
+    repo._meta = {**repo.metadata(), "fingerprint": "fp-2"}  # a tracked edit
+    assert truth.hosts(repo) == ["19BK", "mbp13"] and evals() == 3
+
+
 def test_where_option_and_package(repo, monkeypatch, capsys):
     from nixin.cli import main
 

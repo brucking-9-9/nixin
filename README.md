@@ -21,7 +21,7 @@ talks to the first few and borrows the local-eval idea from NüschtOS.
 | **discovery** | what exists, in which versions | search.nixos.org (packages, NixOS options, programs), Home Manager options, NixHub version history, noogle; `nix search` on the host's *locked* nixpkgs as the exact-rev fallback |
 | **truth** | what *this* host has | `nix eval` of the config flake: installed packages, every option's current value and `declarations` (file:line), lock rev, generation |
 | **writer** | how to change it | new things go to generated `installer/*.nix` (nixfmt'd, from `state.json`); removing or changing something a hand-written module declares edits that module in place |
-| **apply** | make it so | `plan` = build the workspace + `nix store diff-closures` + a boot check (reboot needed? fits on /boot?); `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo; `history` = the system generations with the commits nixin applied; `rollback` = back to a generation, the config reverted with it |
+| **apply** | make it so | `plan` = build the workspace + `nix store diff-closures` + a boot check (reboot needed? fits on /boot?); `apply` = commit the workspace, root pulls it into the authoritative checkout and switches (sudo); `sync` = fetch/pull/push the config hub repo; `history` = the system generations with the commits nixin applied; `rollback` = back to a generation, the config reverted with it; `generations` = each generation's closure size, boot entry and whether `gc` would drop it; `gc` = delete old generations, rewrite the boot menu, collect the garbage |
 
 Why two kinds of search: search.nixos.org indexes channel-*latest*, so a hit can
 name a version your `flake.lock` does not have yet. The truth layer evaluates
@@ -40,6 +40,7 @@ add rm set unset            writer      edit a user-owned workspace clone of the
 plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch
                                         (another host: push to the hub, pull and switch there over ssh); hub sync
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
+generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
@@ -101,13 +102,24 @@ which touch the network, run nix or write files, and the cache locations.
   prints every command and the script and contacts nothing. How to reach H:
   `~/.config/nixin/hosts.toml`, e.g. `[mbp13]` `ssh = "mbp13"` `workspace =
   "/home/master/nixos"` (defaults: the host name, `~/nixos`, `/etc/nixos`).
+  `generations` lists the same generations with each one's closure size (`nix path-info
+  -S`, cached by store path), whether the boot menu has an entry for it, and what `gc`
+  with the same `--keep N` / `--older-than DAYS` would drop (`--keep 3` without flags).
+  `gc` deletes those generations (never the running, booted or boot-default one) with
+  `nix-env --delete-generations`, rewrites the boot menu with the boot default's own
+  `switch-to-configuration boot` (that also frees /boot) and runs `nix-collect-garbage`,
+  as root through the same `sudo -n` backend (`needs-sudo` with the commands). It reports
+  what nix freed and the free space of the store and /boot before and after;
+  `--dry-run` lists what goes and estimates what it frees (the closures only those
+  generations reach, plus what is garbage already) without root.
 - **outdated** answers "what needs updating" for a host. By default it evaluates the
   installed package lists (system and each Home Manager user) and the kernel twice: as
   locked, and with `--override-input nixpkgs` at the lock's own ref as it resolves now
   (`--nixpkgs FLAKEREF|REV`, `--channel NAME` pick another). It compares them by pname:
   `pname  from → to` per scope, added and removed, the kernel, and the commands to take
   the update (`nix flake update nixpkgs`, `nixin plan`, `nixin apply`). Two package-list
-  evals, no build: about 5 s, plus a nixpkgs tarball download for a new commit.
+  evals, side by side, no build: about 2.5 s, plus a nixpkgs tarball download for a new
+  commit.
   `--published` compares the installed versions with a search.nixos.org channel instead
   (one query per 50 names; a heuristic, since many attributes share a pname).
   **update** takes it: it runs the command `outdated` prints (`nix flake update nixpkgs

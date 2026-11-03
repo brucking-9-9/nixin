@@ -80,6 +80,7 @@ ERROR_CODES = {
     "push-failed",
     "ssh-failed",
     "invalid-hosts-config",
+    "gc-failed",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 

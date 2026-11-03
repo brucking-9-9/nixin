@@ -28,7 +28,7 @@ def test_every_verb_speaks_json(verb, after, capsys):
     flags = ["--json", "--host", "testhost"]
     argv = [verb, *flags] if after else [*flags, verb]
     configured = verb in truth.VERBS or verb in writer.VERBS or verb in apply.VERBS
-    configured = configured or verb in outdated.VERBS
+    configured = (configured or verb in outdated.VERBS) and verb != "gc"  # gc has no config
     if configured:
         argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests
     rc = main(argv)
@@ -36,6 +36,7 @@ def test_every_verb_speaks_json(verb, after, capsys):
     assert doc["verb"] == verb and doc["host"] == "testhost"
     assert doc["ok"] is False and rc == 1
     expected = "config-not-found" if configured else "not-implemented"
+    expected = "host-not-local" if verb == "gc" else expected  # before it reads anything
     assert doc["error"]["code"] == expected
 
 

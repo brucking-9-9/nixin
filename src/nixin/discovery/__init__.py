@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -135,6 +134,8 @@ def _error(exc: Exception) -> dict[str, Any]:
         return {"code": exc.code, "message": exc.message}
     # Anything else is a bug or a source that changed shape. Report it as an error
     # document, because under --json a traceback would leave stdout empty.
+    import traceback
+
     frames = traceback.extract_tb(exc.__traceback__)
     where = f" at {os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
     return {"code": "internal", "message": f"{type(exc).__name__}: {exc}{where}"}

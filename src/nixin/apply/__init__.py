@@ -19,7 +19,9 @@ plan and apply also read what the new system does to boot (safety.py): a new ker
 initrd, module tree or command line needs a reboot (`reboot_needed`), and its new
 kernel/initrd files must fit on /boot (`boot_space`; apply refuses with `boot-space`).
 `history` lists the system generations with the apply history; `rollback` goes back to
-one, the config with it (history.py, rollback.py).
+one, the config with it (history.py, rollback.py). `generations` lists them with their
+closure sizes, boot entries and what `gc` would drop; `gc` deletes old generations,
+refreshes the boot menu and collects the garbage (generations.py, gc.py).
 `apply --host H` for another host commits, pushes to the hub and runs the pulls and
 the switch on H over `ssh -t` (remote.py; hosts.py reads ~/.config/nixin/hosts.toml).
 
@@ -40,13 +42,11 @@ from typing import Any
 
 from ..cache import default_root
 from ..configrepo import DEFAULT_CONFIG, ConfigRepo, NixinError, local_hostname
-from ..writer.state import STATE_FILE
-from ..writer.workspace import Workspace
 from . import build, commitmsg, privilege, proc, render, safety, system
 from .git import Git, Status
 from .system import HISTORY
 
-VERBS = ("plan", "apply", "sync", "history", "rollback")
+VERBS = ("plan", "apply", "sync", "history", "rollback", "generations", "gc")
 ENV_AUTHORITATIVE = "NIXIN_AUTHORITATIVE"
 
 
@@ -64,7 +64,7 @@ class ApplyError(NixinError):
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    from . import history, rollback  # they import this package's pieces
+    from . import gc, generations, history, rollback  # they import this package's pieces
 
     handlers = {
         "plan": plan,
@@ -72,12 +72,17 @@ def register(sub: argparse._SubParsersAction) -> None:
         "sync": sync,
         "history": history.history,
         "rollback": rollback.rollback,
+        "generations": generations.generations,
+        "gc": gc.gc,
     }
     for verb, handler in handlers.items():
         p = sub.choices.get(verb)
         if p is None:
             p = sub.add_parser(verb)
             p.add_argument("args", nargs="*")
+        p.set_defaults(run=handler)
+        if verb == "gc":  # no config: it acts on the system profile and the store
+            continue
         p.add_argument("--config", help="workspace clone (default: $NIXIN_CONFIG)")
         p.add_argument(
             "--authoritative",
@@ -85,7 +90,6 @@ def register(sub: argparse._SubParsersAction) -> None:
             help=f"root-owned clone the system switches from (default: ${ENV_AUTHORITATIVE} "
             f"or {DEFAULT_CONFIG})",
         )
-        p.set_defaults(run=handler)
     ap = sub.choices["apply"]
     ap.add_argument("-m", "--message", help="commit message (default: generated)")
     ap.add_argument("--dry-run", action="store_true", help="print the commands, run none of them")
@@ -100,6 +104,8 @@ def register(sub: argparse._SubParsersAction) -> None:
         if a.dest == "args":
             a.metavar, a.help = "GEN", "generation (default: the one before the running one)"
     rb.add_argument("--dry-run", action="store_true", help="print the commands, run none of them")
+    generations.add_arguments(sub.choices["generations"], preview=True)
+    gc.add_arguments(sub.choices["gc"])
     sy = sub.choices["sync"]
     sy.add_argument("--pull", action="store_true", help="git pull --ff-only into the workspace")
     sy.add_argument("--push", action="store_true", help="push the workspace branch")
@@ -143,6 +149,8 @@ def authoritative_path(explicit: str | None = None) -> Path:
 
 
 def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
+    from ..writer.workspace import Workspace  # here: `status` imports this package
+
     ws = Workspace.open(ns.config, nix=build.nix)  # config-not-found / not-a-workspace
     git = Git(ws.root)
     if not git.is_repo():
@@ -168,7 +176,7 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
     )
 
 
-def _text_hosts(ws: Workspace) -> list[str]:
+def _text_hosts(ws) -> list[str]:
     try:
         return list(ws.flake_hosts())
     except Exception:  # noqa: BLE001 -- the scanner is a shortcut; the eval decides
@@ -408,6 +416,8 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
                 f"{ctx.auth_path} and /run/current-system is its build "
                 f"(generation {before['generation']})",
             )
+    from ..writer.state import STATE_FILE
+
     message = ns.message or commitmsg.message(
         ctx.git.show("HEAD", STATE_FILE), _read(ctx.path / STATE_FILE), to_commit
     )

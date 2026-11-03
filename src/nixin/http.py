@@ -3,6 +3,8 @@
 Every discovery backend goes through `get_json` / `post_json` here, so the
 user agent (`nixin/<version>`), the timeouts, the retry policy and the error
 mapping live in one place. Tests swap the transport with `set_session()`.
+`requests` is imported on first use: every verb imports this module (discovery's
+error type), few of them talk HTTP, and `requests` is most of the CLI's startup.
 
 Failures become `NetworkError`, whose `.code` is the `--json` error code:
 `network` for anything transport-level (DNS, refused, timeout, 5xx after the
@@ -12,13 +14,12 @@ interpret (`404` on a retired channel alias, for instance).
 
 from __future__ import annotations
 
-from typing import Any
-
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from typing import TYPE_CHECKING, Any
 
 from . import __version__
+
+if TYPE_CHECKING:
+    import requests
 
 USER_AGENT = f"nixin/{__version__}"
 DEFAULT_TIMEOUT = 15.0
@@ -40,6 +41,10 @@ class NetworkError(Exception):
 
 
 def _new_session() -> requests.Session:
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
     s = requests.Session()
     s.headers["User-Agent"] = USER_AGENT
     s.headers["Accept"] = "application/json"
@@ -73,6 +78,8 @@ def set_session(s: requests.Session | None) -> None:
 
 
 def _request(method: str, url: str, **kw: Any) -> Any:
+    import requests
+
     kw.setdefault("timeout", DEFAULT_TIMEOUT)
     try:
         resp = session().request(method, url, **kw)

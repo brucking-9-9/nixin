@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..writer.state import STATE_FILE
 from .system import HISTORY
 
 SUBJECT_MAX = 72
@@ -73,5 +72,7 @@ def message(old_state: str | None, new_state: str | None, files: list[str]) -> s
         body.append("")
     body += ["Files:"] + [f"  {f}" for f in files]
     body.append("")
+    from ..writer.state import STATE_FILE
+
     body.append(f"Written by nixin apply; {STATE_FILE} is the record of what nixin added.")
     return subject + "\n\n" + "\n".join(body) + "\n"

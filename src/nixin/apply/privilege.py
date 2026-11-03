@@ -10,6 +10,12 @@ rollback has two more (and the same pull):
     profile   nix-env --profile /nix/var/nix/profiles/system --switch-generation <N>
     activate  <generation N's store path>/bin/switch-to-configuration switch
 
+gc has three:
+
+    delete      nix-env --profile /nix/var/nix/profiles/system --delete-generations <N>...
+    bootloader  /nix/var/nix/profiles/system/bin/switch-to-configuration boot
+    collect     nix-collect-garbage
+
 A `Backend` turns a step into what nixin runs and into what a person would type.
 `Sudo` (the default) prefixes `sudo -n`: it never prompts; without a cached ticket or a
 NOPASSWD rule it fails at once, and apply answers `needs-sudo` with the commands.
@@ -41,7 +47,7 @@ HELPER_WAIT = 4 * 3600.0  # the helper waits for a person at the desktop, then b
 
 @dataclass
 class Step:
-    name: str  # "pull" | "switch" | "profile" | "activate"
+    name: str  # "pull" | "switch" | "profile" | "activate" | "delete" | "bootloader" | "collect"
     argv: list[str]  # the command root runs, without any sudo
     mode: str = ""  # switch: "switch" | "boot"
 
@@ -64,6 +70,23 @@ def profile_step(profile: str, generation: int) -> Step:
 
 def activate_step(out: str) -> Step:
     return Step("activate", [f"{out}/bin/switch-to-configuration", "switch"], mode="switch")
+
+
+def delete_step(profile: str, generations: list[int]) -> Step:
+    return Step(
+        "delete",
+        ["nix-env", "--profile", profile, "--delete-generations", *map(str, generations)],
+    )
+
+
+def bootloader_step(profile: str) -> Step:
+    """The boot default's own switch-to-configuration, reached through the profile link:
+    it rewrites the boot entries for the generations left and keeps the default."""
+    return Step("bootloader", [f"{profile}/bin/switch-to-configuration", "boot"], mode="boot")
+
+
+def collect_step() -> Step:
+    return Step("collect", ["nix-collect-garbage"])
 
 
 class Backend:

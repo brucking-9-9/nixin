@@ -7,7 +7,7 @@ Default ("lock" mode): evaluate the host's environment.systemPackages and every 
 Manager user's home.packages twice, as the flake is locked and with
 `--override-input <nixpkgs> <target>` (default: the lock's own `original`, so what
 `nix flake update nixpkgs` would bring), and compare them by pname. Two package-list
-evals (outdated.nix), never system.build.toplevel: nothing is built. The target side
+evals (outdated.nix), run side by side, never system.build.toplevel: nothing is built. The target side
 needs the network once per target commit (the nixpkgs tarball); its eval is cached under
 the truth cache by (flake fingerprint, target rev).
 
@@ -208,15 +208,33 @@ def _lock(
         flakeref, source = tgt.requested(np, None, tgt.channel_branch(ns.channel, stable))
     else:
         flakeref, source = tgt.requested(np, ns.nixpkgs, None)
-    t = time.monotonic()
-    target = tgt.resolve(repo, np, flakeref, source, refresh=ns.refresh)
-    timings["resolve"] = round(time.monotonic() - t, 2)
-    lock = _lock_side(repo, host, cache, ns, timings)
-    same = bool(target.rev and target.rev == np.locked.rev)
-    if same:  # the lock already has it: nothing to evaluate
+    from concurrent.futures import ThreadPoolExecutor  # here: 10 ms at import (logging)
+
+    repo.source()  # the cache key's `nix flake metadata`, once, before two threads need it
+    # The two evals are independent: the lock side runs in a thread while this one
+    # resolves the target and evaluates it. Errors keep the sequential order: resolve,
+    # then the lock side, then the target.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        lock_job = pool.submit(_lock_side, repo, host, cache, ns, timings)
+        t = time.monotonic()
+        try:
+            target = tgt.resolve(repo, np, flakeref, source, refresh=ns.refresh)
+        finally:
+            timings["resolve"] = round(time.monotonic() - t, 2)
+        same = bool(target.rev and target.rev == np.locked.rev)
+        new = None
+        target_error: NixinError | None = None
+        if not same:
+            try:
+                new = _eval(repo, host, cache, target)
+            except NixinError as e:
+                target_error = e
+        lock = lock_job.result()
+    if target_error is not None:
+        raise target_error
+    if new is None:  # the lock already has it: nothing to evaluate
         new, timings["target"] = lock, 0.0
     else:
-        new = _eval(repo, host, cache, target)
         timings["target"] = 0.0 if new["cached"] else new["seconds"]
     d = compare.diff(lock, new, ns.home)
     days = None

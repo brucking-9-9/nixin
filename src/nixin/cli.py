@@ -23,7 +23,6 @@ import json
 import os
 import socket
 import sys
-import traceback
 
 from . import __version__, apply, discovery, explain, gui, outdated, truth, tui, writer
 from .configrepo import default_host
@@ -46,6 +45,8 @@ VERBS: dict[str, tuple[str, str]] = {
     "sync": ("apply", "push/pull the config hub repo"),
     "history": ("apply", "this machine's system generations, with the commits nixin applied"),
     "rollback": ("apply", "switch back to an earlier generation, revert the config with it"),
+    "generations": ("apply", "system generations: closure size, boot entry, what gc would drop"),
+    "gc": ("apply", "delete old system generations, collect garbage, refresh /boot (sudo)"),
     "outdated": ("outdated", outdated.HELP),
     "update": ("outdated", outdated.update.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
@@ -122,6 +123,8 @@ def _emit(ns: argparse.Namespace, doc: dict) -> int:
 def _internal(exc: Exception) -> dict:
     """An unexpected exception as the error document: under --json a traceback would leave
     stdout empty. The message names the exception and where it was raised."""
+    import traceback  # only here: it costs 20 ms at startup (its colour support)
+
     frames = traceback.extract_tb(exc.__traceback__)
     where = f" at {os.path.basename(frames[-1].filename)}:{frames[-1].lineno}" if frames else ""
     return {

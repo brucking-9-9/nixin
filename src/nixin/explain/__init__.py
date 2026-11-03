@@ -29,6 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, unknown_host
+from ..truth import hosts as truth_hosts
 from ..truth import option_infos, package_info
 from ..truth import render as truth_render
 from ..truth.cache import TruthCache
@@ -139,7 +140,7 @@ class Config:
         if self.repo is None:
             return None, self.error
         try:
-            hosts = self.repo.hosts()
+            hosts = truth_hosts(self.repo, refresh=self.ns.refresh)
             if self.host not in hosts:
                 raise unknown_host(self.host, hosts)
             return fn(), None
