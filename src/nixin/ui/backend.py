@@ -28,7 +28,7 @@ STREAMING = frozenset({"plan", "apply"})
 # verbs that read --config (discovery ignores it)
 CONFIG_VERBS = frozenset(
     {"status", "where", "list", "add", "rm", "set", "unset", "plan", "apply", "sync"}
-    | {"outdated", "update"}
+    | {"outdated", "update", "info"}  # info: the lock its AppStream lookup evaluates
 )
 
 

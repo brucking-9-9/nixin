@@ -487,8 +487,29 @@ def program_record(program: str, src: dict[str, Any], ch: Channel, exact: bool) 
 # --------------------------------------------------------------------------- API
 
 
-def search(cache: Cache, query: str, kind: str, ch: Channel, limit: int) -> Part:
-    """`kind` is pkg, opt or program."""
+def _fields(appstream: bool) -> list[str]:
+    """The package fields to ask for: with `appstream`, also the desktop data
+    (appstream.hint.ES_FIELDS) the AppStream layer reads."""
+    if not appstream:
+        return PKG_SOURCE_FIELDS
+    from ..appstream import hint
+
+    return [*PKG_SOURCE_FIELDS, *hint.ES_FIELDS]
+
+
+def _package(src: dict[str, Any], ch: Channel, appstream: bool) -> dict[str, Any]:
+    rec = package_record(src, ch)
+    if appstream:
+        from ..appstream import hint
+
+        rec["appstream"] = hint.from_es(src)
+    return rec
+
+
+def search(
+    cache: Cache, query: str, kind: str, ch: Channel, limit: int, appstream: bool = False
+) -> Part:
+    """`kind` is pkg, opt or program; `appstream` adds each package's hint (pkg only)."""
     words = _words(query)
     if not words:
         raise DiscoveryError("usage", f"nothing searchable in {query!r}")
@@ -498,7 +519,7 @@ def search(cache: Cache, query: str, kind: str, ch: Channel, limit: int) -> Part
         q = _build_query(
             words, "package", _PKG_FIELDS, "package_attr_name", _PKG_PHRASE, _PKG_POPULARITY
         )
-        body = {"query": q, "size": size, "_source": PKG_SOURCE_FIELDS, "rescore": _PKG_RESCORE}
+        body = {"query": q, "size": size, "_source": _fields(appstream), "rescore": _PKG_RESCORE}
     elif kind == "program":
         q = _build_query(words, "package", _PKG_FIELDS, "package_programs", _PKG_PHRASE, [])
         body = {"query": q, "size": size, "_source": PKG_SOURCE_FIELDS}
@@ -509,7 +530,7 @@ def search(cache: Cache, query: str, kind: str, ch: Channel, limit: int) -> Part
         raise DiscoveryError("usage", f"{SOURCE} has no kind {kind!r}")
     hits, cached = _es_search(cache, ch, body)
     if kind == "pkg":
-        results = [package_record(h, ch) for h in hits]
+        results = [_package(h, ch, appstream) for h in hits]
     elif kind == "opt":
         results = [option_record(h, ch) for h in hits]
     else:
@@ -542,22 +563,20 @@ def _term(doc_type: str, field: str, value: str, size: int, fields: list[str]) -
     }
 
 
-def info_package(cache: Cache, name: str, ch: Channel) -> Part:
+def info_package(cache: Cache, name: str, ch: Channel, appstream: bool = False) -> Part:
     """Exact attribute match first; then packages whose pname is `name`.
 
     Several attributes can share a pname (firefox, firefox-esr, ...): the
     canonical one (attr == pname) wins, the others are listed in `alternatives`.
+    `appstream` adds the record's hint (appstream.hint) as `appstream`.
     """
-    hits, cached = _es_search(
-        cache, ch, _term("package", "package_attr_name", name, 1, PKG_SOURCE_FIELDS)
-    )
+    fields = _fields(appstream)
+    hits, cached = _es_search(cache, ch, _term("package", "package_attr_name", name, 1, fields))
     if hits:
-        rec = package_record(hits[0], ch)
+        rec = _package(hits[0], ch, appstream)
         rec["matched_by"] = "attr"
         return Part(SOURCE, ch.name, ch.rev, cached, [rec])
-    hits, cached2 = _es_search(
-        cache, ch, _term("package", "package_pname", name, 5, PKG_SOURCE_FIELDS)
-    )
+    hits, cached2 = _es_search(cache, ch, _term("package", "package_pname", name, 5, fields))
     if not hits:
         return Part(SOURCE, ch.name, ch.rev, cached and cached2, [])
     hits = sorted(
@@ -567,7 +586,7 @@ def info_package(cache: Cache, name: str, ch: Channel) -> Part:
             h.get("package_attr_name", ""),
         ),
     )
-    rec = package_record(hits[0], ch)
+    rec = _package(hits[0], ch, appstream)
     rec["matched_by"] = "pname"
     rec["alternatives"] = [h["package_attr_name"] for h in hits[1:] if h.get("package_attr_name")]
     return Part(SOURCE, ch.name, ch.rev, cached and cached2, [rec])

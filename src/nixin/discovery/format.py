@@ -100,6 +100,18 @@ def _footer(doc: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def app_mark(a: dict[str, Any] | None) -> str:
+    """`search --appstream`'s APP column: the main categories of a GUI app, `app` without
+    any, `-` for nothing to launch, empty when unknown."""
+    if not a:
+        return ""
+    if a.get("gui") is True:
+        from ..appstream.parse import main_categories
+
+        return ",".join(main_categories(a.get("categories") or [])) or "app"
+    return "-" if a.get("gui") is False else ""
+
+
 def render_search(doc: dict[str, Any]) -> str:
     results = doc.get("results", [])
     kinds = {r.get("kind") for r in results}
@@ -112,6 +124,9 @@ def render_search(doc: dict[str, Any]) -> str:
     else:
         headers = ["KIND", "NAME", "VERSION/TYPE", "DESCRIPTION"]
         rows = [[r.get("kind", ""), *_row(r)] for r in results]
+    if any("appstream" in r for r in results):
+        headers = [*headers[:-1], "APP", headers[-1]]
+        rows = [[*row[:-1], app_mark(r.get("appstream")), row[-1]] for row, r in zip(rows, results)]
     return table(headers, rows) + "\n" + _footer(doc)
 
 
@@ -141,7 +156,7 @@ _INFO_ORDER = [
     "channel",
     "rev",
 ]
-_SKIP = {"kind", "name", "description", "example", "default"}
+_SKIP = {"kind", "name", "description", "example", "default", "appstream"}
 
 
 def _value(v: Any) -> str:
@@ -172,7 +187,46 @@ def _block(rec: dict[str, Any]) -> str:
     w = max((len(k) for k in keys), default=0)
     for k in keys:
         lines.append(f"  {k.ljust(w)}  {_value(rec[k])}")
+    if isinstance(rec.get("appstream"), dict):
+        lines += _appstream_block(rec["appstream"])
     return "\n".join(lines)
+
+
+_FROM = {
+    "installed": "an installed output",
+    "store": "the locked nixpkgs' output in the store",
+    "search.nixos.org": "search.nixos.org's desktop data",
+    "curated": "nixin's list of well-known apps",
+}
+
+
+def _appstream_block(a: dict[str, Any]) -> list[str]:
+    """`info`'s AppStream part: what is known, where from, and why not more."""
+    gui = {True: "an application", False: "nothing to launch", None: "unknown"}[a.get("gui")]
+    src = _FROM.get(a.get("source") or "", "nothing found")
+    lines = [f"  appstream: {gui}, from {src}"]
+    icon = a.get("icon") or {}
+    shots = a.get("screenshots") or []
+    rows: list[tuple[str, Any]] = [
+        ("name", a.get("name")),
+        ("summary", a.get("summary")),
+        ("id", a.get("id")),
+        ("categories", a.get("categories")),
+        ("icon", icon.get("path") or icon.get("url") or icon.get("name")),
+        ("license", a.get("license")),
+        ("launchable", a.get("launchable")),
+        ("store path", a.get("store_path")),
+        ("for", a.get("installed_for")),
+        ("screenshots", [s.get("large") or s.get("url") for s in shots][:3]),
+    ]
+    rows = [(k, v) for k, v in rows if v not in (None, "", [])]
+    w = max((len(k) for k, _ in rows), default=0)
+    lines += [f"    {k.ljust(w)}  {_value(v)}" for k, v in rows]
+    if a.get("description"):
+        lines.append("    description:")
+        lines += [f"      {ln}" if ln else "" for ln in str(a["description"]).splitlines()]
+    lines += [f"    note: {n}" for n in a.get("notes") or []]
+    return lines
 
 
 def render_info(doc: dict[str, Any]) -> str:

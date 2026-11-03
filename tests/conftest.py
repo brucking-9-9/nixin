@@ -148,3 +148,19 @@ def es_transport(transport):
     )
     transport.add("POST", r"/_search$", fixture_file="es/empty.json")  # anything else: no hits
     return transport
+
+
+@pytest.fixture(autouse=True)
+def _no_local_appstream(monkeypatch):
+    """`info`'s AppStream lookup reads this machine's profiles and evaluates the config's
+    locked nixpkgs (/etc/nixos when nothing else is set). Unit tests see neither: no
+    profiles, no lock. tests/test_appstream.py drives those parts with its own fakes."""
+    from nixin import discovery
+    from nixin.appstream import installed, store
+
+    def no_nix(args, timeout, env=None):
+        raise store.StoreError("nix-missing", "unit tests run no nix")
+
+    monkeypatch.setattr(installed, "profiles", lambda home=None: [])
+    monkeypatch.setattr(discovery, "_locked_nixpkgs", lambda ns: ns.nixpkgs or None)
+    monkeypatch.setattr(store, "_nix", no_nix)

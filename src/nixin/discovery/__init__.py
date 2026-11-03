@@ -108,6 +108,12 @@ def register(sub: argparse._SubParsersAction) -> set[str]:
     sp.add_argument("query")
     sp.add_argument("--kind", choices=KINDS, default="pkg")
     sp.add_argument("--limit", type=int, default=DEFAULT_LIMIT, metavar="N")
+    sp.add_argument(
+        "--appstream",
+        action="store_true",
+        help="mark GUI applications (an `appstream` hint per package: search.nixos.org's "
+        "desktop data, else nixin's list of well-known apps; no nix)",
+    )
     _channel_flags(sp)
     _cache_flags(sp)
     sp.set_defaults(run=run_search)
@@ -115,6 +121,20 @@ def register(sub: argparse._SubParsersAction) -> set[str]:
     sp = sub.add_parser("info", help=VERBS["info"])
     sp.add_argument("name")
     sp.add_argument("--kind", choices=INFO_KINDS, default="all")
+    sp.add_argument(
+        "--appstream",
+        choices=("local", "fetch", "hint", "off"),
+        default="local",
+        help="a package's AppStream data: local (default; the installed or locked output "
+        "in the store, else search.nixos.org's hint), fetch (also substitute it when that "
+        "is cheap), hint (search.nixos.org only, no nix), off",
+    )
+    sp.add_argument(
+        "--config",
+        metavar="DIR",
+        help="the config flake whose locked nixpkgs --appstream evaluates "
+        "(default $NIXIN_CONFIG, else /etc/nixos)",
+    )
     _channel_flags(sp)
     _cache_flags(sp)
     sp.set_defaults(run=run_info)
@@ -305,7 +325,7 @@ def _search(ns: argparse.Namespace) -> dict[str, Any]:
             from . import nixos_search as es
 
             channel = es.resolve_channel(cache, _channel_name(ns))
-            return es.search(cache, query, kind, channel, ns.limit)
+            return es.search(cache, query, kind, channel, ns.limit, ns.appstream)
         if kind == "hm":
             from . import home_manager as hm
 
@@ -316,6 +336,10 @@ def _search(ns: argparse.Namespace) -> dict[str, Any]:
 
     doc = _merge(ns, _fan_out(ns, kinds, one))
     doc.update(query=query, kind=ns.kind, limit=ns.limit)
+    if ns.appstream:
+        from .. import appstream
+
+        appstream.mark(doc["results"])
     return doc
 
 
@@ -336,7 +360,7 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
 
             channel = es.resolve_channel(cache, _channel_name(ns))
             return (
-                es.info_package(cache, name, channel)
+                es.info_package(cache, name, channel, ns.appstream != "off")
                 if kind == "pkg"
                 else es.info_option(cache, name, channel)
             )
@@ -366,7 +390,37 @@ def _info(ns: argparse.Namespace) -> dict[str, Any]:
         if failed:
             message += "; not asked: " + ", ".join(failed)
         raise DiscoveryError("not-found", message)
+    if ns.appstream != "off":
+        _appstream(ns, cache, doc["results"])
     return doc
+
+
+def _locked_nixpkgs(ns: argparse.Namespace) -> str | None:
+    """The flakeref the AppStream lookup evaluates: --nixpkgs, else the config's lock."""
+    if ns.nixpkgs:
+        return ns.nixpkgs
+    from ..configrepo import ConfigRepo, NixinError
+
+    try:
+        lock = ConfigRepo.locate(getattr(ns, "config", None)).lock("nixpkgs")
+    except (NixinError, OSError, ValueError):
+        return None
+    return lock.flakeref if lock else None
+
+
+def _appstream(ns: argparse.Namespace, cache: Cache, results: list[dict[str, Any]]) -> None:
+    """Each package row's `appstream` object (appstream.for_package)."""
+    from .. import appstream
+
+    rows = [r for r in results if r.get("kind") == "pkg"]
+    if not rows:
+        return
+    flakeref = _locked_nixpkgs(ns) if ns.appstream in ("local", "fetch") else None
+    paths = appstream.installed.store_paths() if ns.appstream in ("local", "fetch") else {}
+    for r in rows:
+        r["appstream"] = appstream.for_package(
+            cache, r, mode=ns.appstream, flakeref=flakeref, base=r.get("appstream"), profiles=paths
+        )
 
 
 def _versions(ns: argparse.Namespace) -> dict[str, Any]:

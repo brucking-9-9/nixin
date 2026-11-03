@@ -25,13 +25,14 @@ import socket
 import sys
 import traceback
 
-from . import __version__, apply, discovery, gui, outdated, truth, tui, writer
+from . import __version__, apply, appstream, discovery, gui, outdated, truth, tui, writer
 
 VERBS: dict[str, tuple[str, str]] = {
     # verb: (layer, one-line help)
     "search": ("discovery", "search packages / options / programs; --kind filters"),
     "info": ("discovery", "details for one package or option"),
     "versions": ("discovery", "version history of a package (which nixpkgs rev shipped what)"),
+    "browse": ("appstream", appstream.VERBS["browse"]),
     "status": ("truth", "this host: lock rev, generation, counts, pending (unapplied) changes"),
     "where": ("truth", "where a package / option is declared in the config, with its value"),
     "list": ("truth", "the installed packages (system, Home Manager), where each is listed"),
@@ -83,6 +84,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="verb", metavar="VERB")
     discovery.register(sub)
+    appstream.register(sub)
     for verb, (_layer, help_) in VERBS.items():
         if verb in sub.choices:  # a layer registered it with its own arguments
             continue
