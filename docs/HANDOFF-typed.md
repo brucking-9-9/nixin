@@ -134,7 +134,10 @@ the box shared with other sessions.
 
 - `nix develop -c pytest`: 535 passed / 25 skipped without the UI tests, the TUI/GUI tests
   146 passed (run separately); `ruff check`, `ruff format --check`, `nix fmt -- --check`
-  clean. `nix build`: see the last section of this file.
+  clean. `nix build` at `3c342e1` (the code as it is; later commits are docs): 682
+  passed / 25 skipped in the sandbox (the `options.nix` module-system test ran there),
+  GUI self-test ok; the built `bin/nixin` answers `explain` and the `set … yes`
+  type-mismatch against `~/nixos`.
 - New tests: `test_writer.py` (73 type-check cases, mismatch/fits/force/no-check/
   describe/undo per verb, the nix reason), `test_truth.py` (where's docs fields,
   `option_info` modes, `literal_text`, `options.nix` on `lib.evalModules` +
