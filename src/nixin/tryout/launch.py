@@ -67,11 +67,16 @@ def child_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
 EXEC: Callable[..., Any] = os.execvpe
 
 
+def resolve(exe: str) -> str:
+    """exe looked up on nixin's own PATH (child_env's may have lost the directory)."""
+    return shutil.which(exe) or exe
+
+
 def handoff(argv: list[str]) -> None:
-    """exec argv (looked up on PATH) in place of nixin; returns only when EXEC is faked."""
+    """exec argv in place of nixin; returns only when EXEC is faked."""
     sys.stdout.flush()
     sys.stderr.flush()
-    EXEC(argv[0], argv, child_env())
+    EXEC(resolve(argv[0]), argv, child_env())
 
 
 def has_display(env: Mapping[str, str] | None = None) -> bool:
@@ -91,7 +96,7 @@ def _spawn(argv: list[str], *, log: Path | None) -> int:
         out = log.open("wb")
     try:
         p = subprocess.Popen(
-            argv,
+            [resolve(argv[0]), *argv[1:]],
             stdin=subprocess.DEVNULL,
             stdout=out,
             stderr=subprocess.STDOUT,

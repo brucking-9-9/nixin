@@ -1,0 +1,24 @@
+{
+ "available": true,
+ "broken": false,
+ "derivation": true,
+ "description": "Program which generates ASCII pictures of a cow with a message",
+ "found": true,
+ "insecure": false,
+ "license": [
+  "GPL-3.0-only"
+ ],
+ "main_program": "cowsay",
+ "name": "cowsay-3.8.4",
+ "out_paths": {
+  "man": "/nix/store/d2hrfpljkkv5djz1kdwp9i0srlq14sks-cowsay-3.8.4-man",
+  "out": "/nix/store/4lbicqd70qlfdw2l5wbq23c9qj1m5nww-cowsay-3.8.4"
+ },
+ "outputs": [
+  "out",
+  "man"
+ ],
+ "pname": "cowsay",
+ "unfree": false,
+ "version": "3.8.4"
+}

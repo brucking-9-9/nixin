@@ -1,0 +1,20 @@
+{
+ "available": false,
+ "broken": false,
+ "derivation": true,
+ "description": "Digital distribution platform",
+ "found": true,
+ "insecure": false,
+ "license": [
+  "unfreeRedistributable"
+ ],
+ "main_program": "steam",
+ "name": "steam-1.0.0.87",
+ "out_paths": null,
+ "outputs": [
+  "out"
+ ],
+ "pname": "steam",
+ "unfree": true,
+ "version": "1.0.0.87"
+}
