@@ -10,11 +10,12 @@ import json
 
 import pytest
 from textual.widgets import DataTable, TextArea
-from tui_fake import COWSAY, PACKAGES, FakeBackend, load, screen_text
+from tui_fake import COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
 
 from nixin.cli import main
 from nixin.tui.app import NixinApp
-from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, UpdateModal
+from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, SetOptionModal, UpdateModal
+from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
@@ -301,6 +302,96 @@ def test_update_documents():
 
 
 # --- the backend shim on the real handlers (no network, no nix: usage and config errors) --------
+
+
+def opt_rec(name: str, fixture: str = "options_search_openssh") -> dict:
+    return next(r for r in load(fixture)["results"] if r["name"] == name)
+
+
+def test_option_search_args_and_templates():
+    assert view.option_search_args("ssh", "hm", "stable") == [
+        "--kind",
+        "hm",
+        "--channel",
+        "stable",
+        "--limit",
+        "50",
+        "--",
+        "ssh",
+    ]
+    assert view.option_template("users.users.<name>.shell")
+    assert view.option_template("programs.git.includes.*.path")
+    assert view.option_placeholder("users.users.<name>.shell") == (12, 18)
+    assert view.option_placeholder("programs.git.includes.*.path") == (22, 23)
+    assert view.option_placeholder("services.openssh.enable") is None
+    assert not view.option_template("services.openssh.enable")
+
+
+def test_option_sections_nixos():
+    rec = opt_rec("services.openssh.enable")
+    where = load("options_where_openssh_enable")
+    option, about, host, declared = view.option_sections(rec, where, "mbp13", "opt")
+    assert [(f.label, f.value) for f in option.fields] == [
+        ("type", "boolean"),
+        ("default", "false"),
+        ("example", "—"),
+    ]
+    assert about.note.startswith("Whether to enable the OpenSSH secure shell daemon")
+    assert [(f.label, f.value) for f in host.fields] == [
+        ("value", "true"),
+        ("set in", "hosts/mbp13/default.nix:249  enable = true;"),
+    ]
+    assert declared.fields[0].value == "nixpkgs nixos/modules/services/networking/ssh/sshd.nix:247"
+    assert declared.fields[1].value.startswith("https://github.com/NixOS/nixpkgs/blob/0bb2eed")
+    assert declared.fields[-1].value == "search.nixos.org unstable@0bb2eedc"
+    assert view.option_cue(where, "opt", None) == view.Span("= true", "option")
+    assert view.option_prefill(rec, where, "opt", None) == "true"
+    # still evaluating, then the default from nixpkgs (mkOptionDefault: priority 1500)
+    assert view.option_host(None, "mbp13", "opt").note == "evaluating…"
+    ports = view.option_host(load("options_where_openssh_ports"), "mbp13", "opt")
+    assert [(f.label, f.value) for f in ports.fields] == [
+        ("value", "[ 22 ]"),
+        ("set in", "nixpkgs nixos/modules/services/networking/ssh/sshd.nix (the option's default)"),
+    ]
+
+
+def test_option_sections_home_manager():
+    rec = opt_rec("programs.git.lfs.enable", "options_search_hm_git")
+    where = load("options_where_hm_git_lfs")  # NixOS has programs.git.lfs.enable too
+    assert [s["scope"] for s in where["scopes"]] == ["nixos", "home"]
+    assert view.option_users(where) == ["brucking"]
+    _, _, host, declared = view.option_sections(rec, where, "19BK", "hm", "brucking")
+    assert [(f.label, f.value) for f in host.fields] == [
+        ("value", "true  [home brucking]"),
+        ("set in", "home/modules/git.nix:6  lfs.enable = true;"),
+    ]
+    assert declared.fields[0].value == "home-manager modules/programs/git.nix:273"
+    # the NixOS page sees the NixOS tree's value (the default) in the same document
+    assert view.option_value_text(where, "opt", None) == "false"
+    assert view.option_prefill(rec, where, "hm", "brucking") == "true"
+    assert [f.label for f in view.option_set_hint(rec)] == ["type", "example", "default"]
+    nobody = {**where, "scopes": where["scopes"][:1]}  # a host without HM users
+    assert (
+        view.option_host(nobody, "mbp13", "hm").note == "no Home Manager user of this host has it"
+    )
+    missing = {"ok": False, "error": {"code": "not-found", "message": "no option x.y on mbp13"}}
+    assert view.option_host(missing, "mbp13", "opt").note.startswith("not an option of mbp13")
+
+
+def test_option_prefill_never_writes_a_placeholder_back():
+    rec = {"name": "x.y", "default": '"text"'}
+
+    def where(value):
+        opt = {"name": "x.y", "option": "x.y", "value": value, "value_found": True}
+        return {"ok": True, "scopes": [{"scope": "nixos", "user": None, "options": [opt]}]}
+
+    assert view.option_prefill(rec, where(["a", 2]), "opt", None) == '[ "a" 2 ]'
+    assert view.option_prefill(rec, where({"a": True}), "opt", None) == "{ a = true; }"
+    for lossy in ("<derivation hello-2.12>", ["<function>"], "two\nlines", {"<…>": 3}):
+        assert view.option_prefill(rec, where(lossy), "opt", None) == '"text"'  # the default
+    assert view.option_prefill({"name": "x.y", "default": "{\n}"}, None, "opt", None) == ""
+    template = view.option_fields({"name": "users.users.<name>.shell", "type": "shell"})
+    assert template[-1].label == "path"
 
 
 def test_backend_runs_the_real_verb_handlers(tmp_path):
@@ -888,11 +979,12 @@ def test_page_keys_fold_into_one_group_on_a_phone():
         drive(script, PACKAGES, size=size)
         return out["text"]
 
-    assert "i Packages p Pending s Status" in footer(DESKTOP, [])
-    assert footer(PHONE, []).rstrip().endswith("? Keys  i p s go")
+    assert "i Packages o Options p Pending s Status" in footer(DESKTOP, [])
+    assert footer(PHONE, []).rstrip().endswith("? Keys  i o p s go")
     assert "esc Back t Updates q Quit" in footer(PHONE, ["i"])
     assert "t Installed" in footer(PHONE, ["i", "t"])
-    assert " i s go" in footer(PHONE, ["p"])  # the page you are on is left out
+    assert " i o s go" in footer(PHONE, ["p"])  # the page you are on is left out
+    assert footer(PHONE, ["o", "escape"]).rstrip().endswith("? Keys  i p s go")
 
 
 def test_screenshots_export_at_both_sizes():
@@ -905,3 +997,196 @@ def test_screenshots_export_at_both_sizes():
             assert "#120b10" in svg.lower()  # the theme's background
 
         drive(script, size=size)
+
+
+# --- the Options page: search NixOS / Home Manager options, details, set, unset ----------------
+
+
+async def open_options(app, pilot, *keys: str):
+    await pilot.press("escape", *(keys or ("o",)))  # out of the query box first
+    await settle(app, pilot)
+    assert isinstance(app.screen, OptionsScreen)
+    return app.screen
+
+
+async def pick_option(app, pilot, screen, name: str):
+    """Move the cursor to `name` in the results and open it."""
+    rows = [h.target for h in screen.hits]
+    await pilot.press(*["down"] * rows.index(name), "enter")
+    await settle(app, pilot)
+    assert isinstance(app.screen, OptionScreen) and app.screen.hit.target == name
+    return app.screen
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_options_search_details_set_then_pending(size):
+    async def script(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        assert screen.query_one("#op-query").has_focus
+        assert "type to search NixOS options" in screen_text(app)
+        await pilot.press(*"openssh", "enter")
+        await settle(app, pilot)
+        table = screen.query_one("#op-table", DataTable)
+        assert table.row_count == 12 and table.has_focus
+        cols = [str(c.key.value) for c in table.columns.values()]
+        assert cols == (["name", "detail"] if size == PHONE else ["name", "detail", "description"])
+        assert screen.query_one("#op-preview", Line).value == "OpenSSH package to use for sshd."
+        assert screen.query_one("#op-source", Line).value.startswith(
+            "12 result(s) · search.nixos.org unstable@0bb2eedc"
+        )
+        fits(app)
+        details = await pick_option(app, pilot, screen, "services.openssh.enable")
+        text = screen_text(app)
+        assert "= true" in text and "Set (e)" in text and "home:" not in text
+        assert "hosts/mbp13/default.nix:249" in details.query_one("#op-host", Fields).text
+        assert "sshd.nix:247" in details.query_one("#op-declared", Fields).text
+        assert "secure remote logins" in details.query_one("#op-about", Fields).text
+        fits(app)
+        await pilot.press("e")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, SetOptionModal)
+        assert modal.query_one("#value").value == "true"  # the value on mbp13
+        assert "type boolean" in modal.query_one("#set-hint", Fields).text
+        await pilot.press(*["backspace"] * 4, *"false", "enter")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+        assert "+    enable = false;" in screen_text(app)
+        await pilot.press("w")
+        await settle(app, pilot)
+        assert app.screen is details  # where again: the new value
+        assert "= false" in screen_text(app)
+        assert app.writes == ["services.openssh.enable = false (hosts/mbp13/default.nix)"]
+        await pilot.press("p")
+        await settle(app, pilot)
+        assert isinstance(app.screen, PendingScreen)
+        assert "hosts/mbp13/default.nix" in app.screen.query_one("#pending", Fields).text
+        assert "services.openssh.enable = false" in app.screen.query_one("#session", Fields).text
+        await pilot.press("escape", "escape")
+        await settle(app, pilot)
+        assert app.screen is screen and table.row_count == 12  # the results stay
+
+    _, fake = drive(script, OPTIONS, size=size)
+    assert fake.verbs() == [
+        ["search", "--kind", "opt", "--channel", "unstable", "--limit", "50", "--", "openssh"],
+        ["where", "services.openssh.enable", "--kind", "option"],
+        ["set", "services.openssh.enable", "false", "--dry-run"],
+        ["set", "services.openssh.enable", "false"],
+        ["where", "services.openssh.enable", "--kind", "option"],
+        ["status"],
+    ]
+
+
+def test_options_unset_and_the_page_kept():
+    async def script(app, pilot, fake):
+        screen = await open_options(app, pilot, "ctrl+right_square_bracket")  # ctrl+5, legacy
+        await pilot.press(*"openssh", "enter")
+        await settle(app, pilot)
+        await pick_option(app, pilot, screen, "services.openssh.enable")
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+        assert "-    enable = true;" in screen_text(app)
+        await pilot.press("w")
+        await settle(app, pilot)
+        assert app.writes == ["-services.openssh.enable (hosts/mbp13/default.nix)"]
+        await pilot.press("escape", "escape", "slash")  # Options is popped: Search
+        await settle(app, pilot)
+        await pilot.press("escape", "o")  # a new Options page: the query and results kept
+        await settle(app, pilot)
+        again = app.screen
+        assert isinstance(again, OptionsScreen) and again is not screen
+        assert again.query_one("#op-query").value == "openssh"
+        assert again.query_one("#op-table", DataTable).row_count == 12
+
+    _, fake = drive(script, OPTIONS)
+    verbs = fake.verbs()
+    assert [v[0] for v in verbs] == ["search", "where", "unset", "unset", "where"]
+    assert verbs[2] == ["unset", "services.openssh.enable", "--dry-run"]
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_options_home_manager_for_a_user(size):
+    async def script(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        await pilot.press(*"git", "enter")
+        await settle(app, pilot)
+        await pilot.press("k")  # Home Manager options: the same query again
+        await settle(app, pilot)
+        assert "Home Manager (k)" in screen_text(app)
+        assert screen.query_one("#op-table", DataTable).row_count == 12
+        details = await pick_option(app, pilot, screen, "programs.git.lfs.enable")
+        assert details.user == "brucking"  # the user whose tree has it (where)
+        text = screen_text(app)
+        assert "home: brucking (h)" in text and "[home brucking]" in text
+        assert "home/modules/git.nix:6" in details.query_one("#op-host", Fields).text
+        fits(app)
+        await pilot.press("e")
+        await settle(app, pilot)
+        modal = app.screen
+        assert modal.query_one("#value").value == "true"
+        assert "example true" in modal.query_one("#set-hint", Fields).text
+        await pilot.press(*["backspace"] * 4, *"false", "enter")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+
+    _, fake = drive(script, HM_OPTIONS, size=size, host="19BK")
+    assert fake.verbs()[1][:3] == ["search", "--kind", "hm"]
+    assert fake.verbs()[-1] == [
+        "set",
+        "programs.git.lfs.enable",
+        "false",
+        "--home",
+        "brucking",
+        "--dry-run",
+    ]
+
+
+def test_options_home_manager_without_users_and_templates():
+    async def script(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        await pilot.press(*"openssh", "enter")
+        await settle(app, pilot)
+        name = "users.users.<name>.openssh.authorizedKeys.keys"
+        details = await pick_option(app, pilot, screen, name)
+        assert "a template" in details.query_one("#op-host", Fields).text  # no where for it
+        assert details.query_one("#op-unset").disabled
+        await pilot.press("e")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, SetOptionModal) and modal.query_one("#option").has_focus
+        await pilot.press("enter", *'[ "ssh-ed25519 AAAA" ]', "enter")  # still <name>: refused
+        await settle(app, pilot)
+        assert app.screen is modal and modal.query_one("#option").has_focus
+        await pilot.press(*"master", "enter", "enter")  # <name> was selected again
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal)
+        await pilot.press("escape", "escape", "k")  # Home Manager on mbp13: nobody has HM
+        await settle(app, pilot)
+
+    hm_nobody = {**load("options_where_hm_git_lfs"), "host": "mbp13"}
+    hm_nobody["scopes"] = hm_nobody["scopes"][:1]
+    _, fake = drive(script, OPTIONS)
+    assert ["where", "users.users.<name>.openssh.authorizedKeys.keys", "--kind", "option"] not in (
+        fake.verbs()
+    )
+    assert fake.verbs()[-2] == [
+        "set",
+        "users.users.master.openssh.authorizedKeys.keys",
+        '[ "ssh-ed25519 AAAA" ]',
+        "--dry-run",
+    ]
+
+    async def nobody(app, pilot, fake):
+        screen = await open_options(app, pilot)
+        await pilot.press("k", *"git", "enter")
+        await settle(app, pilot)
+        details = await pick_option(app, pilot, screen, "programs.git.lfs.enable")
+        assert details.user is None
+        assert "no Home Manager user of this host has it" in screen_text(app)
+        await pilot.press("e")  # refused: no user to write for
+        await settle(app, pilot)
+        assert app.screen is details
+
+    _, fake = drive(nobody, {**HM_OPTIONS, "where": hm_nobody})
+    assert not [v for v in fake.verbs() if v[0] == "set"]

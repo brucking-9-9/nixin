@@ -123,6 +123,44 @@ Screen.-narrow #up-notes {
     max-height: 2;
 }
 
+/* --- options: search NixOS / Home Manager options */
+
+#op-bar {
+    height: 1;
+    margin: 0 1;
+}
+#op-query {
+    width: 1fr;
+    border: none;
+    background: $background;
+}
+#op-query:focus {
+    background: $boost;
+}
+#op-kind {
+    width: auto;
+    margin-left: 1;
+}
+
+#op-table {
+    height: 1fr;
+    margin: 0 1;
+    background: $background;
+    scrollbar-size-vertical: 1;
+}
+
+#op-preview {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+    border-top: hkey $panel;
+}
+#op-source {
+    height: auto;
+    max-height: 2;
+    padding: 0 1;
+}
+
 /* --- details, pending, apply, status */
 
 #details-title {
