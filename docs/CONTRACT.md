@@ -1025,6 +1025,10 @@ through `apply` (after `apply --dry-run` and a confirmation). The Packages page 
 `list` (one call, every scope; its filter and for-whom toggle narrow the loaded rows with
 `--filter`/`--scope` semantics, so they cost nothing) and `outdated` (lock mode, or
 `--published`); both documents are kept until a write or an `update` makes them stale.
+Try (Details, `t`) runs `try PKG --build-only` (with `--program NAME` once one is picked
+from an `ambiguous-program`) and then starts a graphical app detached (its own session,
+output to `$XDG_CACHE_HOME/nixin/try/<program>.log`) when the terminal has a display;
+otherwise it shows the `command` and `shell_command` to copy. It installs nothing.
 
 Under `--json`, or when stdin or stderr is not a terminal (Textual draws on stderr, so
 `nixin tui 2>file` would show nothing), it is a `usage` error (exit 2). When the person
@@ -1033,9 +1037,9 @@ not applied yet (nixin plan, nixin apply)`, `nixin tui: applied: generation 113`
 exits 0. While it runs it sets `GIT_TERMINAL_PROMPT=0` (unless already set) so a git
 fetch cannot prompt on the terminal it owns.
 
-Costs: whatever the verbs it calls cost (see each verb). `plan` and `apply` run in human
-mode under the TUI so that nix's build output and nixos-rebuild's log stream into its log
-view; the document is the same apart from `message`.
+Costs: whatever the verbs it calls cost (see each verb). `plan`, `apply` and `try` run in
+human mode under the TUI so that nix's build output and nixos-rebuild's log stream into its
+log view; the document is the same apart from `message`.
 
 ### `gui`
 
@@ -1049,7 +1053,12 @@ the same verb handlers in-process, on a thread pool, and renders their documents
 the same view-model (`nixin.ui.view`). It writes only through `add`/`rm`/`set`/`unset`
 (after showing their `--dry-run` diff in a dialog) and `update` (after `update --dry-run`
 in a dialog), and switches only through `apply` (after `apply --dry-run` and a
-confirmation). Its Packages page uses `list` and `outdated` as the TUI's does.
+confirmation). Its Packages page uses `list` and `outdated` as the TUI's does. Try (the
+details pane) runs `try PKG --build-only` as the TUI does, then starts a graphical app
+detached, or opens a CLI program's `command` in the person's terminal (`$TERMINAL -e`,
+else the first of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal,
+xfce4-terminal, xterm on PATH), held open until Enter; "Shell in terminal" opens
+`shell_command` there.
 
 Under `--json` it is a `usage` error, and so it is without a display (none of
 `WAYLAND_DISPLAY`, `DISPLAY`, `QT_QPA_PLATFORM` set). `--self-test` loads the window,
@@ -1064,7 +1073,7 @@ apply)`), and exits 0; if a verb is still running it waits for it first. It sets
 Costs: whatever the verbs it calls cost. It loads nothing on start (no `status`): search
 and its details (`info`, `versions`, `where`) when asked, `status` when Pending or
 Status is opened or the Home Manager users are needed, `list` when Packages is opened,
-`outdated` when its Updates tab is. `plan` and `apply` run in human
+`outdated` when its Updates tab is. `plan`, `apply` and `try` run in human
 mode, as under `tui`, so their logs stream into the window.
 
 ## Error codes
@@ -1131,6 +1140,10 @@ The `history`/`rollback` rows and the boot check are from 2026-11-02 on mbp13 (l
 the real workspace and `/etc/nixos`: one cowsay apply (gen 121: 101 s, build 72 s,
 switch 30 s) and the rollback to gen 120.
 
+The `try` rows are from 2026-11-02 on mbp13, quiet (load 0.5–0.8), from the tree with
+`--json` against `~/nixos`'s lock (nixpkgs 3ec6363, its source in the store), nix's eval
+cache warm for that commit. Peak RSS is the largest of nixin and its nix children.
+
 The `outdated` rows are from 2026-11-02 on mbp13, quiet (load 0.4–0.7), against `~/nixos`
 (lock nixpkgs 3ec6363, target nixos-unstable 0bb2eed): nixin's cache empty, nix's own
 fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too (load 2.4).
@@ -1164,9 +1177,12 @@ fetcher cache warm unless said otherwise. The 65 s run had nix's cache empty too
 | `sync` | yes (the remote) | git | workspace refs | 1.3 s fetch from GitHub; 0.4 s push to a local bare repo | — | — |
 | `outdated` | GitHub via nix (the target branch head; the nixpkgs tarball once per new commit) | 2 package-list evals + `nix flake metadata` | cache | **4.3 s** mbp13, **6.0 s** 19BK (evals 1.9 + 2.0 s, 2.7 + 3.0 s); **65 s** when the target is a commit nix has not fetched (the tarball: resolve 58 s) | 0.37 s (`--refresh`: 4.4 s, the branch re-asked) | 410 MiB mbp13, 540 MiB 19BK |
 | `outdated --published` | yes (search.nixos.org: 3–6 queries) | the lock-side eval only (shared with lock mode) | cache | 1.1–1.2 s with the eval cached, 1–3 s for the queries; + 2–3 s for a cold eval | 0.33 s | 43 MiB (+ the eval's) |
+| `try --json` | the binary cache, through nix, for what is not in the store | probe eval, `nix build`, `nix path-info` | nix store (unrooted) | **0.95 s** when it is in the store (cowsay: probe 0.6 s, build 0.1 s); 2.3 s for one 0.7 MiB path (toilet); 5.8 s for gnome-calculator (3 paths, 2.3 MiB; its first probe 2.8 s); **16.5 s** when nix builds (lolcat: 2 derivations, 8 paths, 13 MiB) | — (no nixin cache) | 105–206 MiB |
+| `try` not-found | — | the probe | — | 0.5 s (with the suggestions) | — | 105 MiB |
 
 nixin streams no progress under `--json` (in human mode `plan`/`apply` tee nix's build
-output and nixos-rebuild's log to stderr). A UI should run the slow verbs (`search
+output and nixos-rebuild's log to stderr; `try` lets nix draw its progress bar on a terminal
+and tees its lines otherwise). A UI should run the slow verbs (`search
 --nixpkgs` on a new rev, cold `status`, `status --full`, `plan`, `apply`) in the
 background with a spinner and say up front that they can take minutes (a kernel change
 in `plan`: hours). `status` reports `timings` and `cache.hits`/`misses`.

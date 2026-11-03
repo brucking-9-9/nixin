@@ -18,8 +18,10 @@ Nothing is launched: launch.SPAWN is replaced by a recorder.
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pytest
+from conftest import live
 from textual.widgets import OptionList, TextArea
 from tui_fake import COWSAY, FakeBackend, load, screen_text
 
@@ -241,3 +243,35 @@ def test_tui_try_screenshots(spawned):
 
     for size in (PHONE, DESKTOP):
         drive(script, size=size)
+
+
+# --- live (NIXIN_LIVE=1, against $NIXIN_CONFIG; builds `hello` into the store) ----------------
+
+
+@live
+def test_live_tui_try_streams_a_real_build(monkeypatch):
+    import socket
+
+    from nixin.ui.backend import Backend
+
+    monkeypatch.setattr(launch, "SPAWN", lambda argv, *, log: 1)
+
+    async def script(app, pilot, _):
+        app.push_screen(TryScreen("hello"))
+        await pilot.pause(0.1)
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        screen = app.screen
+        assert screen.doc and screen.doc["ok"], screen.doc
+        assert screen.query_one("#try-head", Line).value.startswith("ready: hello ")
+        cmds = screen.query_one("#commands", TextArea).text.splitlines()
+        assert cmds[0].startswith("nix run github:") and cmds[0].endswith("#hello")
+
+    backend = Backend(host=socket.gethostname(), config=os.environ.get("NIXIN_CONFIG"))
+    app = NixinApp(backend)
+
+    async def go():
+        async with app.run_test(size=DESKTOP) as pilot:
+            await script(app, pilot, None)
+
+    asyncio.run(go())

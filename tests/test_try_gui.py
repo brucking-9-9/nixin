@@ -16,6 +16,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 pytest.importorskip("pytestqt")
 
+from conftest import live
 from PySide6.QtGui import QGuiApplication
 from test_gui import click, open_details, settle, shown, ui  # noqa: F401
 from tui_fake import COWSAY, load
@@ -141,3 +142,29 @@ def test_gui_try_waits_for_a_running_plan(ui, spawned):
     u.gui.trying.start("cowsay")
     settle(u)
     assert not u.gui.trying["open"] and ["try", "cowsay", "--build-only"] not in u.fake.verbs()
+
+
+@live
+def test_live_gui_try_streams_a_real_build(qapp, qtbot, monkeypatch):
+    """The real verb handler on the pool, nix's lines through the stderr router."""
+    import socket
+
+    from nixin.gui.app import Window
+    from nixin.gui.bridge import Gui
+    from nixin.ui.backend import Backend
+
+    seen: list[list[str]] = []
+    monkeypatch.setattr(launch, "SPAWN", lambda argv, *, log: seen.append(argv) or 1)
+    gui = Gui(Backend(host=socket.gethostname(), config=os.environ.get("NIXIN_CONFIG")))
+    win = Window(gui)
+    try:
+        gui.trying.start("hello")
+        qtbot.waitUntil(lambda: gui.idle, timeout=600_000)
+        t = gui.trying
+        assert t["phase"] == "done", (t["noticeCode"], t["noticeMessage"])
+        assert t["commands"].startswith("nix run github:")
+        assert seen or "no terminal" in t["note"]
+    finally:
+        gui.pool.waitForDone()
+        win.close()
+        gui.close()
