@@ -101,7 +101,7 @@ in
         unitConfig.ConditionUser = mkIf (cfg.user != null) cfg.user;
         timerConfig = {
           OnCalendar = cfg.outdated.interval;
-          OnBootSec = "10min";
+          OnStartupSec = "10min"; # after the user manager starts: OnBootSec would fire at a late login
         };
       };
     })
@@ -122,7 +122,7 @@ in
         wantedBy = [ "timers.target" ];
         unitConfig.ConditionUser = mkIf (cfg.user != null) cfg.user;
         timerConfig = {
-          OnBootSec = "3min";
+          OnStartupSec = "3min";
           OnUnitActiveSec = cfg.pending.interval;
         };
       };

@@ -206,3 +206,19 @@ def test_nixin_runs_the_verb_in_process(monkeypatch):
     doc = state.nixin("status", "--config", "/tmp/x")
     assert doc["ok"] and doc["verb"] == "status" and seen == {"verb": "status", "json": True}
     assert state.nixin("frobnicate")["error"]["code"] == "usage"
+
+
+@pytest.mark.parametrize(
+    "argv", [["--help"], ["outdated", "--help"], ["status", "-h"], ["report", "--help"]]
+)
+def test_help_prints_usage_and_runs_nothing(sd, fake, capsys, argv):
+    # a review lane's `nixin-state outdated --help` ran the job and notified at 01:53
+    assert state.main(argv) == 0
+    out = capsys.readouterr().out
+    assert "nixin-state outdated [--timeout MS]" in out
+    assert fake.calls == [] and fake.notes == [] and not (sd / "summary.json").exists()
+
+
+def test_unknown_subcommand_is_usage(sd, fake, capsys):
+    assert state.main(["frobnicate"]) == 2
+    assert "nixin-state status" in capsys.readouterr().err and fake.calls == []

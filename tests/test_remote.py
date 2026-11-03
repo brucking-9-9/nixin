@@ -75,6 +75,7 @@ class Other:
         self.ws = self.home / workspace.removeprefix("~/")
         self.ssh_calls: list[list[str]] = []
         self.unreachable = False
+        self.drop = False  # the connection drops once the switch (step 3/3) has started
         # the hub, with the workspace's history; the workspace tracks it
         subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(m.hub)], check=True)
         git(m.ws, "remote", "add", "origin", str(m.hub))
@@ -116,6 +117,9 @@ class Other:
         assert kw.get("tty") is True and kw.get("stream") == "all", kw
         if self.unreachable:
             return proc.Proc(argv, 255, "", "ssh: connect to host otherbox port 22: No route\n")
+        if self.drop:
+            log = "".join(f"[nixin] {i}/3 step {i}\n" for i in (1, 2, 3))
+            return proc.Proc(argv, 255, "", log + "Connection to otherbox closed by remote host.\n")
         env = {**os.environ, "HOME": str(self.home), "PATH": f"{self.bin}:{os.environ['PATH']}"}
         p = subprocess.run(
             ["sh", "-c", argv[3]],  # what the login shell on the other host does with it
@@ -338,6 +342,13 @@ def test_remote_failures(m, o, capsys):
     assert err["committed"] == err["pushed"] == o.head(m.ws) == o.head(m.hub)
     assert err["remote_steps_started"] == [] and err["privileged_commands"] == []
     o.unreachable = False
+    # the session was up and dropped during the switch: not "is it reachable?"
+    o.drop = True
+    err = human(capsys, m, "apply")["error"]
+    assert err["code"] == "ssh-failed" and err["remote_steps_started"] == ["1/3", "2/3", "3/3"]
+    assert "dropped" in err["message"] and "after step 3/3" in err["message"]
+    assert f"pushed {o.head(m.ws)[:7]}" in err["message"] and "reachable" not in err["message"]
+    o.drop = False
     # the other host's workspace is on another branch
     git(o.ws, "checkout", "-q", "-b", "elsewhere")
     d = human(capsys, m, "apply")

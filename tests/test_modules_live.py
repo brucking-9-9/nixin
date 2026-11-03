@@ -68,7 +68,7 @@ def test_nixos_module(facts):
 def test_nixos_module_switches(facts):
     n = facts["nixos"]
     t = n["timers"]
-    assert t["outdated"] == {"OnBootSec": "10min", "OnCalendar": "*-*-* 09:00:00"}
+    assert t["outdated"] == {"OnCalendar": "*-*-* 09:00:00", "OnStartupSec": "10min"}
     assert t["outdatedExec"].endswith(
         "/bin/nixin-state outdated --timeout 30000 --quiet-hours 23-8"
     )
@@ -105,7 +105,7 @@ def test_home_module(facts):
     assert h["git"]["declarations"][0]["file"] == "modules/programs/git.nix"
     assert h["colour"]["type"] == 'one of "cyan", "pink"'
     assert h["enable"]["declarations"][0]["source"] == "nixin"
-    assert h["timer"] == {"OnBootSec": "10min", "OnCalendar": "*-*-* 09:00:00"}
+    assert h["timer"] == {"OnCalendar": "*-*-* 09:00:00", "OnStartupSec": "10min"}
     assert h["exec"] == [h["exec"][0]] and h["exec"][0].endswith("nixin-state outdated --no-notify")
     assert h["status"] is False
 

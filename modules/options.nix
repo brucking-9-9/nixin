@@ -81,7 +81,7 @@ in
       type = types.str;
       default = "*-*-* 09:00:00";
       example = "weekly";
-      description = "When the check runs (systemd OnCalendar), and 10 minutes after boot.";
+      description = "When the check runs (systemd OnCalendar), and 10 minutes after the user's service manager starts (login).";
     };
     notify = mkOption {
       type = types.bool;

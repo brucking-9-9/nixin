@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -576,6 +577,20 @@ def test_render_through_real_nixfmt_is_stable():
     assert text == Tools().fmt(text)[0]
     assert "    pkgs.cowsay\n    pkgs.python3Packages.requests\n" in text
     assert "  a.b = true;\n" in text
+
+
+def test_tools_time_out_instead_of_hanging(tmp_path, monkeypatch):
+    from nixin.writer import state
+
+    for name in ("nix-instantiate", "nixfmt"):
+        exe = tmp_path / name
+        exe.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(30)\n")
+        exe.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr(state, "TOOL_TIMEOUT", 0.2)
+    assert "did not finish" in Tools().parse("{ }")
+    text, why = Tools().fmt("{ }")
+    assert text == "{ }" and "did not finish" in why
 
 
 # --- the value check, with the real parser -----------------------------------------------

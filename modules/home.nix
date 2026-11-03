@@ -105,7 +105,7 @@ in
         Unit.Description = "nixin outdated check";
         Timer = {
           OnCalendar = cfg.outdated.interval;
-          OnBootSec = "10min";
+          OnStartupSec = "10min"; # after the user manager starts: OnBootSec would fire at a late login
         };
         Install.WantedBy = [ "timers.target" ];
       };
@@ -126,7 +126,7 @@ in
       systemd.user.timers.nixin-status = {
         Unit.Description = "nixin pending refresh";
         Timer = {
-          OnBootSec = "3min";
+          OnStartupSec = "3min";
           OnUnitActiveSec = cfg.pending.interval;
         };
         Install.WantedBy = [ "timers.target" ];

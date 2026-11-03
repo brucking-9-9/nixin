@@ -341,6 +341,16 @@ def _failure(p, r, ctx, head, hub, mode, progress) -> NixinError:
                 "sides' lines if git asks)"
             )
         return _err(code, f"{text}:\n{p.tail(12)}", step=step, **progress)
+    started = progress["remote_steps_started"]
+    if p.rc == 255 and started:  # the session was up: the connection dropped mid-way
+        return _err(
+            "ssh-failed",
+            f"the connection to {r.host} dropped (ssh exit 255) after step {started[-1]} had "
+            f"started (pushed {head[:7]}): {r.host} may have pulled it, or be switching to it; "
+            f"look there (nixos-rebuild list-generations, nixin status) before applying "
+            f"again:\n{p.tail(6)}",
+            **progress,
+        )
     if p.rc == 255:
         return _err(
             "ssh-failed",

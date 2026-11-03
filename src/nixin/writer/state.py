@@ -26,6 +26,7 @@ from .workspace import GENERATED_DIR, HEADER, Workspace
 STATE_FILE = f"{GENERATED_DIR}/state.json"
 STATE_VERSION = 1
 LIST_OPTION = {"nixos": "environment.systemPackages", "home": "home.packages"}
+TOOL_TIMEOUT = 60.0  # nix-instantiate --parse and nixfmt answer in well under a second
 
 
 def generated_file(kind: str, name: str) -> str:
@@ -110,13 +111,22 @@ class Tools:
     """nix-instantiate --parse and nixfmt; tests replace this with a fake."""
 
     def parse(self, text: str) -> str | None:
-        """None if `text` parses as Nix, else nix's error message."""
+        """None if `text` parses as Nix, else nix's error message (or that it timed out: a
+        hung tool must not hang `set`/`add` and the TUI/GUI job running them)."""
         exe = shutil.which("nix-instantiate")
         if exe is None:
             raise NixinError("nix-missing", "`nix-instantiate` is not on PATH")
-        proc = subprocess.run(
-            [exe, "--parse", "-"], input=text, capture_output=True, text=True, check=False
-        )
+        try:
+            proc = subprocess.run(
+                [exe, "--parse", "-"],
+                input=text,
+                capture_output=True,
+                text=True,
+                timeout=TOOL_TIMEOUT,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return f"nix-instantiate --parse did not finish in {TOOL_TIMEOUT:.0f}s"
         if proc.returncode == 0:
             return None
         return trim_nix_error(proc.stderr) or f"nix-instantiate exited {proc.returncode}"
@@ -126,7 +136,20 @@ class Tools:
         exe = shutil.which("nixfmt")
         if exe is None:
             return text, "nixfmt is not on PATH; generated files are not formatted"
-        proc = subprocess.run([exe, "-"], input=text, capture_output=True, text=True, check=False)
+        try:
+            proc = subprocess.run(
+                [exe, "-"],
+                input=text,
+                capture_output=True,
+                text=True,
+                timeout=TOOL_TIMEOUT,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                text,
+                f"nixfmt did not finish in {TOOL_TIMEOUT:.0f}s; generated files are not formatted",
+            )
         if proc.returncode != 0:
             return text, f"nixfmt failed: {proc.stderr.strip()[:300]}"
         return proc.stdout, None

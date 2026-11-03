@@ -1,7 +1,7 @@
 """The CLI starts light: building the parser and running a verb that needs neither never
 imports the UI toolkits (Textual, PySide6), the HTTP stack (requests is imported on
 first use by discovery) or a thread pool (concurrent.futures brings logging: outdated and
-explain import it where they use it). Run in a fresh interpreter, since this test process
+explain import it where they use it) or the AppStream layer's parsers (xml.etree). Run in a fresh interpreter, since this test process
 has imported all of them."""
 
 from __future__ import annotations
@@ -11,7 +11,17 @@ import os
 import subprocess
 import sys
 
-HEAVY = ["PySide6", "shiboken6", "textual", "rich", "requests", "urllib3", "concurrent", "logging"]
+HEAVY = [
+    "PySide6",
+    "shiboken6",
+    "textual",
+    "rich",
+    "requests",
+    "urllib3",
+    "concurrent",
+    "logging",
+    "xml",  # the AppStream parsers: browse, info and search --appstream import them on use
+]
 
 CODE = """
 import json, sys

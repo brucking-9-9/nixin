@@ -32,6 +32,7 @@ nixin --version | --help | VERB --help
 | `outdated` | outdated | what a nixpkgs lock update would change for a host (two package-list evals); `--published`: installed versions against a search.nixos.org channel |
 | `update` | outdated | take it: move the nixpkgs input in the workspace's `flake.lock` (the command `outdated` prints); no build, no switch |
 | `try` | try | build a package from the host's locked nixpkgs into the store without installing it, then run it (`nix run`) or a shell with it (`nix shell`); `--json`: build and report only |
+| `doctor` | doctor | read-only health check of this machine: option indexes, the timers and their state, the trees, hosts.toml over ssh (`--full`), the hand-installed secrets the config names, /boot, failed units |
 
 - `--json` and `--host H` are global. They go before the verb, or after it, in any order
   with the verb's own flags (`nixin where kitty --host 19BK --json`).
@@ -994,7 +995,8 @@ at the pushed commit afterwards; root's pull failed, e.g. a wrong password. When
 uncommitted `installer/history.jsonl` lines block the pull the message says how to set
 them aside), `authoritative-diverged` (root's pull cannot fast-forward), `switch-failed`
 (nixos-rebuild failed; both trees are at the pushed commit), `ssh-failed` (no `ssh`, no
-connection: exit 255, or the session ended otherwise). Before anything runs: `needs-tty`,
+connection: exit 255, or the session ended otherwise; exit 255 after a step started says
+the connection dropped and which step, not "is H reachable"). Before anything runs: `needs-tty`,
 `push-failed` (no remote), `invalid-hosts-config`. A dropped connection during the
 switch leaves the switch to nixos-rebuild on H.
 
@@ -1212,6 +1214,71 @@ Errors: `usage` (a positional argument, `--keep` below 1, `--older-than` below 0
 Costs: `history`'s reads, `/boot/loader/entries` (when readable), and one `nix path-info
 --closure-size` for the store paths it has not sized before. A closure never changes, so
 the sizes are cached by store path (see [Caches](#caches)).
+
+### `doctor`
+
+```
+nixin doctor [--full] [--config DIR] [--authoritative DIR]
+```
+
+One read-only health check of this machine: what the modules, the timers and the apply
+verbs assume. Nothing is written (not even the state directory), nothing prompts, nix
+is not evaluated: files are stat'ed or parsed, git and `systemctl` only read. Without
+`--full` it is local and takes well under 2 s (27 ms on mbp13); `--full` adds the
+network: `git ls-remote` of the workspace's upstream (5 s, ssh in BatchMode) and `ssh -o
+BatchMode=yes -o ConnectTimeout=5 DEST true` to each other host in `hosts.toml`, up to 8
+at a time. `--config` is the workspace (`$NIXIN_CONFIG`, else `~/nixos` when it is a git
+checkout, else the authoritative tree), `--authoritative` as for `apply`. `--host`, when
+given, must be this machine (`host-not-local`).
+
+Result: `checks[]`, each `{name, ok, detail, fix}`. `ok` is `true` (fine), `false`
+(broken, or will break a switch) or `null` (could not tell, or information: never a
+failure). `fix` is the one command to run, or null. `healthy` (no `ok: false`),
+`failed[]` (their names), `unknown` (how many are null), `full`, `workspace`,
+`authoritative`, `elapsed_ms`. A finding is not an error: `ok` stays true and the exit
+code 0; a UI shows `healthy`.
+
+| name | ok false when | null when |
+|---|---|---|
+| `index.nixos`, `index.home` | the file is there but unreadable, built for another host, from a generation that is not the running one (HM: not the active one), or from another nixpkgs revision than the authoritative `flake.lock` (the lock moved since the switch) | absent: the module is not in use; `NIXIN_NO_INDEX` |
+| `timer.nixin-outdated`, `timer.nixin-status` | the timer is not enabled or not active; the service's last run did not succeed (`systemctl --user show` `Result`, `ExecMainStatus`; `detail` has `ExecMainExitTimestamp`) | not installed; no user manager |
+| `state.files` | a `*.json` in the state directory does not parse | the directory is not there |
+| `state.summary` | `summary.json` has `errors` (a failed nixin run inside the timer, which still exits 0), or is more than 2 days old | no `summary.json` yet |
+| `tree.dirty` | — | the workspace has uncommitted files |
+| `tree.authoritative` | it is not a git checkout, or its HEAD is not in the workspace's history (`apply` cannot fast-forward it) | the workspace is ahead (commits to apply), or the commit was never fetched into it |
+| `tree.lock` | — | the two `flake.lock` differ (`detail` names the inputs), or one is missing |
+| `tree.hub` | the hub has commits the workspace lacks | without `--full`; no upstream; offline or unreachable (`unknown`); the workspace is ahead |
+| `tree.workspace` | — | the workspace is not a git checkout (the only tree row then) |
+| `host.H` | `ssh` failed (the last stderr line) | without `--full` |
+| `hosts` | `hosts.toml` does not parse | — |
+| `secret PATH` | PATH does not exist | the user cannot look into its directory |
+| `secrets` | — | (`ok: true`: the config names no such file) |
+| `boot.space` | /boot's free space is below the biggest generation's kernels + initrds (its specialisations' too): the next kernel change of that size would not fit | statvfs failed |
+| `boot.generations` | — | more system generations than `configurationLimit` (`fix`: `nixin gc --keep N`) |
+| `boot` | — | not systemd-boot (no `configurationLimit` in the running system's builder) |
+| `units.system`, `units.user` | — | `systemctl [--user] --failed` lists units (`detail`), or systemctl failed |
+
+**Secrets** are found without an eval: the tracked `.nix` files that
+`nixosConfigurations.<host>` reaches (the `./…` paths in its block of `flake.nix`, then
+every `./…`/`../…` path those files name; all tracked files when `flake.nix` has no
+such block), every string given to an option named `*environmentFile`,
+`*passwordFile`, `*keyFile`, `*secretFile`, `*credentialsFile`, `sshKey` or
+`identityPaths` (either capitalisation), and every `"/etc/….env"`. Comment lines are
+skipped; `${config.home.homeDirectory}`, `${config.xdg.configHome}`, `$HOME` and `~/`
+become the user's home; other interpolations and relative paths are skipped (they need
+an eval), as are paths Nix makes itself (`/nix/store`, `/run/agenix`, `/run/secrets`).
+Each is `os.stat`ed, never read: a root-only file counts as present; `detail` names the
+first `file:line`.
+
+Human output: one line per check (`ok`, `BAD`, `-`), the fix under each that is not ok.
+
+Errors: `host-not-local`, `usage`, `internal`. A check that raises becomes its own row
+(`ok: null`, `the check failed: …`); the others still run.
+
+Costs: about 12 subprocesses (`systemctl` 3, git 4–7, one `ssh` per host and one `git
+ls-remote` with `--full`), the option index headers, the state files, the config's
+tracked `.nix` files, `/boot` statvfs and the generations' kernel/initrd sizes. No
+network without `--full`. The groups run side by side.
 
 ### `gc`
 
@@ -1628,6 +1695,9 @@ nixin-state summary
 nixin-state report LOCK.json PUBLISHED.json
 ```
 
+`-h`/`--help` anywhere on the line prints this usage on stdout and exits 0 without running
+anything (a `nixin-state outdated --help` used to run the job, notification included).
+
 | file | written by | what |
 |---|---|---|
 | `outdated-lock.json`, `outdated-published.json` | `outdated` | the `outdated` and `outdated --published` documents for the authoritative tree (`$NIXIN_AUTHORITATIVE`, else `/etc/nixos`) |
@@ -1673,7 +1743,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `ambiguous-program` | try | PKG has several programs and none is meta.mainProgram; `programs[]`, repeat with `--program NAME` (the build is done: `out`, `size`, `cached`, `shell_command`) |
 | `no-program` | try | PKG has nothing in `bin/` to run; `programs[]` is empty, `shell_command` puts it on PATH |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
-| `host-not-local` | apply | `rollback`, `history`, `generations`, `gc` with `--host H` for a host that is not this machine (`apply` goes there over ssh instead) |
+| `host-not-local` | apply, doctor | `rollback`, `history`, `generations`, `gc`, `doctor` with `--host H` for a host that is not this machine (`apply` goes there over ssh instead) |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
 | `authoritative-dirty` | apply | the authoritative tree has uncommitted changes (`files[]`); nixin only fast-forwards it |
 | `authoritative-diverged` | apply | root's `git pull --ff-only` could not take the workspace (`state`: `behind`, `diverged`, `unknown`); the message has the commands to fix it |
