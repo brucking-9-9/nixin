@@ -55,11 +55,14 @@ which touch the network, run nix or write files, and the cache locations.
   Manager option JSON behind home-manager-options.extranix.com, NixHub (version history)
   and noogle (lib functions). With `--nixpkgs github:nixos/nixpkgs/<rev>` it answers
   packages with `nix search` / `nix eval` on that exact rev, typically the host's lock.
+  Options come from this machine's option index instead when the [modules](#modules)
+  wrote one for `--host` (`source: "index"`; `--no-index` asks upstream).
   Every result carries `kind`, `source`, `channel` and `rev`.
 - **truth** evaluates the config flake (`--config`, else `$NIXIN_CONFIG`, else
   `/etc/nixos`) with the host's own `nix`. `status` reports the lock, the running
   generation, package/program counts, and with `--full` the option index. `where NAME`
-  traces a package or option to the files that declare and define it, with values.
+  traces a package or option to the files that declare and define it, with values (and,
+  with an option index, the option's documentation from it).
   `list` shows the installed packages themselves (system and each Home Manager user;
   `--home USER`, `--scope`, `--filter TEXT`, `--programs`), sorted by name, each with the
   line that lists it where a text scan finds one; it shares `status`'s cached eval.
@@ -189,8 +192,73 @@ PYTHONPATH=src:$PYTHONPATH python3 -m nixin.cli --json search firefox   # from t
 
 Keep `$PYTHONPATH` when you put `src` on it: the dev shell carries `requests` there.
 
-Consume from a config flake: add `nixin` as an input and
-`nixpkgs.overlays = [ nixin.overlays.default ]`, then `pkgs.nixin`.
+Consume from a config flake: the modules below, or (package only) add `nixin` as an
+input and `nixpkgs.overlays = [ nixin.overlays.default ]`, then `pkgs.nixin`.
+
+## Modules
+
+The flake has a NixOS module and a Home Manager module. Both declare `programs.nixin`.
+
+```nix
+# flake.nix of the config: inputs.nixin.url = "github:brucking-9-9/nixin";
+nixosConfigurations.host = nixpkgs.lib.nixosSystem {
+  modules = [
+    inputs.nixin.nixosModules.default
+    { programs.nixin.enable = true; }
+  ];
+};
+```
+
+```nix
+# a Home Manager user (standalone, or home-manager.users.<name> / sharedModules)
+{ inputs, ... }:
+{
+  imports = [ inputs.nixin.homeModules.default ];
+  programs.nixin.enable = true;
+}
+```
+
+| option | default | does |
+|---|---|---|
+| `enable` | false | installs nixin (`nixin`, `nixin-tui`, `nixin-gui`, `nixin-state`) |
+| `package` | nixin built with the config's own `pkgs` (no overlay needed) | |
+| `optionIndex.enable` | true | writes the [option index](docs/CONTRACT.md#option-indexes): NixOS `/etc/nixin/options-nixos.json`, Home Manager `$XDG_CONFIG_HOME/nixin/options-home.json` |
+| `optionIndex.configRoot` | the source of the file that sets `enable` | the config's top directory, for config-relative declarations |
+| `optionIndex.prune` | NixOS: `[ [ "home-manager" "users" ] ]` | option paths whose sub-options the index leaves out |
+| `outdated.enable` | false | a user timer: `nixin-state outdated` at `outdated.interval` (OnCalendar, `*-*-* 09:00:00`) and 10 min after boot |
+| `outdated.notify`, `.notifyTimeout`, `.quietHours` | true, null, null | notify-send when the number of newer packages changes; how long it stays (ms); hours (`23-8`) it waits out |
+| `pending.enable`, `pending.interval` | false, `10min` | a user timer: `nixin-state status` (the workspace's unapplied changes), and right after a switch or a commit in either tree (a path unit) |
+| `authoritative`, `workspace` | `/etc/nixos`, null (`~/nixos` if a clone) | the trees the timers read |
+| `user` (NixOS only) | null (every user) | the account whose user manager runs the timers (`ConditionUser`) |
+
+**The option index.** Built with each generation from the module system's own `options`
+(`lib/options-index.nix`, also the flake's `lib.optionsIndex`; nixpkgs'
+`optionAttrSetToDocList`), it holds every option that generation has, the config's own
+included, with type, description, default, example and where it is declared (file and
+line; the config's files relative to its root). `search --kind opt|hm` and `info` answer
+from it with no network (`source: "index"`, the generation's number and date), `where`
+takes the options' documentation from it and does not evaluate a scope the index rules
+out, and `status` says whether the files are there and belong to the running
+generation. Values still come from evaluating the config. `--no-index`, `--channel` or
+`--nixpkgs` ask upstream instead. Cost, measured on mbp13 (2026-11-03): its system index
+has 28 042 options (13 MB) and adds 8–11 s and 0.6 GiB to the system's evaluation
+(toplevel drvPath 33–35 s → 42–47 s, peak 3.0 → 3.6 GiB); 19BK's Home Manager index for
+brucking has 6 286 options and adds about 0.5 s (eval 15–17 s). `optionIndex.enable =
+false` turns it off.
+
+**The timers and what reads their files.** `nixin-state` keeps `summary.json`,
+`outdated-lock.json`, `outdated-published.json` and `status.json` in
+`$XDG_STATE_HOME/nixin` (`~/.local/state/nixin`); CONTRACT.md, "`nixin-state`", has the
+fields. The bars and dashboards stay in the config, since they are UI. On the hub's
+`nixin-integration` branch 19BK's bar island
+(`home/config/quickshell/bottom/NixinIsland.qml`, `services/Nixin.qml`) and mbp13's
+companion footer (`hosts/mbp13/companion/local.py` → `qml/Footer.qml`) read only
+`~/.local/state/nixin/summary.json` (`outdated`, `pending`, `errors`), and the weekly
+flake report (`home/modules/terminal/ai/flake-report.sh`) runs `nixin-state report` on the
+two outdated documents. Running the outdated check as a user on a root-owned `/etc/nixos`
+needs `safe.directory = /etc/nixos` in that user's git config: nix's libgit2 refuses the
+repository otherwise (`eval-failed`, "not owned by current user"; seen on mbp13 with nix
+2.34.9).
 
 ## Status
 
