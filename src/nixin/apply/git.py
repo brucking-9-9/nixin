@@ -141,10 +141,13 @@ class Git:
             what=f"git restore --source={rev[:12]}",
         )
 
-    def commit(self, message: str, also: list[str]) -> str:
-        """Stage every tracked change (intent-to-add files included) plus `also`, commit
-        with the repo's own identity, return the new HEAD."""
-        self.check("add", "-u", what="git add -u")
+    def commit(self, message: str, also: list[str], exclude: str | None = None) -> str:
+        """Stage every tracked change (intent-to-add files included; not `exclude`) plus
+        `also`, commit with the repo's own identity, return the new HEAD."""
+        if exclude:
+            self.check("add", "-u", "--", ".", f":(exclude){exclude}", what="git add -u")
+        else:
+            self.check("add", "-u", what="git add -u")
         if also:
             self.check("add", "--", *also, what="git add")
         self.check("commit", "-q", "-m", message, what="git commit")

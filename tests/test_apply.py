@@ -540,8 +540,8 @@ def test_needs_sudo_names_the_commands_and_a_retry_finishes(m, capsys):
 
 
 def test_apply_refusals(m, capsys):
-    d = run(capsys, m, "apply", host="other")
-    assert d["error"]["code"] == "host-not-local"
+    d = run(capsys, m, "apply", host="other")  # another host: over ssh, never under --json
+    assert d["error"]["code"] == "needs-tty"
     # a commit made in the authoritative tree itself
     (m.auth / "flake.nix").write_text("{ outputs = _: { x = 1; }; }\n")
     git(m.auth, "commit", "-qam", "edited as root")

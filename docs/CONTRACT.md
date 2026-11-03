@@ -989,7 +989,7 @@ mode, as under `tui`, so their logs stream into the window.
 | `invalid-state` | writer | `installer/state.json` is not valid JSON or has the wrong version |
 | `build-failed` | apply | `nix build` of the toplevel failed; the message is the failing builder's block with nix's log tail |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
-| `host-not-local` | apply | `apply`, `rollback`, `history` with `--host H` for a host that is not this machine |
+| `host-not-local` | apply | `rollback`, `history` with `--host H` for a host that is not this machine (`apply` goes there over ssh instead) |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
 | `authoritative-dirty` | apply | the authoritative tree has uncommitted changes (`files[]`); nixin only fast-forwards it |
 | `authoritative-diverged` | apply | root's `git pull --ff-only` could not take the workspace (`state`: `behind`, `diverged`, `unknown`); the message has the commands to fix it |
@@ -1001,6 +1001,10 @@ mode, as under `tui`, so their logs stream into the window.
 | `boot-space` | apply | `apply`/`rollback`: the new system's kernels and initrds do not fit on /boot (`boot_space` has the numbers); nothing ran as root |
 | `unknown-generation` | apply | `rollback GEN`: no such system generation, or none before the running one |
 | `workspace-dirty` | apply | `rollback`: the workspace has uncommitted changes (`files[]`) or unapplied commits (`commits[]`) its revert would sweep in or drop |
+| `needs-tty` | apply | `apply --host H` for another host, not `--dry-run`, under `--json`, from a UI (a worker thread) or without a terminal: the sudo on H may ask for a password on this terminal |
+| `push-failed` | apply | `apply --host H` for another host: no remote to push the workspace branch to, or the push failed (`rejected: true`: the hub has commits the workspace lacks) |
+| `ssh-failed` | apply | `apply --host H` for another host: `ssh` is missing, could not connect (exit 255), or the session ended otherwise; `committed`, `pushed` say how far it got |
+| `invalid-hosts-config` | apply | `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/`) does not parse, or a value is of the wrong type or not a usable path / ssh destination |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's
 `sources[...].error` while `ok` is true.
