@@ -41,6 +41,7 @@ class Machine:
         monkeypatch.setenv("XDG_STATE_HOME", str(self.state))
         monkeypatch.setattr(system, "CURRENT", str(tmp / "current-system"))
         monkeypatch.setattr(system, "PROFILE", str(self.profiles / "system"))
+        monkeypatch.setattr(optindex, "hostname", lambda: "mbp13")  # not the build sandbox's
         optindex._LOADED.clear()
 
     def blob(self, scope: str, name: str, **header) -> Path:
