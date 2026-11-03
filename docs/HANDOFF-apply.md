@@ -46,7 +46,26 @@ Done; nothing half-done.
 - `cli.py`: two `VERBS` lines (generations, gc). `tests/test_cli.py`: gc has no
   `--config`, so its stub check expects `host-not-local`.
 
-Gates: see the last commit of the branch (`HANDOFF-apply: gates at …`).
+Gates at 3ac04c4 (the last commit before this note): `nix build` 625 passed, 25 skipped
+(live) in the sandbox, then `nixin gui: self-test ok`; `nix develop -c pytest` the same;
+`ruff check`, `ruff format --check`, `nix fmt -- --check` clean.
+
+### Files
+
+| file | what |
+|---|---|
+| `src/nixin/apply/generations.py` | `generations` verb; `Policy` + `decide` (the keep/older-than rule gc shares), `closure_sizes` (cached), `boot_entries`, `rows` (history's rows + the new fields), `span`, `size_text`, the table |
+| `apply/gc.py` | `gc` verb: the preview, `estimate` (roots, closures, dead scan, sizes), the three root steps through `run_privileged`, verify, `freed` parse, human output |
+| `apply/privilege.py` | `delete_step`, `bootloader_step`, `collect_step` |
+| `apply/__init__.py` | `register` adds `generations` (with `--config`) and `gc` (without); the writer imported lazily |
+| `apply/commitmsg.py` | `STATE_FILE` imported lazily |
+| `outdated/__init__.py` | the lock-side eval in a thread |
+| `truth/__init__.py` | `hosts()`: the hosts list cached by fingerprint, used by status/list/where |
+| `http.py`, `discovery/__init__.py`, `cli.py` | `requests` / `traceback` imported lazily; `cli.py`: two `VERBS` lines |
+| `tests/test_gc.py` | `GcMachine` (apply's `Machine` + roots, closures, sizes, dead paths, nix-env delete, the bootloader step, nix-collect-garbage, `df`); 18 tests |
+| `tests/test_startup.py` | no toolkit / requests import for CLI verbs (fresh interpreter) |
+| `tests/test_outdated.py`, `tests/test_truth.py`, `tests/test_cli.py`, `tests/test_integration.py` | evals side by side (a barrier), lock error first; hosts cache; gc has no `--config`; `gc-failed` in the contract list |
+| `docs/CONTRACT.md`, `README.md` | `generations`, `gc`, `gc-failed`, costs, the cache file, outdated's timings |
 
 ### Speed (warm, mbp13, `~/nixos`, median of 9 runs, output discarded)
 
