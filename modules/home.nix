@@ -25,6 +25,13 @@ let
     inherit pkgs options;
     scope = "home";
     inherit (cfg.optionIndex) prune;
+    # as a NixOS module, Home Manager evaluates a user under home-manager.users.<name>:
+    # every loc starts with that; standalone, nothing
+    stripPrefix =
+      let
+        loc = options.programs.nixin.enable.loc;
+      in
+      lib.take (builtins.length loc - 3) loc;
     roots = common.roots cfg options [
       {
         source = "home-manager";

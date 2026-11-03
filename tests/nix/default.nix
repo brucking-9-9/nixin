@@ -174,6 +174,13 @@ in
   nixosWithHm = lib.optionalAttrs (homeManager != null) {
     bobFile = bob.xdg.configFile."nixin/options-home.json".source.name;
     bobHeader = header bob.programs.nixin.optionIndex.file;
+    bobEnable = find bob.programs.nixin.optionIndex.file "programs.nixin.enable";
+    bobGit = find bob.programs.nixin.optionIndex.file "programs.git.enable";
+    bobPrefixed = builtins.length (
+      builtins.filter (
+        o: builtins.head o.loc == "home-manager"
+      ) bob.programs.nixin.optionIndex.file.passthru.options
+    );
     systemHasHmTree = builtins.length (
       builtins.filter (
         o:

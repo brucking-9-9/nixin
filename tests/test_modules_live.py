@@ -117,3 +117,7 @@ def test_home_manager_as_a_nixos_module(facts):
     assert w["bobHeader"]["user"] == "bob" and w["bobHeader"]["host"] == "nixin-test"
     assert "config" not in {r["source"] for r in w["bobHeader"]["roots"]}  # not nixpkgs
     assert w["systemHasUsers"] is True and w["systemHasHmTree"] == 0  # pruned
+    assert w["bobPrefixed"] == 0  # names without home-manager.users.bob.
+    assert w["bobEnable"]["loc"] == ["programs", "nixin", "enable"]
+    assert w["bobEnable"]["declarations"][0]["line"] is not None  # found by the short path
+    assert w["bobGit"]["declarations"][0]["source"] == "home-manager"

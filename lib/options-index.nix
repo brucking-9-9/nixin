@@ -3,7 +3,8 @@
 # search.nixos.org or evaluating the config (format: docs/CONTRACT.md, "Option indexes").
 #
 #   optionsIndex = import ./lib/options-index.nix { inherit lib; };
-#   optionsIndex.entries  { options, roots ? [ ], prune ? [ ] }  -> [ { name, loc, … } ]
+#   optionsIndex.entries  { options, roots ? [ ], prune ? [ ], stripPrefix ? [ ] }
+#                                                      -> [ { name, loc, … } ]
 #   optionsIndex.document { options, scope, roots ? [ ], prune ? [ ], meta ? { } } -> attrset
 #   optionsIndex.mkIndex  { pkgs, options, scope, … } -> derivation, $out = the JSON file
 #
@@ -24,6 +25,8 @@
 #
 # A field whose evaluation throws becomes null and its name goes into `errors`, so one
 # broken default does not cost the whole index (builtins.tryEval: throw and assert only).
+# `stripPrefix` is the path a submodule's options were evaluated under, taken off each
+# name and loc (Home Manager as a NixOS module: [ "home-manager" "users" "alice" ]).
 # `prune` lists option paths whose sub-options are left out (the option itself stays):
 # NixOS's home-manager.users would otherwise repeat every Home Manager option per user.
 # Every submodule's own `_module.*` options (args, check, freeformType, specialArgs) are
@@ -168,11 +171,28 @@ let
       options,
       roots ? [ ],
       prune ? [ ],
+      stripPrefix ? [ ],
     }:
     let
       tree = pruneTree prune (removeAttrs options [ "_module" ]);
+      n = length stripPrefix;
+      # a submodule's options (Home Manager as a NixOS module) carry the path they were
+      # evaluated under: home-manager.users.alice.programs.git.enable
+      strip =
+        d:
+        if n > 0 && lib.take n d.loc == stripPrefix then
+          let
+            loc = lib.drop n d.loc;
+          in
+          d
+          // {
+            inherit loc;
+            name = lib.showOption loc;
+          }
+        else
+          d;
     in
-    map (entry (sortRoots roots) tree) (
+    map (d: entry (sortRoots roots) tree (strip d)) (
       filter (d: !(builtins.elem "_module" d.loc)) (lib.optionAttrSetToDocList tree)
     );
 
@@ -182,10 +202,18 @@ let
       scope,
       roots ? [ ],
       prune ? [ ],
+      stripPrefix ? [ ],
       meta ? { },
     }:
     let
-      list = entries { inherit options roots prune; };
+      list = entries {
+        inherit
+          options
+          roots
+          prune
+          stripPrefix
+          ;
+      };
     in
     {
       format = "nixin-options/1";
@@ -206,6 +234,7 @@ let
       scope,
       roots ? [ ],
       prune ? [ ],
+      stripPrefix ? [ ],
       meta ? { },
       name ? "nixin-options-${scope}.json",
     }:
@@ -216,6 +245,7 @@ let
           scope
           roots
           prune
+          stripPrefix
           meta
           ;
       };
