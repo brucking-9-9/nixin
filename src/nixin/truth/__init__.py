@@ -113,6 +113,8 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
             }
 
     running_rev = run.get("nixpkgs_rev")
+    from .. import optindex
+
     doc = {
         "ok": True,
         "config": {
@@ -137,6 +139,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
             "home": {u: h["programs"] for u, h in pk["home"].items()},
         },
         "options": option_docs,
+        "indexes": optindex.status(host),
         "cache": cache.doc(),
         "timings": {**timings, "total": round(time.monotonic() - t0, 2)},
     }
@@ -267,9 +270,14 @@ def _entry_doc(repo: ConfigRepo, e: dict, rest: list[str]) -> dict[str, Any]:
 
 
 def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name: str) -> dict:
+    from .. import optindex
+
     path = name.split(".")
     scopes_out = []
+    skipped = optindex.prune_scopes(host, _scopes(pk), path)  # no eval where an index says no
     for scope, user in _scopes(pk):
+        if (scope, user) in skipped:
+            continue
         q = opts.prefix_query(repo, host, cache, path, hm=user)
         entries, excluded = q["entries"], q["excluded"]
         if not entries and not excluded:
@@ -298,7 +306,14 @@ def _where_option(repo: ConfigRepo, host: str, cache: TruthCache, pk: dict, name
         raise NixinError(
             "not-found", f"{name!r} is not an option of {host} (NixOS or Home Manager)"
         )
-    return {"scopes": scopes_out}
+    doc: dict[str, Any] = {
+        "scopes": scopes_out,
+        "skipped_scopes": [
+            {"scope": scope, "user": user, "reason": why} for (scope, user), why in skipped.items()
+        ],
+    }
+    optindex.annotate_where(doc, host)  # docs from the index; doc["index"]
+    return doc
 
 
 def _list_definers(

@@ -128,6 +128,7 @@ def status(d: dict[str, Any], host: str) -> str:
                 + f"  · {sum(s['excluded'] for _, s in parts)} skipped",
             )
         )
+    lines.append(row("indexes", _indexes(d.get("indexes") or {})))
     misses = d["cache"]["misses"]
     lines.append(
         f"({d['timings']['total']} s; "
@@ -135,6 +136,22 @@ def status(d: dict[str, Any], host: str) -> str:
         + ")"
     )
     return "\n".join(lines)
+
+
+def _indexes(ix: dict[str, Any]) -> str:
+    """The option indexes nixin's modules write: per scope, its size and generation."""
+    parts = []
+    for scope in ("nixos", "home"):
+        e = ix.get(scope) or {}
+        if not e.get("present"):
+            continue
+        g = e.get("generation") or {}
+        gen = f"generation {g['number']}" if g.get("number") is not None else "a generation"
+        state = "running" if e.get("fresh") else "not the running one"
+        who = f" {e['user']}" if scope == "home" and e.get("user") else ""
+        tail = "" if e.get("applies", True) else ", built for another host"
+        parts.append(f"{scope}{who} {e.get('count')} options ({gen}, {state}{tail})")
+    return ", ".join(parts) or 'none (programs.nixin.optionIndex, README "Modules")'
 
 
 # --- where --------------------------------------------------------------------------------
@@ -183,6 +200,8 @@ def _where_option(d: dict[str, Any]) -> str:
                 lines += _option(o, tag)
         for name, msg in s["excluded"].items():
             lines.append(sub("skipped", f"{name}: {cap(msg.splitlines()[0], 80)}"))
+    for sk in d.get("skipped_scopes") or []:
+        lines.append(sub("not asked", f"{_tag(sk['scope'], sk['user'])}: {cap(sk['reason'], 80)}"))
     return "\n".join(lines)
 
 
@@ -211,8 +230,13 @@ def _option(o: dict[str, Any], tag: str) -> list[str]:
             lines.append(sub("", f"maybe {c['file']}:{c['line']}  {cap(c['text'], 50)}"))
     if not o["definitions"]:
         lines.append(sub("set in", "nothing (the default)"))
-    if o.get("description"):
-        lines.append(sub("about", cap(o["description"].strip(), 90)))
+    docs = o.get("docs") or {}  # from this machine's option index (optindex)
+    for key in ("default", "example"):
+        if docs.get(key) is not None:
+            lines.append(sub(key, cap(" ".join(str(docs[key]).split()), 90)))
+    about = docs.get("description") or o.get("description")
+    if about:
+        lines.append(sub("about", cap(about.strip(), 90)))
     return lines
 
 
