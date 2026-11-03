@@ -108,19 +108,36 @@ let
       update = o: o // { visible = "shallow"; };
     }) (filter (p: lib.hasAttrByPath p options) prune)) options;
 
-  # Where each declaration is, with its line: the option's declarationPositions (parallel
-  # to its declarations; a position names the file the option is written in, e.g. a file
-  # imported into `options.x = import ./x.nix`). Templates under a submodule
-  # (`<name>`, `*`) are not reachable by path: their files only, without lines.
+  # Where each declaration is, with its line: the option's declarationPositions, parallel
+  # to its declarations. A position names the file the option is written in (a file
+  # imported into `options.x = import ./x.nix`: that one); a position inside nixpkgs'
+  # lib/ is where a helper built the option (mkRenamedOptionModule's aliases), so the
+  # declaring module stands instead, without a line. Templates under a submodule
+  # (`<name>`, `*`) are not reachable by path: their files only.
   declarationsOf =
     roots: options: d:
     let
       o = lib.attrByPath d.loc null options;
+      files = if lib.isOption o then o.declarations or [ ] else [ ];
       pos = if lib.isOption o then o.declarationPositions or [ ] else [ ];
-      known = filter (p: toString p.file != "<unknown-file>") pos;
+      generated = r: r.source == "nixpkgs" && lib.hasPrefix "lib/" r.file;
+      one =
+        i:
+        let
+          f = builtins.elemAt files i;
+          p = builtins.elemAt pos i;
+          at = relative roots p.file;
+        in
+        if toString p.file == toString f || !(generated at) then
+          at // { line = p.line or null; }
+        else
+          relative roots f // { line = null; };
+      known = filter (i: toString (builtins.elemAt files i) != "<unknown-file>") (
+        lib.range 0 (length files - 1)
+      );
     in
-    if known != [ ] then
-      map (p: relative roots p.file // { line = p.line or null; }) known
+    if files != [ ] && length files == length pos then
+      map one known
     else
       map (f: relative roots f // { line = null; }) d.declarations;
 
