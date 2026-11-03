@@ -35,6 +35,7 @@ nixin [--json] [--host H] VERB [ARGS...]
 
 search info versions        discovery   what exists upstream, in which versions
 status where list           truth       what this config gives a host (evaluates the flake)
+explain                     explain     one option or package: the config's side and upstream's docs together
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff; commit, pull into /etc/nixos, switch; hub sync
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
@@ -58,7 +59,9 @@ which touch the network, run nix or write files, and the cache locations.
 - **truth** evaluates the config flake (`--config`, else `$NIXIN_CONFIG`, else
   `/etc/nixos`) with the host's own `nix`. `status` reports the lock, the running
   generation, package/program counts, and with `--full` the option index. `where NAME`
-  traces a package or option to the files that declare and define it, with values.
+  traces a package or option to the files that declare and define it, with values, and
+  for an option its type (as a tree: `enum` values, list/attrset elements), default and
+  example, also for a path inside a submodule (`services.openssh.settings.X11Forwarding`).
   `list` shows the installed packages themselves (system and each Home Manager user;
   `--home USER`, `--scope`, `--filter TEXT`, `--programs`), sorted by name, each with the
   line that lists it where a text scan finds one; it shares `status`'s cached eval.
@@ -84,12 +87,27 @@ which touch the network, run nix or write files, and the cache locations.
   --flake WORKSPACE`, or `nix flake lock --override-input nixpkgs REF` for `--to`) in the
   workspace only, and returns the input's commit before and after. It never builds or
   switches: `plan` and `apply` do that, as for any other change.
+- **explain NAME** puts both sides of one option or package in one document: for an
+  option its type, default, example, value per scope (NixOS, each Home Manager user),
+  where the config sets it and where it is declared (linked on GitHub at the locked
+  revision), with upstream's full description; for a package what is installed (and
+  which `programs.NAME.enable` brings it in, or which file lists it) against the
+  channel's version, homepage and license. Either side may be missing (no config,
+  `--offline`); `view` is the display form a help pane can show as is.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
-  or change what they declare. A `set` value is checked for syntax only, so it can use
-  `pkgs`, `lib` and `config`. Each write is re-parsed and proven by one eval. It
-  refuses `/etc/nixos`: it edits a clone you own.
+  or change what they declare. A `set` value is checked for syntax (so it can use
+  `pkgs`, `lib` and `config`), then against the option's type before anything is
+  written: `set services.openssh.enable yes` is a `type-mismatch` that shows the type,
+  default and example (`--force` writes it anyway); `set OPTION` without a value shows
+  them, the current value and where `set` would write. Each write is re-parsed and
+  proven by one eval; when that eval fails the change stays, the verb fails
+  (`eval-failed`) and says how to undo it. It refuses `/etc/nixos`: it edits a clone
+  you own.
+
+`--host` defaults to this machine; for a config without this machine but with exactly
+one host, to that host. With several, nixin asks for `--host` (`unknown-host`).
 
 Answers and evals are cached under `$XDG_CACHE_HOME/nixin/` (see CONTRACT.md, "Caches").
 
@@ -187,8 +205,11 @@ switched mbp13 for real from its workspace (add → plan → apply → rm → ap
 `configurationLimit 2` to free `/boot`): `docs/HANDOFF-apply.md`. The TUI ran the same
 round trip on mbp13 from a 50×25 terminal (generations 113 and 114):
 `docs/HANDOFF-tui.md`. The GUI ran on mbp13 against the real config (search, details,
-`where`, the add preview) and on its Wayland session: `docs/HANDOFF-gui.md`. See
-`docs/HANDOFF-*.md` for each layer.
+`where`, the add preview) and on its Wayland session: `docs/HANDOFF-gui.md`. The
+type-aware `set`, `explain` and the three judgement calls (an eval failure after a write
+fails the verb, exclusions per host, the `--host` default) were run on mbp13 against
+`~/nixos` read-only and a clone: `docs/HANDOFF-typed.md`. See `docs/HANDOFF-*.md` for
+each layer.
 
 [search.nixos.org]: https://search.nixos.org
 [Home Manager Option Search]: https://home-manager-options.extranix.com
