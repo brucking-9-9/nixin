@@ -387,7 +387,7 @@ def test_option_prefill_never_writes_a_placeholder_back():
 
     assert view.option_prefill(rec, where(["a", 2]), "opt", None) == '[ "a" 2 ]'
     assert view.option_prefill(rec, where({"a": True}), "opt", None) == "{ a = true; }"
-    for lossy in ("<derivation hello-2.12>", ["<function>"], "two\nlines", {"<…>": 3}):
+    for lossy in ("<derivation hello-2.12>", ["<function>"], "two\nlines", {"<…>": 3}, "ab<…>"):
         assert view.option_prefill(rec, where(lossy), "opt", None) == '"text"'  # the default
     assert view.option_prefill({"name": "x.y", "default": "{\n}"}, None, "opt", None) == ""
     template = view.option_fields({"name": "users.users.<name>.shell", "type": "shell"})

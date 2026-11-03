@@ -1318,9 +1318,10 @@ def _first(scope: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def _lossy(v: Any) -> bool:
     """A `where` value nix_text cannot give back exactly: a placeholder (a derivation, a
-    function, a capped list) or a multi-line string (cut to its first line)."""
+    function, a capped list), a long string options.nix cut (`…<…>`) or a multi-line one
+    (nix_text keeps its first line)."""
     if isinstance(v, str):
-        return "\n" in v or bool(_PLACEHOLDER.match(v))
+        return "\n" in v or v.endswith("<…>") or bool(_PLACEHOLDER.match(v))
     if isinstance(v, list):
         return any(_lossy(x) for x in v)
     if isinstance(v, dict):
