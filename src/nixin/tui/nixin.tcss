@@ -214,6 +214,12 @@ Screen.-narrow .pane {
     margin-right: 1;
     min-width: 6;
 }
+/* Details on a phone: Add, Try, Remove and the home toggle do not fit one row of 50 */
+DetailsScreen.-narrow #actions {
+    layout: grid;
+    grid-size: 2;
+    grid-rows: 1;
+}
 
 #closure {
     height: auto;

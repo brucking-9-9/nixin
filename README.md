@@ -42,6 +42,7 @@ plan apply sync             apply       build + closure diff + boot check; commi
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
+try                         try         run a package from the locked nixpkgs without installing it (--shell: a shell with it)
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
 gui                         gui         the desktop UI (Qt 6, QML) over the same documents (also nixin-gui)
 ```
@@ -136,6 +137,17 @@ which touch the network, run nix or write files, and the cache locations.
   which `programs.NAME.enable` brings it in, or which file lists it) against the
   channel's version, homepage and license. Either side may be missing (no config,
   `--offline`); `view` is the display form a help pane can show as is.
+- **try** runs a package without installing it (nix-software-center's "launch without
+  installing"): `nixin try cowsay -- moo`, `nixin try htop --shell`. PKG is an attribute
+  of the host's *locked* nixpkgs (the config's nixpkgs input as `flake.lock` pins it;
+  `--nixpkgs` picks another), so you try what `nixin add` would install. One probe eval
+  (meta, outputs), `nix build --no-link` (nix's progress on stderr; nothing is rooted, the
+  next garbage collection removes it), then nixin execs `nix run <flakeref>#PKG -- ARGS`,
+  or `nix shell` with `--shell`. It picks `meta.mainProgram`, else the only program, else
+  asks (`ambiguous-program`, `--program NAME`). Unfree packages need
+  `NIXPKGS_ALLOW_UNFREE=1 … --impure`, and the `unfree` error says so. `--json` only builds
+  and returns `out`, `programs`, `size`, `cached`, `command`, `gui`: what a UI needs to say
+  "ready, 12 MiB" and offer to launch.
 - **writer** puts new things into generated `installer/<host>.nix` /
   `installer/<user>-home.nix` (from `installer/state.json`, nixfmt'd, imported once from
   the host's or user's entry module). It edits hand-written modules in place to remove
@@ -180,8 +192,11 @@ default, example, the whole description, its value on this host and the file and
 that set it (`where`; for a Home Manager option, the user's tree), and the module that
 declares it with upstream's link. Set opens the value dialog (the current value, the type
 and the example under it; for a template like `users.users.<name>.shell` the name first)
-→ the `set --dry-run` diff → write; Unset the same; both land on Pending. Error documents
-show as `code` + message.
+→ the `set --dry-run` diff → write; Unset the same; both land on Pending. Try (Details,
+`t`) builds the package with nix's output streaming (nothing is installed), then starts a
+graphical app detached (`setsid`) or shows the exact `nix run` / `nix shell` lines to
+copy; several programs and no mainProgram: pick one. Error documents show as `code` +
+message.
 
 Keys: `/` search, `i` packages (`ctrl+4`), `o` options (`ctrl+5`), `p` pending, `s` status,
 `?` all keys, `ctrl+p` command palette, `esc` back, `q` quit (`ctrl+q` while typing or
@@ -222,9 +237,12 @@ runs and the window goes to Pending). **Options** searches NixOS or Home Manager
 the description, its value on this host and where it is set (`where`; for a Home Manager
 option the picked user's), the declaring module with upstream's link; Set… (prefilled with
 the current value, the example and default under it, a template's `<name>` selected to
-type over) and Unset go through the diff dialog and on to Pending. Error documents appear
-as a notice over the page (`code` + message, the candidates to pick for an ambiguous
-write, commands to copy).
+type over) and Unset go through the diff dialog and on to Pending. **Try** (next to Add)
+builds the package in a dialog with nix's output streaming, then launches a graphical app
+detached or opens a CLI program in your terminal (`$TERMINAL -e …`, else kitty, foot, …)
+running the `nix run` line; Shell in terminal, Copy command, and a program picker when
+there are several. Error documents appear as a notice over the page (`code` + message, the
+candidates to pick for an ambiguous write, commands to copy).
 
 Keys: `/` search, `Ctrl+1/2/3/4/5` the pages, `Esc` closes a dialog, `Ctrl+Enter` writes
 in the diff dialog, `Ctrl+Q` quits (a second time while a write, a plan or an apply runs).

@@ -105,3 +105,15 @@ on merge it moves here.
   module from the hub worktree `~/nixos-modules-wt` (branch `nixin-modules`, 1c1da1e;
   gen 125), tested, and put back on main (gen 126). The hub's nixin lock is bumped
   after this merges.
+- [try](docs/HANDOFF-try.md) — branch `try-verb`: `nixin try PKG [-- ARGS] [--shell]
+  [--program NAME] [--nixpkgs REF] [--impure] [--build-only]`, which runs a package from
+  the host's locked nixpkgs without installing it. A probe eval, `nix build --no-link`
+  (progress on stderr), then an exec of `nix run`/`nix shell`. `--json` only builds and
+  returns `{out, programs, size, cached, fetched, command, gui, …}`. Errors: `not-found`
+  (with suggestions), `unfree` (the `NIXPKGS_ALLOW_UNFREE=1 … --impure` commands),
+  `ambiguous-program`, `no-program`, `build-failed`. **Try** sits next to Add in both front
+  ends: the build streams into the log, then a GUI app is launched detached (`setsid`), and
+  a CLI program gets the command to copy (TUI) or opens in the terminal (GUI: `$TERMINAL
+  -e`, else kitty, …). Live on mbp13: cowsay, figlet on a pty, `--shell`, gnome-calculator
+  built (detached `--version` only: no window on the kiosk screen), lolcat built from
+  source. Nothing switched, no sudo, `~/nixos` only read.

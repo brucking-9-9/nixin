@@ -238,6 +238,7 @@ class DetailsScreen(Base):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "back", "Back"),
         Binding("a", "add", "Add", show=False),
+        Binding("t", "try", "Try", show=False),
         Binding("r", "remove", "Remove", show=False),
         Binding("e", "set", "Set", show=False),
         Binding("u", "unset", "Unset", show=False),
@@ -279,6 +280,7 @@ class DetailsScreen(Base):
         with Horizontal(id="actions"):
             if h.is_package:
                 yield Button("Add (a)", id="add", variant="primary", compact=True)
+                yield Button("Try (t)", id="try", compact=True)
                 yield Button("Remove (r)", id="remove", variant="error", compact=True)
             elif h.is_option:
                 yield Button("Set (e)", id="set", variant="primary", compact=True)
@@ -360,7 +362,7 @@ class DetailsScreen(Base):
         )
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
-        if action in ("add", "remove"):
+        if action in ("add", "remove", "try"):
             return self.hit.is_package
         if action in ("set", "unset"):
             return self.hit.is_option
@@ -422,6 +424,13 @@ class DetailsScreen(Base):
         if home is not None:
             self.nixin.write("add", [self.hit.target, *home], after=self.action_where)
 
+    def action_try(self) -> None:
+        """Build it into the store and run it, without installing (the Try screen)."""
+        if self.hit.is_package:
+            from .trying import TryScreen  # it imports this module
+
+            self.app.push_screen(TryScreen(self.hit.target))
+
     def action_remove(self) -> None:
         home = self._home_args() if self.hit.is_package else None
         if home is not None:
@@ -447,6 +456,7 @@ class DetailsScreen(Base):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         action = {"add": self.action_add, "remove": self.action_remove, "set": self.action_set}
+        action["try"] = self.action_try
         action |= {"unset": self.action_unset, "home": self.action_home}
         action[event.button.id or ""]()
 

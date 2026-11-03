@@ -80,6 +80,15 @@ Item {
                 enabled: pane.backend.busy === ""
                 onClicked: pane.d.add()
             }
+            Button {
+                objectName: "tryButton"
+                visible: pane.d.isPackage
+                text: "Try"
+                enabled: pane.backend.busy === ""
+                ToolTip.visible: hovered
+                ToolTip.text: "Build it into the store and run it, without installing it"
+                onClicked: pane.backend.trying.start(pane.d.target)
+            }
             DangerButton {
                 objectName: "removeButton"
                 visible: pane.d.isPackage

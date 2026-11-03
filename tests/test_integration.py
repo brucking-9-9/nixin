@@ -81,6 +81,9 @@ ERROR_CODES = {
     "ssh-failed",
     "invalid-hosts-config",
     "gc-failed",
+    "unfree",
+    "ambiguous-program",
+    "no-program",
 }
 HTTP_CODE = re.compile(r"http-[1-5][0-9]{2}")
 
@@ -818,7 +821,7 @@ def test_no_error_code_escapes_the_contract():
     src = "\n".join(p.read_text() for p in (ROOT / "src" / "nixin").rglob("*.py"))
     raised = set(
         re.findall(
-            r'(?:NixinError|WriterError|DiscoveryError|ApplyError)\(\s*"([a-z][a-z0-9-]*)"',
+            r'(?:NixinError|WriterError|DiscoveryError|ApplyError|TryError)\(\s*"([a-z][a-z0-9-]*)"',
             src,
             re.MULTILINE,
         )

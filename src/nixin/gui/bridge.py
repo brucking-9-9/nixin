@@ -1827,7 +1827,7 @@ class Gui(VM):
         "host": "",
         "configLabel": "",
         "channel": "unstable",
-        "busy": "",  # writing | updating | planning | checking | applying while one runs
+        "busy": "",  # writing | updating | planning | checking | applying | trying while one runs
         "running": False,  # any verb is running
         "activity": "",  # the newest running verb, as the busy indicator says it
         "activityHint": "",
@@ -1876,6 +1876,9 @@ class Gui(VM):
             "apply": ApplyVM(self),
             "status": StatusVM(self),
         }
+        from .trying import TryVM  # it subclasses VM, from this module
+
+        self._areas["trying"] = TryVM(self)
         chan = channel if channel in view.CHANNELS else view.CHANNELS[0]
         self.set(host=backend.host, configLabel=backend.config_label, channel=chan)
 
@@ -1888,6 +1891,7 @@ class Gui(VM):
     pending = area("pending")
     apply = area("apply")
     status = area("status")
+    trying = area("trying")
 
     # --- running verbs
 

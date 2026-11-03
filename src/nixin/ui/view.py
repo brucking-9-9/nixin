@@ -29,6 +29,7 @@ from ..apply.closure import human_size
 from ..discovery.format import _HEADERS, _footer
 from ..outdated import render as outdated_render
 from ..truth.render import nix_text
+from ..tryout import render as try_render
 
 ELLIPSIS = "…"
 
@@ -118,6 +119,7 @@ def notice(doc: Doc) -> Notice | None:
     cands = [c for c in err.get("candidates") or [] if isinstance(c, dict)]
     items += [candidate_label(c) for c in cands]
     items += [str(f) for f in err.get("files") or []]
+    items += [f"did you mean {x}" for x in err.get("suggestions") or []]  # try: not-found
     if err.get("file") and err.get("line") and code in ("import-site-missing", "invalid-nix"):
         items.append(f"{err['file']}:{err['line']}")
     return Notice(
@@ -1513,3 +1515,58 @@ def option_set_hint(rec: dict[str, Any]) -> list[Field]:
     if rec.get("default") not in (None, ""):
         out.append(Field("default", str(rec.get("default")), "dim"))
     return out
+
+
+# --- try ----------------------------------------------------------------------------------------
+
+TRY_HINT = "seconds when cache.nixos.org has it; a build from source can take much longer"
+
+
+def try_head(doc: Doc) -> str:
+    """`ready: cowsay 3.8.4 · 107 MiB with its dependencies · already in the store`."""
+    size = try_render.size(doc.get("size"))
+    return f"ready: {try_render.title(doc)} · {size} with its dependencies · {try_render.got(doc)}"
+
+
+def try_fields(doc: Doc) -> list[Field]:
+    out = [Field("package", try_render.title(doc), "accent")]
+    if doc.get("description"):
+        out.append(Field("what", str(doc["description"])))
+    out.append(Field("from", str((doc.get("nixpkgs") or {}).get("label") or "?"), "dim"))
+    out.append(Field("out", store_name(doc.get("out")), "dim"))
+    out.append(Field("programs", try_render.programs_line(doc)))
+    apps = [e for e in doc.get("desktop") or [] if not e.get("hidden")]
+    if doc.get("gui"):
+        names = ", ".join(str(e.get("name") or e.get("file")) for e in apps if not e["terminal"])
+        out.append(Field("kind", f"graphical app ({names})", "accent"))
+    else:
+        out.append(Field("kind", "command-line program" if doc.get("programs") else "no programs"))
+    if doc.get("unfree"):
+        out.append(Field("license", ", ".join(doc.get("license") or []) + " (unfree)", "warn"))
+    return out
+
+
+def try_commands(doc: Doc) -> list[str]:
+    """The lines to copy: how to run it, and the shell with it."""
+    return [c for c in (doc.get("command"), doc.get("shell_command")) if c]
+
+
+def try_next(doc: Doc, *, display: bool, terminal: bool) -> str:
+    """What a front end does after a try: `launch` a graphical app detached (there is a
+    display), open the command in a `terminal` (the GUI, when it knows one), or show the
+    `command` to copy (the TUI, which is the terminal; no display; nothing to run)."""
+    if doc.get("gui") and doc.get("exec") and display:
+        return "launch"
+    if terminal and doc.get("command"):
+        return "terminal"
+    return "command"
+
+
+def try_programs(doc: Doc) -> list[str]:
+    """ambiguous-program: the programs to pick from (the error object's)."""
+    err = doc.get("error") or {}
+    return (
+        [str(p) for p in err.get("programs") or []]
+        if err.get("code") == "ambiguous-program"
+        else []
+    )

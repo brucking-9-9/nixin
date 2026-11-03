@@ -24,7 +24,7 @@ import os
 import socket
 import sys
 
-from . import __version__, apply, discovery, explain, gui, outdated, truth, tui, writer
+from . import __version__, apply, discovery, explain, gui, outdated, truth, tryout, tui, writer
 from .configrepo import default_host
 
 VERBS: dict[str, tuple[str, str]] = {
@@ -49,6 +49,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "gc": ("apply", "delete old system generations, collect garbage, refresh /boot (sudo)"),
     "outdated": ("outdated", outdated.HELP),
     "update": ("outdated", outdated.update.HELP),
+    "try": ("try", tryout.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
     "gui": ("gui", "desktop UI (Qt) over the same documents"),
 }
@@ -86,6 +87,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="verb", metavar="VERB")
     discovery.register(sub)
+    tryout.register(sub)  # before the stubs: its own positionals (PKG, then ARGS after --)
     for verb, (_layer, help_) in VERBS.items():
         if verb in sub.choices:  # a layer registered it with its own arguments
             continue

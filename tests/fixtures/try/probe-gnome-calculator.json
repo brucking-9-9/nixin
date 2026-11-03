@@ -1,0 +1,22 @@
+{
+ "available": true,
+ "broken": false,
+ "derivation": true,
+ "description": "Application that solves mathematical equations and is suitable as a default application in a Desktop environment",
+ "found": true,
+ "insecure": false,
+ "license": [
+  "GPL-3.0-or-later"
+ ],
+ "main_program": "gnome-calculator",
+ "name": "gnome-calculator-50.0",
+ "out_paths": {
+  "out": "/nix/store/0wzx59q463byhgj9y56jklygdbgdcfph-gnome-calculator-50.0"
+ },
+ "outputs": [
+  "out"
+ ],
+ "pname": "gnome-calculator",
+ "unfree": false,
+ "version": "50.0"
+}

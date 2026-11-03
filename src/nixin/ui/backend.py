@@ -6,8 +6,9 @@ the result is the document `nixin --json …` prints (envelope keys included), w
 subprocess and no second implementation. Calls block: the UIs run them in worker
 threads (Textual workers in the TUI, QThreadPool runnables in the GUI).
 
-`stream=True` runs the verb in human mode. plan and apply then tee nix's build output and
-nixos-rebuild's log to `sys.stderr`; the UI routes that into its log view (the TUI with
+`stream=True` runs the verb in human mode. plan, apply and try then tee nix's build output
+and nixos-rebuild's log to `sys.stderr` (try is called with --build-only: it must not hand
+the UI's terminal to the program); the UI routes that into its log view (the TUI with
 App.begin_capture_print, the GUI with a sys.stderr proxy). The document is the same apart
 from `message`, the human rendering, which the UIs ignore.
 
@@ -24,11 +25,11 @@ from typing import Any
 from .. import cli
 
 # verbs whose human mode streams a log worth showing (CONTRACT.md: the slow ones)
-STREAMING = frozenset({"plan", "apply"})
+STREAMING = frozenset({"plan", "apply", "try"})
 # verbs that read --config (discovery ignores it)
 CONFIG_VERBS = frozenset(
     {"status", "where", "list", "add", "rm", "set", "unset", "plan", "apply", "sync"}
-    | {"outdated", "update"}
+    | {"outdated", "update", "try"}
 )
 
 

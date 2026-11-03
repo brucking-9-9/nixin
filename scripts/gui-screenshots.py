@@ -9,12 +9,15 @@ reproducible): search, details, the add preview, plan, the apply confirmation,
 `needs-sudo`, status, an option with the Set dialog, an error notice; then Packages on
 19BK's documents: installed with a row in details, updates (lock, --published), the
 update confirmation; then Options: mbp13's openssh options with one in full, the Set
-dialog, its diff, and a Home Manager option on 19BK. --live drives the real verb handlers
-instead (network for discovery, nix against --config): search, details with `where`, the
-`add --dry-run` preview, an option's details and Set dialog, Packages (`list`,
-`outdated`), the Options page (an option, Set, the `set --dry-run` diff; with --hm-host a
-Home Manager option there); it writes nothing (the dialogs are cancelled, `update` is
-never run). `--only options` takes only the Options part. OUTDIR defaults to docs/gui.
+dialog, its diff, and a Home Manager option on 19BK; then the Try dialog on the recorded
+`try` documents (a CLI program opened in the terminal, a GUI app launched, the program
+picker; nothing is started). --live drives the real verb handlers instead (network for
+discovery, nix against --config): search, details with `where`, the `add --dry-run`
+preview, an option's details and Set dialog, Packages (`list`, `outdated`), the Options
+page (an option, Set, the `set --dry-run` diff; with --hm-host a Home Manager option
+there); it writes nothing (the dialogs are cancelled, `update` is never run). `--only
+options` takes only the Options part, --try only the Try shots. OUTDIR defaults to
+docs/gui.
 Files are named <n>-<step>.png (live-<n>-<step>.png with --live), 1200x780.
 """
 
@@ -219,6 +222,34 @@ def live_options(
     rows = [h.target for h in g.options.hits]
     g.options.select(rows.index(hm_option) if hm_option in rows else 0)
     s.shot("13-options-hm")
+
+
+def trying(outdir: Path) -> None:
+    from tui_fake import COWSAY, FakeBackend
+
+    from nixin.tryout import launch
+
+    launch.SPAWN = lambda argv, *, log: 4242  # the shots say "launched", nothing starts
+    routes = {
+        **COWSAY,
+        "try": "try_cowsay",
+        "try gnome-calculator": "try_gnome_calculator",
+        "try coreutils": "try_coreutils_ambiguous",
+    }
+    gui = Gui(FakeBackend(routes))
+    s = Shooter(gui, outdir)
+    g = gui
+    s.search("cowsay")
+    g.search.select(0)
+    s.settle()
+    for step, target in (("18-try-cli", "cowsay"), ("19-try-gui-app", "gnome-calculator")):
+        g.trying.start(target)
+        s.shot(step)
+        g.trying.close()
+        s.settle()
+    g.trying.start("coreutils")
+    s.shot("20-try-pick")
+    g.trying.close()
     s.done()
 
 
@@ -256,6 +287,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("outdir", nargs="?", default=str(ROOT / "docs" / "gui"))
     ap.add_argument("--live", action="store_true")
+    ap.add_argument("--try", dest="try_only", action="store_true", help="only the Try shots")
     ap.add_argument("--config")
     ap.add_argument("--host", default=socket.gethostname())
     ap.add_argument("--query", default="cowsay")
@@ -270,7 +302,9 @@ def main() -> int:
     a = ap.parse_args()
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
-    if a.live:
+    if a.try_only:
+        trying(out)
+    elif a.live:
         if a.only == "all":
             live(out, a.host, a.config, a.query, a.package, a.option)
         hm = (a.hm_host, a.hm_query, a.hm_option) if a.hm_host else None
@@ -279,6 +313,8 @@ def main() -> int:
         if a.only == "all":
             fixtures(out)
         options(out)
+        if a.only == "all":
+            trying(out)
     return 0
 
 

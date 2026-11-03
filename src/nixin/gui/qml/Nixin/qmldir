@@ -17,6 +17,7 @@ DiffDialog 1.0 DiffDialog.qml
 SetDialog 1.0 SetDialog.qml
 ApplyDialog 1.0 ApplyDialog.qml
 UpdateDialog 1.0 UpdateDialog.qml
+TryDialog 1.0 TryDialog.qml
 NoticeBar 1.0 NoticeBar.qml
 FieldList 1.0 FieldList.qml
 SectionHead 1.0 SectionHead.qml
