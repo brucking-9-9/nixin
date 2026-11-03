@@ -740,3 +740,49 @@ def test_image_prune_keeps_the_newest(tmp_path):
         os.utime(f, (1000 + i, 1000 + i))
     images.prune(tmp_path, total=250)
     assert sorted(f.name for f in d.iterdir()) == ["2.png", "3.png"]
+
+
+# --- the view-model (shared by the TUI and the GUI) ------------------------------------------
+
+
+def tui_doc(name: str) -> dict:
+    return json.loads((FIX.parent / "tui" / f"{name}.json").read_text())
+
+
+def test_view_chips_source_and_fields():
+    from nixin.ui import view
+
+    a = {"categories": ["Qt", "KDE", "System", "TerminalEmulator", "X-Thing"], "gui": True}
+    assert view.chips(a) == ["System", "TerminalEmulator"]
+    assert view.app_source({**a, "source": "installed"}) == "installed output · an application"
+    assert (
+        view.app_source({"source": None, "gui": None}) == "nothing found · not known to be an app"
+    )
+    assert view.appstream_fields(None) == []
+    assert view.appstream_fields(hint.empty()) == []  # nothing known, nothing said
+    fields = {f.label: f.value for f in view.appstream_fields(hint.from_es(es_doc("kitty")))}
+    assert fields["app"] == "kitty" and fields["category"] == "System, TerminalEmulator"
+    assert all(len(label) <= 9 for label in fields)  # the TUI's label column
+    rec = {"kind": "pkg", "name": "kitty", "appstream": hint.from_es(es_doc("kitty"))}
+    assert ("category", "System, TerminalEmulator") in [
+        (f.label, f.value) for f in view.info_fields(rec)
+    ]
+    shots = view.screenshot_urls(hint.from_es(es_doc("prismlauncher")))
+    assert len(shots) == 3 and shots[0][0].startswith(hint.SCREENSHOT_URL)
+    assert shots[0][1] == "The main Prism Launcher window"
+
+
+def test_view_browse_rows():
+    from nixin.ui import view
+
+    cats = view.browse_categories(tui_doc("browse_overview"))
+    assert [c.key for c in cats][:2] == ["AudioVideo", "Development"]
+    game = next(c for c in cats if c.key == "Game")
+    assert game.label == "Games" and game.count.startswith("5 installed · ")
+    doc = tui_doc("browse_game")
+    rows = view.app_rows(doc)
+    steam = next(r for r in rows if r.target == "steam")
+    assert steam.name == "Steam" and steam.installed and steam.curated and steam.marks == "●★"
+    hit = view.app_hit(steam)
+    assert hit.kind == "pkg" and hit.target == "steam" and hit.record["appstream"]["gui"]
+    assert view.browse_footer(doc).startswith("9 app(s) · 5 installed · search.nixos.org unstable@")

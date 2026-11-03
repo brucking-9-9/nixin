@@ -40,6 +40,23 @@ class Job(QRunnable):
         self.signals.done.emit(doc)
 
 
+class CallJob(QRunnable):
+    """A plain function off the UI thread (an image fetch): `done` gets (result, "") or
+    (None, "code: message")."""
+
+    def __init__(self, fn: Callable[..., Any], *args: Any) -> None:
+        super().__init__()
+        self.fn, self.args = fn, args
+        self.signals = JobSignals()
+
+    def run(self) -> None:
+        try:
+            result = (self.fn(*self.args), "")
+        except Exception as exc:  # noqa: BLE001 -- shown as a note, never fatal
+            result = (None, f"{getattr(exc, 'code', type(exc).__name__)}: {exc}")
+        self.signals.done.emit(result)
+
+
 class StderrRouter:
     """A file-like `sys.stderr`: writes go to `sink` while one is attached."""
 

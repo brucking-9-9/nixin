@@ -1,0 +1,520 @@
+{
+ "cached": false,
+ "category": {
+  "key": "AudioVideo",
+  "label": "Audio & Video",
+  "matches": [
+   "AudioVideo",
+   "Audio",
+   "Video"
+  ]
+ },
+ "channel": "unstable",
+ "count": 6,
+ "limit": 3,
+ "ok": true,
+ "results": [
+  {
+   "appstream": {
+    "categories": [
+     "Qt",
+     "KDE",
+     "Audio",
+     "AudioVideo"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "org.kde.elisa.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "elisa",
+     "path": "/nix/store/nslarc8m9rxhw74vqb3icmj07w4r0bpp-elisa-26.08.2/share/icons/hicolor/scalable/apps/elisa.svg",
+     "url": "https://search.nixos.org/icons/36b6e995f4dbe5c49e3068cdccfec935.svg"
+    },
+    "id": "org.kde.elisa",
+    "installed_for": [
+     "system"
+    ],
+    "launchable": "org.kde.elisa.desktop",
+    "license": null,
+    "name": "Elisa",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": "The Elisa music player",
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/866b5f72d2552daf0112803dee6ded4a.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/c76a1c3358ab008420a2d5683e1fb546.webp",
+      "url": "https://cdn.kde.org/screenshots/elisa/elisa.png"
+     },
+     {
+      "caption": "Elisa on Plasma Mobile",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/bf5de7e8f829556d7434e3ba282ed19c.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/138e0662455abeba467e26c4da6313c2.webp",
+      "url": "https://cdn.kde.org/screenshots/elisa/elisa-mobile.png"
+     }
+    ],
+    "source": "installed",
+    "store_path": "/nix/store/nslarc8m9rxhw74vqb3icmj07w4r0bpp-elisa-26.08.2",
+    "summary": "Play local music and listen to online radio"
+   },
+   "channel": "unstable",
+   "curated": false,
+   "description": "Simple music player aiming to provide a nice experience for its users",
+   "homepage": "https://invent.kde.org/multimedia/elisa",
+   "installed": true,
+   "installed_for": [
+    "system"
+   ],
+   "kind": "pkg",
+   "license": [
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "GPL-3.0-or-later",
+    "LGPL-2.1-only",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "LGPL-3.0-or-later"
+   ],
+   "listed_by": [
+    "installed"
+   ],
+   "main_program": "elisa",
+   "name": "kdePackages.elisa",
+   "outputs": [
+    "devtools",
+    "dev",
+    "debug",
+    "out"
+   ],
+   "platforms": [
+    "arc-linux",
+    "i686-freebsd"
+   ],
+   "pname": "elisa",
+   "position": "pkgs/kde/gear/elisa/default.nix:10",
+   "programs": [
+    "elisa"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "26.08.2"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "AudioVideo",
+     "Audio",
+     "Mixer",
+     "GTK",
+     "Settings",
+     "X-XFCE-SettingsDialog",
+     "X-XFCE-HardwareSettings"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "org.pulseaudio.pavucontrol.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "org.pulseaudio.pavucontrol",
+     "path": "/nix/store/lqhqbvlzzsm2p4g8hsd8hjpybn8hajx1-pavucontrol-6.2/share/icons/hicolor/scalable/apps/org.pulseaudio.pavucontrol.svg",
+     "url": "https://search.nixos.org/icons/6f8879e9083ee2a23121fa29835dec46.svg"
+    },
+    "id": "org.pulseaudio.pavucontrol",
+    "installed_for": [
+     "system"
+    ],
+    "launchable": "org.pulseaudio.pavucontrol.desktop",
+    "license": null,
+    "name": "Volume Control",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": "The \u201cPlayback\u201d tab",
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/ad9355c9c2bfc776705294956cd7bded.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/dd3946f4e9c92856158c76a8622ceb76.webp",
+      "url": "https://freedesktop.org/software/pulseaudio/pavucontrol/screenshots/pavucontrol-playback.png"
+     },
+     {
+      "caption": "The \u201cRecording\u201d tab",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/dba4c7297f6de4cd2c0e192bb072a504.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/85ff389c83791b72afbca12895b8a0a0.webp",
+      "url": "https://freedesktop.org/software/pulseaudio/pavucontrol/screenshots/pavucontrol-record.png"
+     },
+     {
+      "caption": "The \u201cOutput\u201d tab",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/7615ce759e964bc80f59ef0ec0e398b6.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/0860b6cd7ba21a6d099b8ab2b5ff3a55.webp",
+      "url": "https://freedesktop.org/software/pulseaudio/pavucontrol/screenshots/pavucontrol-output.png"
+     },
+     {
+      "caption": "The \u201cInput\u201d tab",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/623fdd361bd405a88dfe1d4bfad4148e.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/1cbb343ab09be4b1f3f8266b082db1dc.webp",
+      "url": "https://freedesktop.org/software/pulseaudio/pavucontrol/screenshots/pavucontrol-input.png"
+     },
+     {
+      "caption": "The \u201cConfiguration\u201d tab",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/5a837439ae6d84b785519b6174e61801.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/224dcca2e3c3c99a62de44ee16550c8c.webp",
+      "url": "https://freedesktop.org/software/pulseaudio/pavucontrol/screenshots/pavucontrol-config.png"
+     }
+    ],
+    "source": "installed",
+    "store_path": "/nix/store/lqhqbvlzzsm2p4g8hsd8hjpybn8hajx1-pavucontrol-6.2",
+    "summary": "Adjust the volume level"
+   },
+   "channel": "unstable",
+   "curated": false,
+   "description": "PulseAudio Volume Control",
+   "homepage": "http://freedesktop.org/software/pulseaudio/pavucontrol/",
+   "installed": true,
+   "installed_for": [
+    "system"
+   ],
+   "kind": "pkg",
+   "license": [
+    "GPL-2.0-or-later"
+   ],
+   "listed_by": [
+    "installed",
+    "search.nixos.org"
+   ],
+   "main_program": "pavucontrol",
+   "name": "pavucontrol",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "armv5tel-linux",
+    "riscv64-linux"
+   ],
+   "pname": "pavucontrol",
+   "position": "pkgs/by-name/pa/pavucontrol/package.nix:58",
+   "programs": [
+    "pavucontrol"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "6.2"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "AudioVideo",
+     "Player",
+     "Recorder"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "vlc",
+     "path": null,
+     "url": "https://search.nixos.org/icons/5d5f26df24ccecefc6686ee01b025ff8.png"
+    },
+    "id": "org.videolan.vlc",
+    "launchable": null,
+    "license": null,
+    "name": "VLC media player",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": null,
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/9343a694a931962996943ef86e472f7f.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/f3d111c9a7f506e506670c60353fc71f.webp",
+      "url": "https://images.videolan.org/vlc/screenshots/2.0.0/vlc-2.0-poney.jpg"
+     },
+     {
+      "caption": null,
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/ea014381566e646bbe6a7641a57c22b4.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/b35dbf45c6472c46ffbc4e6620b23b67.webp",
+      "url": "https://images.videolan.org/vlc/screenshots/2.0.0/vlc-2.0-gnome3-open.jpg"
+     },
+     {
+      "caption": null,
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/f90cca512ffd699168a39bc5c30c4198.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/7e0c1f680c5d1ea3f06fa5ba46dc947c.webp",
+      "url": "https://images.videolan.org/vlc/screenshots/2.0.0/vlc-2.0-gnome3-debian.jpg"
+     }
+    ],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Read, capture, broadcast your multimedia streams"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Cross-platform media player and streaming server",
+   "homepage": "https://www.videolan.org/vlc/",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "LGPL-2.1-or-later"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "vlc",
+   "name": "vlc",
+   "outputs": [
+    "man",
+    "doc",
+    "out",
+    "dev"
+   ],
+   "platforms": [
+    "microblaze-linux",
+    "arc-linux"
+   ],
+   "pname": "vlc",
+   "position": "pkgs/by-name/vl/vlc/package.nix:321",
+   "programs": [
+    "vlc-wrapper",
+    "qvlc",
+    "vlc",
+    "svlc",
+    "cvlc",
+    "nvlc",
+    "rvlc"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "3.0.24"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "AudioVideo",
+     "Audio",
+     "Video",
+     "Player",
+     "TV"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "mpv",
+     "path": null,
+     "url": "https://search.nixos.org/icons/bf6082c81dcc8b8c6351326b53530f46.svg"
+    },
+    "id": "io.mpv.mpv",
+    "launchable": null,
+    "license": null,
+    "name": "mpv Media Player",
+    "notes": [],
+    "screenshots": [],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Play movies and songs"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "General-purpose media player, fork of MPlayer and mplayer2",
+   "homepage": "https://mpv.io",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-2.0-or-later",
+    "LGPL-2.1-or-later"
+   ],
+   "listed_by": [
+    "curated",
+    "search.nixos.org"
+   ],
+   "main_program": "mpv",
+   "name": "mpv",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [],
+   "pname": "mpv-with-scripts",
+   "position": "pkgs/by-name/mp/mpv/package.nix:177",
+   "programs": [
+    "umpv",
+    "mpv",
+    "mpv_identify.sh"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "0.41.0"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "AudioVideo",
+     "Audio",
+     "AudioVideoEditing"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "audacity",
+     "path": null,
+     "url": "https://search.nixos.org/icons/79474054b8aa0c7ccff3ceaeb5fed231.png"
+    },
+    "id": "org.audacityteam.Audacity",
+    "launchable": null,
+    "license": null,
+    "name": "Audacity 4 Portable",
+    "notes": [],
+    "screenshots": [],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Record and edit audio files"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Sound editor with graphical UI",
+   "homepage": "https://www.audacityteam.org",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "CC-BY-3.0"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "audacity",
+   "name": "audacity",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "arc-linux",
+    "sh4-linux"
+   ],
+   "pname": "audacity",
+   "position": "pkgs/by-name/au/audacity/package.nix:185",
+   "programs": [
+    "audacity"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "4.0.0"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "AudioVideo",
+     "Recorder"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "com.obsproject.Studio",
+     "path": null,
+     "url": "https://search.nixos.org/icons/d879e0ce0d6a181af4fe5582230f63a7.svg"
+    },
+    "id": "com.obsproject.Studio",
+    "launchable": null,
+    "license": null,
+    "name": "OBS Studio",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": "The OBS Studio window showing a card game, the project website, a video, and a purple rectangle",
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/261e734bffa99aaa31540a49f851a65b.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/d057687e98d2b09497cd706e37b4aaa3.webp",
+      "url": "https://obsproject.com/assets/images/OBSDemoApp301Flathub.png"
+     }
+    ],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Free and Open Source Streaming/Recording Software"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Free and open source software for video recording and live streaming",
+   "homepage": "https://obsproject.com",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-2.0-or-later",
+    "FDK-AAC"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "obs",
+   "name": "obs-studio",
+   "outputs": [
+    "debug",
+    "out"
+   ],
+   "platforms": [
+    "x86_64-linux",
+    "i686-linux"
+   ],
+   "pname": "obs-studio",
+   "position": "pkgs/applications/video/obs-studio/default.nix:246",
+   "programs": [
+    "obs-ffmpeg-mux",
+    "obs",
+    "obs-nvenc-test"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "32.2.2"
+  }
+ ],
+ "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+ "source": "search.nixos.org",
+ "sources": {
+  "curated": {
+   "count": 10
+  },
+  "installed": {
+   "count": 2
+  },
+  "search.nixos.org": {
+   "cached": false,
+   "channel": "unstable",
+   "count": 3,
+   "error": null,
+   "kinds": [
+    "app"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+  }
+ }
+}

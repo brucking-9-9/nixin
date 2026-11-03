@@ -1,0 +1,137 @@
+{
+ "cached": false,
+ "channel": "unstable",
+ "count": 1,
+ "kind": "pkg",
+ "name": "prismlauncher",
+ "ok": true,
+ "results": [
+  {
+   "appstream": {
+    "categories": [
+     "Game",
+     "ActionGame",
+     "AdventureGame",
+     "Simulation",
+     "PackageManager"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "org.prismlauncher.PrismLauncher",
+     "path": null,
+     "url": "https://search.nixos.org/icons/2aa61eb4041e301366fad368b6d8507b.svg"
+    },
+    "id": "org.prismlauncher.PrismLauncher",
+    "launchable": null,
+    "license": null,
+    "name": "Prism Launcher",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": "The main Prism Launcher window",
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/438cc90ce0c9112e255eded6eeaba225.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/0df8636836ad514ead4de81141f6272f.webp",
+      "url": "https://prismlauncher.org/img/screenshots/LauncherDark.png"
+     },
+     {
+      "caption": "Modpack installation",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/672e4c6d0c9bcc79936c51ed85167255.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e3c23d3dd3a8c01ddc6c196298bcc612.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModpackInstallDark.png"
+     },
+     {
+      "caption": "Modpack updating",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/3942f926ed00581d34c6c9d2f8823dea.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/397bf5cb095697c91278892127675ad5.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModpackUpdateDark.png"
+     },
+     {
+      "caption": "Mod installation",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/cad9e98a49b53e6443648165f64ccab8.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/591354530713e5385f16e563425df8a5.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModInstallDark.png"
+     },
+     {
+      "caption": "Mod updating",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/f8ebb45028cec5ef17c513cd9794c461.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/8085297181ce5ef5f71322eb02d7d112.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModUpdateDark.png"
+     },
+     {
+      "caption": "Instance management",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/2a76ecc3cacfbf8c78e0f35130d4968f.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/eb0f2db2167fbce1c9c1ddc47194fd81.webp",
+      "url": "https://prismlauncher.org/img/screenshots/PropertiesDark.png"
+     },
+     {
+      "caption": "Cat :3",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/3f0c66797250cb72845627fdd3ffde4f.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e71e193008e191c2e3b109113b36eead.webp",
+      "url": "https://prismlauncher.org/img/screenshots/LauncherCatDark.png"
+     },
+     {
+      "caption": "Customization",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/f92fdd2772aca65101c54d409e051c44.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e51e1a87faa6e7eaafccbc9025f632f8.webp",
+      "url": "https://prismlauncher.org/img/screenshots/CustomizeDark.png"
+     }
+    ],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Discover, manage, and play Minecraft instances"
+   },
+   "channel": "unstable",
+   "description": "Free, open source launcher for Minecraft",
+   "homepage": "https://prismlauncher.org/",
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-only"
+   ],
+   "main_program": "prismlauncher",
+   "matched_by": "attr",
+   "name": "prismlauncher",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "powerpc64-linux",
+    "riscv64-linux"
+   ],
+   "pname": "prismlauncher",
+   "position": "pkgs/by-name/pr/prismlauncher/package.nix:140",
+   "programs": [
+    "prismlauncher"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "11.1.1"
+  }
+ ],
+ "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+ "source": "search.nixos.org",
+ "sources": {
+  "search.nixos.org": {
+   "cached": false,
+   "channel": "unstable",
+   "count": 1,
+   "error": null,
+   "kinds": [
+    "pkg"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+  }
+ }
+}

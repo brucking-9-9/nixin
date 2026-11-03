@@ -905,3 +905,21 @@ def test_screenshots_export_at_both_sizes():
             assert "#120b10" in svg.lower()  # the theme's background
 
         drive(script, size=size)
+
+
+def test_details_show_appstream_as_text():
+    """The TUI shows a package's `appstream` as lines in the info pane (no images)."""
+    info = load("info_cowsay")
+    info["results"][0]["appstream"] = load("info_prismlauncher")["results"][0]["appstream"]
+
+    async def script(app, pilot, fake):
+        await open_details(app, pilot)
+        text = app.screen.query_one("#info", Fields).text
+        assert "app Prism Launcher" in text
+        assert "summary Discover, manage, and play Minecraft instances" in text
+        assert "category Game, ActionGame, AdventureGame" in text
+        assert "shots 8 screenshot(s) (the GUI shows them)" in text
+        assert "appstream search.nixos.org · an application" in text
+        assert "Prism Launcher" in screen_text(app)
+
+    drive(script, routes={**COWSAY, "info": info})

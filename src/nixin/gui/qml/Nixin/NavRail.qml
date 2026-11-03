@@ -4,7 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Search, Pending, Status, Packages, with their keys; under them what this session wrote and applied.
+// Search, Browse, Pending, Status, Packages, with their keys; under them what this session wrote and applied.
 Rectangle {
     id: rail
 
@@ -20,6 +20,7 @@ Rectangle {
         Repeater {
             model: [
                 { page: "search", text: "Search", key: "/" },
+                { page: "browse", text: "Browse", key: "Ctrl+B" },
                 { page: "pending", text: "Pending", key: "Ctrl+2" },
                 { page: "status", text: "Status", key: "Ctrl+3" },
                 { page: "packages", text: "Packages", key: "Ctrl+4" }

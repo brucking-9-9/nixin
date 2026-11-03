@@ -1,0 +1,667 @@
+{
+ "cached": false,
+ "category": {
+  "key": "Game",
+  "label": "Games",
+  "matches": [
+   "Game"
+  ]
+ },
+ "channel": "unstable",
+ "count": 9,
+ "limit": 4,
+ "ok": true,
+ "results": [
+  {
+   "appstream": {
+    "categories": [
+     "Utility",
+     "Game",
+     "Graphics",
+     "3DGraphics",
+     "Emulator",
+     "GNOME",
+     "GTK"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "com.usebottles.bottles.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "com.usebottles.bottles",
+     "path": "/nix/store/qzyzj4jib3x3srb2arash93pgjv906sv-bottles-unwrapped-67.4/share/icons/hicolor/scalable/apps/com.usebottles.bottles.svg",
+     "url": null
+    },
+    "id": "com.usebottles.bottles",
+    "installed_for": [
+     "master"
+    ],
+    "launchable": "com.usebottles.bottles.desktop",
+    "license": null,
+    "name": "Bottles",
+    "notes": [],
+    "screenshots": [],
+    "source": "installed",
+    "store_path": "/nix/store/qzyzj4jib3x3srb2arash93pgjv906sv-bottles-unwrapped-67.4",
+    "summary": "Run Windows software"
+   },
+   "channel": "unstable",
+   "curated": false,
+   "description": "Easy-to-use wineprefix manager",
+   "homepage": "https://usebottles.com/",
+   "installed": true,
+   "installed_for": [
+    "master"
+   ],
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-only"
+   ],
+   "listed_by": [
+    "installed"
+   ],
+   "main_program": "bottles",
+   "name": "bottles",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "mips-linux",
+    "s390x-linux"
+   ],
+   "pname": "bottles",
+   "position": "pkgs/by-name/bo/bottles-unwrapped/package.nix:137",
+   "programs": [],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "67.4"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "lunarclient.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "lunarclient",
+     "path": null,
+     "url": null
+    },
+    "id": "lunarclient",
+    "installed_for": [
+     "master"
+    ],
+    "launchable": "lunarclient.desktop",
+    "license": null,
+    "name": "Lunar Client",
+    "notes": [],
+    "screenshots": [],
+    "source": "installed",
+    "store_path": "/nix/store/yjjrr4vzb2qps0jq082kb5hmc2wxkv0l-lunarclient-3.7.17",
+    "summary": "Electron launcher for Lunar Client"
+   },
+   "channel": "unstable",
+   "curated": false,
+   "description": "Free Minecraft client with mods, cosmetics, and performance boost",
+   "homepage": "https://www.lunarclient.com/",
+   "installed": true,
+   "installed_for": [
+    "master"
+   ],
+   "kind": "pkg",
+   "license": [
+    "unfree"
+   ],
+   "listed_by": [
+    "installed"
+   ],
+   "main_program": "lunarclient",
+   "name": "lunar-client",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "x86_64-linux"
+   ],
+   "pname": "lunarclient",
+   "position": "pkgs/by-name/lu/lunar-client/package.nix:35",
+   "programs": [],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "3.7.25"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game",
+     "PackageManager"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "net.lutris.Lutris.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "net.lutris.Lutris",
+     "path": "/nix/store/0xzl6bcgdndkq55pbfdcnrsmc0w7yq6s-lutris-unwrapped-0.5.22/share/icons/hicolor/scalable/apps/net.lutris.Lutris.svg",
+     "url": null
+    },
+    "id": "net.lutris.Lutris",
+    "installed_for": [
+     "master"
+    ],
+    "launchable": "net.lutris.Lutris.desktop",
+    "license": null,
+    "name": "Lutris",
+    "notes": [],
+    "screenshots": [],
+    "source": "installed",
+    "store_path": "/nix/store/0xzl6bcgdndkq55pbfdcnrsmc0w7yq6s-lutris-unwrapped-0.5.22",
+    "summary": "Video Game Preservation Platform"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Open Source gaming platform for GNU/Linux",
+   "homepage": "https://lutris.net",
+   "installed": true,
+   "installed_for": [
+    "master"
+   ],
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-or-later"
+   ],
+   "listed_by": [
+    "installed",
+    "curated"
+   ],
+   "main_program": "lutris",
+   "name": "lutris",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "loongarch64-linux",
+    "x86_64-linux"
+   ],
+   "pname": "lutris",
+   "position": "pkgs/by-name/lu/lutris/package.nix:314",
+   "programs": [],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "0.5.22"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game",
+     "ActionGame",
+     "AdventureGame",
+     "Simulation",
+     "PackageManager"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "org.prismlauncher.PrismLauncher.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "org.prismlauncher.PrismLauncher",
+     "path": "/nix/store/p9g53akvhpxwr0figxdwkzypv7b8k6rm-prismlauncher-unwrapped-11.1.1/share/icons/hicolor/scalable/apps/org.prismlauncher.PrismLauncher.svg",
+     "url": "https://search.nixos.org/icons/2aa61eb4041e301366fad368b6d8507b.svg"
+    },
+    "id": "org.prismlauncher.PrismLauncher",
+    "installed_for": [
+     "master"
+    ],
+    "launchable": "org.prismlauncher.PrismLauncher.desktop",
+    "license": null,
+    "name": "Prism Launcher",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": "The main Prism Launcher window",
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/438cc90ce0c9112e255eded6eeaba225.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/0df8636836ad514ead4de81141f6272f.webp",
+      "url": "https://prismlauncher.org/img/screenshots/LauncherDark.png"
+     },
+     {
+      "caption": "Modpack installation",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/672e4c6d0c9bcc79936c51ed85167255.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e3c23d3dd3a8c01ddc6c196298bcc612.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModpackInstallDark.png"
+     },
+     {
+      "caption": "Modpack updating",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/3942f926ed00581d34c6c9d2f8823dea.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/397bf5cb095697c91278892127675ad5.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModpackUpdateDark.png"
+     },
+     {
+      "caption": "Mod installation",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/cad9e98a49b53e6443648165f64ccab8.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/591354530713e5385f16e563425df8a5.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModInstallDark.png"
+     },
+     {
+      "caption": "Mod updating",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/f8ebb45028cec5ef17c513cd9794c461.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/8085297181ce5ef5f71322eb02d7d112.webp",
+      "url": "https://prismlauncher.org/img/screenshots/ModUpdateDark.png"
+     },
+     {
+      "caption": "Instance management",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/2a76ecc3cacfbf8c78e0f35130d4968f.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/eb0f2db2167fbce1c9c1ddc47194fd81.webp",
+      "url": "https://prismlauncher.org/img/screenshots/PropertiesDark.png"
+     },
+     {
+      "caption": "Cat :3",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/3f0c66797250cb72845627fdd3ffde4f.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e71e193008e191c2e3b109113b36eead.webp",
+      "url": "https://prismlauncher.org/img/screenshots/LauncherCatDark.png"
+     },
+     {
+      "caption": "Customization",
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/f92fdd2772aca65101c54d409e051c44.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/e51e1a87faa6e7eaafccbc9025f632f8.webp",
+      "url": "https://prismlauncher.org/img/screenshots/CustomizeDark.png"
+     }
+    ],
+    "source": "installed",
+    "store_path": "/nix/store/p9g53akvhpxwr0figxdwkzypv7b8k6rm-prismlauncher-unwrapped-11.1.1",
+    "summary": "Discover, manage, and play Minecraft instances"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Free, open source launcher for Minecraft",
+   "homepage": "https://prismlauncher.org/",
+   "installed": true,
+   "installed_for": [
+    "master"
+   ],
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-only"
+   ],
+   "listed_by": [
+    "installed",
+    "curated"
+   ],
+   "main_program": "prismlauncher",
+   "name": "prismlauncher",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "powerpc64-linux",
+    "riscv64-linux"
+   ],
+   "pname": "prismlauncher",
+   "position": "pkgs/by-name/pr/prismlauncher/package.nix:140",
+   "programs": [
+    "prismlauncher"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "11.1.1"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Network",
+     "FileTransfer",
+     "Game"
+    ],
+    "description": null,
+    "desktop_ids": [
+     "steam.desktop"
+    ],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "steam",
+     "path": "/nix/store/zr6zwg0rjc1xzd5b804lk22pamrym3i9-steam-unwrapped-1.0.0.87/share/icons/hicolor/256x256/apps/steam.png",
+     "url": null
+    },
+    "id": "steam",
+    "installed_for": [
+     "system"
+    ],
+    "launchable": "steam.desktop",
+    "license": null,
+    "name": "Steam",
+    "notes": [],
+    "screenshots": [],
+    "source": "installed",
+    "store_path": "/nix/store/zr6zwg0rjc1xzd5b804lk22pamrym3i9-steam-unwrapped-1.0.0.87",
+    "summary": "Application for managing and playing games on Steam"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Digital distribution platform",
+   "homepage": "https://store.steampowered.com/",
+   "installed": true,
+   "installed_for": [
+    "system"
+   ],
+   "kind": "pkg",
+   "license": [
+    "unfreeRedistributable"
+   ],
+   "listed_by": [
+    "installed",
+    "curated"
+   ],
+   "main_program": "steam",
+   "name": "steam",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [],
+   "pname": "steam",
+   "position": "pkgs/by-name/st/steam-unwrapped/package.nix:47",
+   "programs": [],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "1.0.0.87"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": null,
+    "id": null,
+    "launchable": null,
+    "license": null,
+    "name": null,
+    "notes": [
+     "search.nixos.org has no desktop data for this package (unfree or a wrapper); nixin's own list names it"
+    ],
+    "screenshots": [],
+    "source": "curated",
+    "store_path": null,
+    "summary": null
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Native GOG, Epic, and Amazon Games Launcher for Linux, Windows and Mac",
+   "homepage": "https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-only"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "heroic",
+   "name": "heroic",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "x86_64-linux",
+    "aarch64-linux"
+   ],
+   "pname": "heroic",
+   "position": "pkgs/by-name/he/heroic-unwrapped/package.nix:143",
+   "programs": [
+    "heroic"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "2.22.4"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game",
+     "ArcadeGame"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "supertuxkart",
+     "path": null,
+     "url": "https://search.nixos.org/icons/4eaee546a33ed30bdd96224057e204d0.png"
+    },
+    "id": "net.supertuxkart.SuperTuxKart",
+    "launchable": null,
+    "license": null,
+    "name": "SuperTuxKart",
+    "notes": [],
+    "screenshots": [],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "A 3D open-source kart racing game"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "3D open-source arcade racer",
+   "homepage": "https://supertuxkart.net/",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-3.0-or-later"
+   ],
+   "listed_by": [
+    "curated",
+    "search.nixos.org"
+   ],
+   "main_program": "supertuxkart",
+   "name": "supertuxkart",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "riscv32-netbsd",
+    "armv7l-linux"
+   ],
+   "pname": "supertuxkart",
+   "position": "pkgs/by-name/su/supertuxkart/package.nix:184",
+   "programs": [
+    "supertuxkart"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "1.5"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game",
+     "Simulation"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": {
+     "name": "luanti",
+     "path": null,
+     "url": "https://search.nixos.org/icons/f477da1794825580b5768fbbce28e6fe.svg"
+    },
+    "id": "org.luanti.luanti",
+    "launchable": null,
+    "license": null,
+    "name": "Luanti",
+    "notes": [],
+    "screenshots": [
+     {
+      "caption": null,
+      "default": true,
+      "large": "https://search.nixos.org/screenshots/1ce26fb9802638bef8e45a5eb8a266d9.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/b88047debb42c5825aaa9139878f2889.webp",
+      "url": "https://www.luanti.org/media/gallery/1.jpg"
+     },
+     {
+      "caption": null,
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/fbd5c9abb707225a551e1a6da784d5d7.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/056251525dd43e490d5eee4a70a5f15e.webp",
+      "url": "https://www.luanti.org/media/gallery/3.jpg"
+     },
+     {
+      "caption": null,
+      "default": false,
+      "large": "https://search.nixos.org/screenshots/b3e7690a94e4e6d4e8b10ce4e1cfb828.webp",
+      "thumbnail": "https://search.nixos.org/screenshots/f8d68369bda886537f5ec2498a280110.webp",
+      "url": "https://www.luanti.org/media/gallery/5.jpg"
+     }
+    ],
+    "source": "search.nixos.org",
+    "store_path": null,
+    "summary": "Block-based multiplayer game platform"
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Open source voxel game engine (formerly Minetest)",
+   "homepage": "https://www.luanti.org/",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "LGPL-2.1-or-later"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "luanti",
+   "name": "luanti",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "mips64el-linux",
+    "i686-linux"
+   ],
+   "pname": "luanti",
+   "position": "pkgs/by-name/lu/luanti/package.nix:142",
+   "programs": [
+    "luanti",
+    "minetestserver",
+    "minetest",
+    "luantiserver"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "5.17.0"
+  },
+  {
+   "appstream": {
+    "categories": [
+     "Game"
+    ],
+    "description": null,
+    "desktop_ids": [],
+    "files": [],
+    "gui": true,
+    "homepage": null,
+    "icon": null,
+    "id": null,
+    "launchable": null,
+    "license": null,
+    "name": null,
+    "notes": [
+     "search.nixos.org has no desktop data for this package (unfree or a wrapper); nixin's own list names it"
+    ],
+    "screenshots": [],
+    "source": "curated",
+    "store_path": null,
+    "summary": null
+   },
+   "channel": "unstable",
+   "curated": true,
+   "description": "Free fast-paced first-person shooter",
+   "homepage": "https://www.xonotic.org/",
+   "installed": false,
+   "installed_for": [],
+   "kind": "pkg",
+   "license": [
+    "GPL-2.0-or-later"
+   ],
+   "listed_by": [
+    "curated"
+   ],
+   "main_program": "xonotic",
+   "name": "xonotic",
+   "outputs": [
+    "out"
+   ],
+   "platforms": [
+    "i686-linux",
+    "m68k-linux"
+   ],
+   "pname": "xonotic-sdl",
+   "position": "pkgs/games/xonotic/default.nix:54",
+   "programs": [],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "source": "search.nixos.org",
+   "unfree": null,
+   "version": "0.8.6"
+  }
+ ],
+ "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+ "source": "search.nixos.org",
+ "sources": {
+  "curated": {
+   "count": 10
+  },
+  "installed": {
+   "count": 5
+  },
+  "search.nixos.org": {
+   "cached": false,
+   "channel": "unstable",
+   "count": 4,
+   "error": null,
+   "kinds": [
+    "app"
+   ],
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f"
+  }
+ }
+}

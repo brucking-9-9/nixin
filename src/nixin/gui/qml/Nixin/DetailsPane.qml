@@ -149,6 +149,154 @@ Item {
                 width: scroll.availableWidth - 12
                 spacing: Theme.gap
 
+                // the package as an application (`appstream`): icon, name, summary, chips
+                RowLayout {
+                    objectName: "appBlock"
+                    Layout.fillWidth: true
+                    visible: pane.d.hasApp
+                    spacing: 12
+                    AppIcon {
+                        objectName: "appIcon"
+                        Layout.preferredWidth: 56
+                        Layout.preferredHeight: 56
+                        Layout.alignment: Qt.AlignTop
+                        source: pane.d.iconUrl
+                        name: pane.d.appName !== "" ? pane.d.appName : pane.d.name
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Text {
+                            objectName: "appName"
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            text: pane.d.appName
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: Theme.fg
+                            font.family: Theme.font
+                            font.pixelSize: Theme.fontSize + 2
+                            font.bold: true
+                        }
+                        Text {
+                            objectName: "appSummary"
+                            Layout.fillWidth: true
+                            visible: text !== ""
+                            text: pane.d.appSummary
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            color: Theme.fg
+                            opacity: 0.85
+                            font.family: Theme.font
+                            font.pixelSize: Theme.fontSize
+                        }
+                        Flow {
+                            objectName: "chips"
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: pane.d.chips
+                                delegate: Rectangle {
+                                    id: chip
+                                    required property string modelData
+                                    implicitWidth: chipText.implicitWidth + 14
+                                    implicitHeight: chipText.implicitHeight + 6
+                                    radius: height / 2
+                                    color: Qt.alpha(Theme.purple, 0.12)
+                                    border.width: 1
+                                    border.color: Qt.alpha(Theme.purple, 0.45)
+                                    Text {
+                                        id: chipText
+                                        anchors.centerIn: parent
+                                        text: chip.modelData
+                                        textFormat: Text.PlainText
+                                        color: Theme.purple
+                                        font.family: Theme.font
+                                        font.pixelSize: Theme.small
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            objectName: "appSource"
+                            Layout.fillWidth: true
+                            text: pane.d.appSource
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: Theme.dim2
+                            font.family: Theme.font
+                            font.pixelSize: Theme.small
+                        }
+                    }
+                }
+
+                // screenshots: fetched when this pane opened (search.nixos.org's small copies
+                // when it has them), cached, at most three
+                ListView {
+                    id: shots
+                    objectName: "shots"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 170
+                    visible: pane.d.hasApp && (count > 0 || pane.d.shotsLoading)
+                    orientation: ListView.Horizontal
+                    spacing: 8
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: pane.d.shots
+                    delegate: Column {
+                        id: shot
+                        required property string url
+                        required property string caption
+                        width: 240
+                        spacing: 2
+                        Rectangle {
+                            width: 240
+                            height: 148
+                            radius: Theme.radius
+                            color: Theme.sunken
+                            border.width: 1
+                            border.color: Theme.line
+                            Image {
+                                objectName: "shotImage"
+                                anchors.fill: parent
+                                anchors.margins: 1
+                                source: shot.url
+                                sourceSize.width: 480
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                            }
+                        }
+                        Text {
+                            width: 240
+                            text: shot.caption
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: Theme.dim2
+                            font.family: Theme.font
+                            font.pixelSize: Theme.small
+                        }
+                    }
+                    BusyIndicator {
+                        anchors.left: parent.left
+                        anchors.leftMargin: shots.count * 248 + 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        running: pane.d.shotsLoading
+                        visible: pane.d.shotsLoading
+                    }
+                }
+                Text {
+                    objectName: "shotsNote"
+                    Layout.fillWidth: true
+                    visible: pane.d.hasApp && text !== ""
+                    text: pane.d.shotsNote
+                    textFormat: Text.PlainText
+                    wrapMode: Text.Wrap
+                    color: Theme.dim2
+                    font.family: Theme.font
+                    font.pixelSize: Theme.small
+                }
+
                 SectionHead {
                     Layout.fillWidth: true
                     text: "info"

@@ -34,6 +34,9 @@ CLOSURE = ("sign", "name", "version", "size", "style")
 PACKAGE = ("name", "drv", "version", "tag", "where", "isHome")
 UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome")
 LINE = ("text",)
+APP = ("name", "target", "version", "summary", "icon", "installed", "curated", "marks")
+CATEGORY = ("key", "label", "count", "installed")
+SHOT = ("url", "caption")
 
 
 class Rows(QAbstractListModel):
@@ -177,6 +180,37 @@ def updates(xs: Iterable[view.UpdateRow]) -> list[Row]:
             "isHome": r.user is not None,
         }
         for r in xs
+    ]
+
+
+def file_url(path: str) -> str:
+    """A local file as a URL for QML's Image (empty when there is no such file)."""
+    import os
+
+    from PySide6.QtCore import QUrl
+
+    return QUrl.fromLocalFile(path).toString() if path and os.path.isfile(path) else ""
+
+
+def apps(xs: Iterable[view.AppRow]) -> list[Row]:
+    return [
+        {
+            "name": r.name,
+            "target": r.target,
+            "version": r.version,
+            "summary": " ".join(r.summary.split()),
+            "icon": file_url(r.icon),
+            "installed": r.installed,
+            "curated": r.curated,
+            "marks": r.marks,
+        }
+        for r in xs
+    ]
+
+
+def categories(xs: Iterable[view.BrowseCategory]) -> list[Row]:
+    return [
+        {"key": c.key, "label": c.label, "count": c.count, "installed": c.installed} for c in xs
     ]
 
 

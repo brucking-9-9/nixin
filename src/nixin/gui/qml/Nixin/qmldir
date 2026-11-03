@@ -6,6 +6,9 @@ NavRail 1.0 NavRail.qml
 SearchPage 1.0 SearchPage.qml
 HitRow 1.0 HitRow.qml
 PackagesPage 1.0 PackagesPage.qml
+BrowsePage 1.0 BrowsePage.qml
+AppRow 1.0 AppRow.qml
+AppIcon 1.0 AppIcon.qml
 PackageRow 1.0 PackageRow.qml
 UpdateRow 1.0 UpdateRow.qml
 DetailsPane 1.0 DetailsPane.qml
