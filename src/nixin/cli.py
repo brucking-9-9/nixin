@@ -29,6 +29,7 @@ from . import (
     apply,
     appstream,
     discovery,
+    doctor,
     explain,
     gui,
     outdated,
@@ -63,6 +64,7 @@ VERBS: dict[str, tuple[str, str]] = {
     "outdated": ("outdated", outdated.HELP),
     "update": ("outdated", outdated.update.HELP),
     "try": ("try", tryout.HELP),
+    "doctor": ("doctor", doctor.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
     "gui": ("gui", "desktop UI (Qt) over the same documents"),
 }
@@ -101,6 +103,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="verb", metavar="VERB")
     discovery.register(sub)
     appstream.register(sub)
+    doctor.register(sub)
     tryout.register(sub)  # before the stubs: its own positionals (PKG, then ARGS after --)
     for verb, (_layer, help_) in VERBS.items():
         if verb in sub.choices:  # a layer registered it with its own arguments
