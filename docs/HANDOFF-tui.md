@@ -304,3 +304,109 @@ changes something. The view-model is shared (`ui/view.py`: `package_rows`,
 
 How to test the page: `nix develop -c pytest tests/test_tui.py -k "packages or page_keys"`;
 by hand `nixin-tui --config ~/nixos`, `i`, `t`, `m` (read-only); `u` only on a clone.
+
+## Options page (branch `ui-options`, 2026-11-02, mbp13)
+
+Options were reachable only through Search's `opt`/`hm` kinds and the generic Details
+screen. Now there is an Options page in both front ends: a browser over `search --kind
+opt|hm`, one option in full, and Set/Unset through the writer flow. No backend change: it
+calls `search`, `where`, `set`, `unset` (and `status` for Pending, as before).
+
+- **View-model** (`ui/view.py`, "options", shared with the GUI): `option_search_args`
+  (`--kind opt|hm --limit 50`), `option_template` / `option_placeholder` /
+  `option_set_name` (templates: `users.users.<name>.shell`; a list element
+  `programs.git.includes.*.path` is set through its list), `option_where_scopes` /
+  `option_users` (the page's tree only: `programs.git.lfs.enable` is a NixOS *and* a Home
+  Manager option, and `where` answers both), `option_value_text`, `option_cue`,
+  `option_prefill` (the value on the host when nix_text can write it back exactly, else
+  the documented default, else empty: never a `<derivation …>`, `<function>`, a capped
+  list, a string options.nix cut with `<…>`, or a multi-line string cut to one line),
+  `option_sections` (option: type/default/example/read-only; about: the whole
+  description; on HOST: the value per scope, `set in` with the config file, line and text
+  or the module that gives the default with its priority (`the option's default`,
+  `lib.mkDefault`, `lib.mkForce`); declared: the module file:line on the locked
+  nixpkgs/home-manager from `where`, upstream's link, the docs source), `option_set_hint`.
+- **Screens** (`tui/options.py`): `OptionsScreen`: `o` from anywhere (`ctrl+5`, and
+  `ctrl+]`, which is what a terminal without the kitty protocol sends for it). The query
+  (focused on entry, debounced as on Search, Enter searches and moves to the results), the
+  kind button `NixOS (k)` / `Home Manager (k)`, the table (name and type; from 60 cells
+  the description), under it the highlighted row's description and the CLI's source
+  footer. `f` back to the query, `c` channel, `esc` query → results → back. The query,
+  kind and results are kept on the app (`options_last`), so leaving and coming back costs
+  nothing. Enter opens `OptionScreen`: title with the cue (`= true`), two panes from 80
+  cells (option + about | on HOST + declared), stacked below; `e` Set, `u` Unset, `h` the
+  Home Manager user (from `where`'s home scopes, else status/list), `w` where again.
+- **Set**: `SetOptionModal` now takes `hint` (type, example, default under the value) and
+  `path` (a template: the option name is an input with its `<name>` selected, Enter moves
+  to the value, a name still holding `<name>`/`*` is refused); it dismisses with
+  `(option, value)` (`app.set_option` is the only caller). Then the usual flow: `set …
+  --dry-run` → DiffModal → `w` → `where` again → the session's writes → Pending.
+- Page keys: `i o p s` (folded as `i o p s go` below 80 cells; the page you are on is left
+  out). `?` lists the Options keys. The palette has Options.
+- Tests (`tests/test_tui.py`, +9 functions, 11 cases): the view-model on the recorded
+  documents (NixOS and HM sections, the definitions' priorities, prefill never writing a
+  placeholder back, templates and list elements), and the app at 50×25 and 120×40: search → details →
+  Set (prefill `true`, the hint) → diff → write → `where` again (`= false`) → Pending
+  (`changed hosts/mbp13/default.nix`, the session's write); Unset; the page kept after
+  Search; HM for brucking (`set … --home brucking --dry-run`); a template (no `where`, the
+  name filled in, `<name>` refused); HM on a host without HM users (Set refused); a list
+  element (Set on `programs.git.includes`); an HM `<name>` template loading the users
+  from status. Fixtures `tests/fixtures/tui/options_*.json` (`tui_fake.OPTIONS`,
+  `HM_OPTIONS`): recorded on mbp13 against `~/nixos` (search, where, `set/unset
+  --dry-run`; 19BK's brucking for HM) and, for the written `set`/`unset` and the `status`
+  after them, in a throwaway clone (its path replaced by `/home/master/nixos`).
+- Screenshots: `docs/tui/{phone,desktop}-13…18-*.svg` (results, one option, Set, its
+  diff, Pending, an HM option); every other fixture SVG redrawn (the footers carry `o`).
+
+### Live on mbp13
+
+| step | result |
+|---|---|
+| read-only, `~/nixos` (`scripts/tui-screenshots.py --live --only options --config ~/nixos --host mbp13 --hm-host 19BK`) | `openssh`: 50 options (search.nixos.org unstable@0bb2eedc, cached); `services.openssh.enable` `= true`, set in `hosts/mbp13/default.nix:249  enable = true;`, declared `nixpkgs …/ssh/sshd.nix:247`; Set prefilled `true`; the real `set … false --dry-run` diff (line 249), cancelled. 19BK: `programs.git.lfs.enable` `= true [home brucking]`, set in `home/modules/git.nix:6`, declared `home-manager modules/programs/git.nix:273`. 26 s for both sizes and both hosts. `docs/tui/live-{phone,desktop}-8…12-*.svg` |
+| `~/nixos` after | HEAD a198757, `git status`/`git diff` and the hashes of `flake.lock`, `hosts/mbp13/default.nix`, `home/modules/git.nix` identical before and after |
+| the round trip on a throwaway clone (`git clone ~/nixos ~/nixos-ui-test`), 50×25, the real backend | search 0.03 s · where 3.0 s · `set … false --dry-run` 0.12 s · `set` 1.1 s (eval check ok) · where 2.9 s (`= false`) · Pending: `status` 0.15 s (warm; 36 s cold for the first status of the clone), `changed hosts/mbp13/default.nix`, the session's write · `unset --dry-run` 0.17 s · `unset` 1.2 s · where 2.9 s: `= false`, set in `nixpkgs …/sshd.nix (the option's default)`. `docs/tui/live-phone-13…15-*-clone.svg` |
+
+Nothing switched, no sudo, nothing written in `~/nixos`. The clone could not be removed
+(the run's settings deny `rm -rf`): `rm -rf ~/nixos-ui-test`.
+
+### Judgement calls
+
+1. **A page of its own, not Search's `opt` kind.** Search mixes kinds and its Details asks
+   `info` (a second network call that only repeats the search row for an option). The
+   Options page asks `search` and `where` only, filters `where` to the page's tree, and
+   gives the option's text the room it needs.
+2. **List → details screen at both sizes** (as Search and Packages do), not a side-by-side
+   pane at 120 cells: one navigation model in the TUI, and `where` runs only for the
+   option the person opens (seconds cold, ~200 MiB), never on cursor movement.
+3. **Prefill**: only a value that round-trips; otherwise the default, otherwise empty.
+4. **Templates**: `<name>` paths get no `where` (it would be `not-found`); Set asks for the
+   name with the placeholder selected. A list element (`.*.`) is set through its list,
+   whose value `where` gives (the dialog starts from it). Unset is off for both.
+5. **`explain` (branch `typed-set-explain`) is not used** (not merged here). The seam is
+   `view.option_sections(record, where, host, kind, user)` and the one `where` call per
+   screen (`OptionScreen.action_where`, `OptionsVM.refreshWhere`): `explain NAME [--home
+   USER]` returns the same two sides in one document (`type`, `default`, `example` from
+   the locked eval; `scopes[]`, one entry per tree carrying the option's fields itself
+   (`scope`, `user`, `option`, `value`, `definitions[]`, `declarations[]` with URLs at the
+   locked rev); `upstream` = the search row). After the merge: call `explain` there, pass
+   `doc["upstream"]` (or the search row) as the record and, as the `where`, the document
+   with each scope entry wrapped as `{scope, user, mode, options: [entry]}` (where's
+   shape), and prefer its `default`/`example` in `option_fields`. That branch's typed `set` also makes a wrong value a
+   `type-mismatch` error before anything is written; the UIs already show writer errors
+   as a notice, so it will appear there (expected type, default, example in the message).
+
+### Gaps
+
+1. `explain` not wired (above); upstream's HM declaration link points at home-manager
+   `master`, not the locked revision (`explain` has the locked one).
+2. 50 results per search, no paging: a broad query (`enable`) cuts off; refine the query.
+3. The Set dialog does not say why it started from the default (a value that cannot be
+   written back exactly).
+4. `programs.ssh.matchBlocks.<name>.hostname` and the like: `where` for the filled-in name
+   (`…matchBlocks.gh.hostname`) is not run before the preview; the diff and the eval check
+   after the write show what happened.
+5. A Home Manager option on a host without HM users (mbp13) can be browsed but not set:
+   the details say so and Set is refused.
+
+How to test the page: `nix develop -c pytest tests/test_tui.py -k option`; by hand
+`nixin-tui --config ~/nixos`, `o`, type, Enter, `e`, Esc (read-only); write only on a clone.

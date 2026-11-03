@@ -261,3 +261,48 @@ functions, the `update` verb and the live findings), in the window:
 
 How to test the page: `nix develop -c pytest tests/test_gui.py -k packages`; by hand
 `nixin-gui --config ~/nixos`, Ctrl+4 (read-only); Update only on a clone.
+
+## Options page (branch `ui-options`, 2026-11-02, mbp13)
+
+The same page as the TUI's (see HANDOFF-tui.md, "Options page", for the view-model
+functions, the judgement calls, the `explain` seam and the gaps), in the window:
+
+- **Nav** entry Options (`Ctrl+5`, last in the rail). The query field takes the focus when
+  the page opens (from the rail or the key).
+- `qml/Nixin/OptionsPage.qml`: left the query (debounced 350 ms; Enter searches and moves
+  to the results), the kind combo (NixOS / Home Manager: `search --kind opt|hm`), the
+  results (the shared `HitRow`: name in purple, type, the description under it), the
+  CLI's source footer. Right `OptionPane.qml`: title with the cue (`= true`), Set… and
+  Unset (off for templates and list elements), "for" a Home Manager user (from `where`'s
+  home scopes; "no Home Manager user" when the host has none), sections option, about
+  (the whole description, selectable), on HOST (value, `set in` file:line and text, or
+  the module giving the default with its priority; "where again"), declared (module
+  file:line, upstream's link, the docs source).
+- `SetDialog.qml`: the example and default under the value (`writer.setHint`), and for a
+  template an option-name field first with its `<name>` selected (`setPath`,
+  `setSelect`); Enter moves to the value (selected), Preview calls `previewSetPath(option,
+  value)`, which refuses a name still holding `<name>`/`*` (a notice; the dialog stays).
+  `previewSet(value)` remains for the Search page's dialog.
+- `bridge.py`: `OptionsVM` (state, models `results`/`option`/`host`/`declared`; slots
+  `search`, `setKind`, `select`, `refreshWhere`, `setHome`, `editOption`, `unset`;
+  `rerun` on a channel change; `sync_home` follows the diff dialog's user picker).
+  `WriterVM.start(…, users=)` and `open_set(…, hint=, path=, users=)`: the dialog's user
+  picker gets the option's users from the Options page instead of the details pane's.
+  `Gui.go("options")`, `Gui.options`.
+- Tests (`tests/test_gui.py`, +5): search → details → Set (prefill, hint) → diff → Write →
+  `where` again → Pending (`changed hosts/mbp13/default.nix`, the session's write) → back
+  (the page kept); Unset's diff; HM for brucking (`--home brucking`, no system choice in
+  the diff dialog); a template (no `where`, `<name>` selected, refused while unfilled,
+  then `set users.users.master…`); HM on a host without HM users (Set refused with the
+  notice); a list element (Set on the list, its value as the prefill). qmllint clean.
+- Screenshots: `docs/gui/14-options.png` … `17-options-hm.png` (fixtures; 1–13 redrawn
+  for the rail entry); live: `live-10-options.png` … `live-13-options-hm.png` (mbp13,
+  `~/nixos` read-only, 7 s; the Set preview is the real `set --dry-run`, cancelled),
+  `live-14-option-written-clone.png`, `live-15-option-pending-clone.png`,
+  `live-16-option-unset-clone.png` (the real set → Pending → unset on the throwaway
+  clone: set 1.0 s, where 2.8 s, status 0.12 s warm, unset 1.1 s; the window's farewell
+  `nixin gui: wrote 2: services.openssh.enable = false (hosts/mbp13/default.nix);
+  -services.openssh.enable (hosts/mbp13/default.nix) · not applied yet`).
+
+How to test the page: `nix develop -c pytest tests/test_gui.py -k option`; by hand
+`nixin-gui --config ~/nixos`, Ctrl+5 (read-only; write only on a clone).
