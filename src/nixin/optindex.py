@@ -258,8 +258,8 @@ class Index:
 
     def search(self, query: str, limit: int) -> list[dict[str, Any]]:
         """Options matching `query`, best first: the Home Manager source's scoring (exact
-        path, prefix, segment, substring, description). Internal and hidden options are
-        left out, as on search.nixos.org."""
+        path, prefix, segment, substring, description), then the shorter path. Internal
+        and hidden options are left out, as on search.nixos.org."""
         from .discovery.home_manager import score
 
         scored = []
@@ -268,9 +268,9 @@ class Index:
                 continue
             s = score(o["name"], o.get("description"), query)
             if s:
-                scored.append((-s, o["name"].casefold(), o))
-        scored.sort(key=lambda t: (t[0], t[1]))
-        return [o for _s, _n, o in scored[:limit]]
+                scored.append((-s, len(o["loc"]), o["name"].casefold(), o))
+        scored.sort(key=lambda t: t[:3])  # equal scores: the shallower path first
+        return [t[3] for t in scored[:limit]]
 
     # -- records -------------------------------------------------------------------------
 

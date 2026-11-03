@@ -187,9 +187,9 @@ def test_lookup_covers_and_search(machine):
     assert not idx.covers(["programs", "kitty", "enable"])
     hits = idx.search("openssh", 5)
     assert hits[0]["name"].startswith("services.openssh.") and len(hits) == 5
-    assert [o["name"] for o in idx.search("services.openssh.enable", 3)][0] == (
-        "services.openssh.enable"
-    )
+    assert idx.search("services.openssh.enable", 3)[0]["name"] == "services.openssh.enable"
+    depth = [len(o["loc"]) for o in idx.search("openssh", 80)]
+    assert depth == sorted(depth)  # one score for all: the shallower first
     assert not idx.search("bootMount", 5)  # hidden (an alias): left out, as upstream does
     assert idx.lookup("boot.bootMount") is not None  # but there for info/where
 
@@ -202,8 +202,10 @@ def test_records_and_links(machine):
     assert r["rev"] == idx.rev and r["default"] == "false" and r["read_only"] is False
     assert r["declarations"] == ["nixos/modules/services/networking/ssh/sshd.nix"]
     assert r["declaration_urls"] == [
-        "https://github.com/NixOS/nixpkgs/blob/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504/"
-        "nixos/modules/services/networking/ssh/sshd.nix#L247"
+        (
+            "https://github.com/NixOS/nixpkgs/blob/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504/"
+            "nixos/modules/services/networking/ssh/sshd.nix#L247"
+        )
     ]
     assert r["in_config"] is False and r["generation"]["number"] == 7
     own = idx.record(idx.lookup("nixinTest.greeting"))
@@ -287,7 +289,11 @@ def test_human_search_from_the_index(machine, transport, capsys, monkeypatch):
     monkeypatch.setenv("NIXIN_WIDTH", "100")
     assert main(["--host", "mbp13", "search", "--kind", "opt", "openssh", "--limit", "2"]) == 0
     out = capsys.readouterr().out
-    assert "services.openssh" in out and "index" in out
+    assert "services.openssh" in out and "# 2 result(s) · index (nixos generation 7)" in out
+    assert main(["--host", "mbp13", "info", "--kind", "opt", "services.openssh.enable"]) == 0
+    out = capsys.readouterr().out
+    assert "nixpkgs nixos/modules/services/networking/ssh/sshd.nix:247" in out
+    assert "system 7 (" in out and "running" in out
 
 
 # --- where / status (truth, on the fake nix of test_truth) ---------------------------------

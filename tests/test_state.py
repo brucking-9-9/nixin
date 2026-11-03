@@ -61,24 +61,27 @@ def fake(monkeypatch):
     """Records nixin and notify-send calls; `docs` maps a verb's flags to its document."""
 
     class Fake:
-        calls: list[tuple] = []
-        notes: list[tuple] = []
-        docs: dict[str, dict] = {"--published": PUBLISHED_DOC, "lock": LOCK_DOC}
-        notify_ok = True
+        def __init__(self) -> None:
+            self.calls: list[tuple] = []
+            self.notes: list[tuple] = []
+            self.docs: dict[str, dict] = {"--published": PUBLISHED_DOC, "lock": LOCK_DOC}
+            self.notify_ok = True
+
+    f = Fake()
 
     def nixin(*args):
-        Fake.calls.append(args)
+        f.calls.append(args)
         if args[0] == "outdated":
-            return Fake.docs["--published" if "--published" in args else "lock"]
-        return Fake.docs.get(args[0], {"ok": False, "error": {"code": "x", "message": "y"}})
+            return f.docs["--published" if "--published" in args else "lock"]
+        return f.docs.get(args[0], {"ok": False, "error": {"code": "x", "message": "y"}})
 
     def notify(summary, body, timeout):
-        Fake.notes.append((summary, body, timeout))
-        return Fake.notify_ok
+        f.notes.append((summary, body, timeout))
+        return f.notify_ok
 
     monkeypatch.setattr(state, "nixin", nixin)
     monkeypatch.setattr(state, "notify", notify)
-    return Fake
+    return f
 
 
 def summary(sd):
@@ -157,7 +160,7 @@ def test_in_quiet_wraps_midnight():
 def test_message_wording():
     assert state.message({"count": 1, "source": "lock"})[0] == "1 package has a newer version"
     assert state.message({"count": 0})[0] == "all packages are up to date"
-    head, body = state.message({"count": 3, "source": "published"})
+    _head, body = state.message({"count": 3, "source": "published"})
     assert "search.nixos.org" in body
 
 

@@ -236,7 +236,7 @@ def _option(o: dict[str, Any], tag: str) -> list[str]:
             lines.append(sub(key, cap(" ".join(str(docs[key]).split()), 90)))
     about = docs.get("description") or o.get("description")
     if about:
-        lines.append(sub("about", cap(about.strip(), 90)))
+        lines.append(sub("about", cap(" ".join(about.split()), 90)))
     return lines
 
 
