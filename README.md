@@ -256,9 +256,10 @@ companion footer (`hosts/mbp13/companion/local.py` → `qml/Footer.qml`) read on
 `~/.local/state/nixin/summary.json` (`outdated`, `pending`, `errors`), and the weekly
 flake report (`home/modules/terminal/ai/flake-report.sh`) runs `nixin-state report` on the
 two outdated documents. Running the outdated check as a user on a root-owned `/etc/nixos`
-needs `safe.directory = /etc/nixos` in that user's git config: nix's libgit2 refuses the
-repository otherwise (`eval-failed`, "not owned by current user"; seen on mbp13 with nix
-2.34.9).
+needs `safe.directory = /etc/nixos` in a git config libgit2 reads (`/etc/gitconfig`,
+or the user's own): nix refuses the repository otherwise (`eval-failed`, "not owned by
+current user"; seen on mbp13 with nix 2.34.9). The modules leave git's config to the
+config: the hub's `nixin-integration` branch sets it in `hosts/mbp13/dots.nix`.
 
 ## Status
 
