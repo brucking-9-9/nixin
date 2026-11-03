@@ -23,6 +23,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "nixin.truth" = ["*.nix"]
 "nixin.outdated" = ["*.nix"]
+"nixin.tryout" = ["*.nix"]
 "nixin.tui" = ["*.tcss"]
 "nixin.gui" = ["qml/*/*.qml", "qml/*/qmldir"]
 
