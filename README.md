@@ -90,7 +90,8 @@ which touch the network, run nix or write files, and the cache locations.
   (`--nixpkgs FLAKEREF|REV`, `--channel NAME` pick another). It compares them by pname:
   `pname  from → to` per scope, added and removed, the kernel, and the commands to take
   the update (`nix flake update nixpkgs`, `nixin plan`, `nixin apply`). Two package-list
-  evals, no build: about 5 s, plus a nixpkgs tarball download for a new commit.
+  evals, side by side, no build: about 2.5 s, plus a nixpkgs tarball download for a new
+  commit.
   `--published` compares the installed versions with a search.nixos.org channel instead
   (one query per 50 names; a heuristic, since many attributes share a pname).
   **update** takes it: it runs the command `outdated` prints (`nix flake update nixpkgs

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 import pytest
@@ -491,6 +492,38 @@ def test_a_target_the_config_does_not_evaluate_with(repo, capsys):
     assert rc == 1 and doc["error"]["code"] == "eval-failed"
     assert "would break it" in doc["error"]["message"]
     assert "undefined variable 'tuxedo'" in doc["error"]["message"]
+
+
+def test_the_two_evals_run_side_by_side(repo, capsys):
+    """Each eval waits for the other to have started: run one after the other, the first
+    would wait in vain (the barrier breaks after 10 s)."""
+    barrier = threading.Barrier(2, timeout=10)
+    plain = repo.nix
+
+    def nix(args, **kw):
+        if args[0] == "eval" and "--apply" in args and "cfg:" in args[args.index("--apply") + 1]:
+            barrier.wait()
+        return plain(args, **kw)
+
+    repo.nix = nix
+    rc, doc = run(capsys, "--refresh")
+    assert rc == 0 and doc["ok"] and len(plain.evals()) == 2
+    assert set(doc["timings"]) == {"resolve", "lock", "target", "total"}
+
+
+def test_a_lock_side_failure_wins_over_the_target_side(repo, capsys):
+    """Errors keep the sequential order: the config itself not evaluating comes first."""
+    plain = repo.nix
+    plain.target_error = TUXEDO_STDERR
+
+    def nix(args, **kw):
+        if args[0] == "eval" and "--apply" in args and "--override-input" not in args:
+            raise NixinError("eval-failed", "error: the lock side broke", stderr="x")
+        return plain(args, **kw)
+
+    repo.nix = nix
+    rc, doc = run(capsys, "--refresh")
+    assert rc == 1 and doc["error"]["message"] == "error: the lock side broke"
 
 
 def test_network_failures(repo, capsys):

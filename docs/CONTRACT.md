@@ -879,7 +879,9 @@ this host". It evaluates the host's `environment.systemPackages` and every Home 
 user's `home.packages`, plus `boot.kernelPackages.kernel.version`, twice: once as the
 flake is locked, and once with `--override-input <input> <target>` (plus
 `--no-write-lock-file`). Then it compares the two by pname. These are two package-list
-evals (`outdated.nix`); `system.build.toplevel` is never evaluated. The target is:
+evals (`outdated.nix`), run side by side (the lock side in a thread while the target is
+resolved and evaluated; an error of the lock side still comes before the target's);
+`system.build.toplevel` is never evaluated. The target is:
 
 | argument | target |
 |---|---|
@@ -932,7 +934,7 @@ Result:
 | `commands[]` | shell lines to take the update. Lock mode: `nix flake update <input> --flake DIR` for the default target, else `nix flake lock DIR --override-input <input> <ref>/<rev>` (writes exactly the commit compared and keeps flake.nix's ref), then `nixin plan`, `nixin apply`. `--published`: `nixin outdated` (the exact answer) first |
 | `notes[]` | for a target other than the lock's ref: how to follow it for good (change `inputs.<input>.url`); `--published`: the attribute caveat |
 | `cache` | as in `status` (`outdated-lock`, `outdated-target`) |
-| `timings` | seconds: `resolve` (the target's `nix flake metadata`), `lock`, `target` (0 when cached), `search` (`--published`), `total` |
+| `timings` | seconds: `resolve` (the target's `nix flake metadata`), `lock`, `target` (0 when cached), `search` (`--published`), `total` (the lock eval runs alongside `resolve` + `target`, so `total` is about the longer of the two, not the sum) |
 
 Without `--json`: a header (lock → target commit and dates), one aligned `pname  from →
 to` table per scope (`(removed)`, `(added)`, `(older)` marked), a summary line (`57 of 337
