@@ -17,7 +17,7 @@ from nixin.tui.app import NixinApp
 from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, SetOptionModal, UpdateModal
 from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
-from nixin.tui import screens
+from nixin.tui import options, screens
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
 from nixin.ui import backend, view
@@ -435,6 +435,17 @@ def test_tui_verb_has_no_json_form(capsys):
 # --- the app ---------------------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _slow_debounce(monkeypatch):
+    """Typing in these tests must never trigger a search on its own.
+
+    The real window is 0.35 s. On a loaded builder (nix check phase next to a kernel build) the gap between two
+    pilot key presses can exceed it, and a search for the first letter runs before Enter. The tests drive searches
+    with Enter or wait for the timer explicitly, so a 5 s window changes nothing they check."""
+    monkeypatch.setattr(screens, "DEBOUNCE", 5.0)
+    monkeypatch.setattr(options, "DEBOUNCE", 5.0)
+
+
 def drive(script, routes=None, size=DESKTOP, host="mbp13"):
     """Run `script(app, pilot, fake)` inside App.run_test; returns (app, fake)."""
     fake = FakeBackend(dict(COWSAY if routes is None else routes), host=host)
@@ -487,9 +498,7 @@ def test_search(size):
 
 
 def test_typing_is_debounced_and_kind_and_channel_rerun(monkeypatch):
-    # A wide window: on a loaded builder the 0.05 s gap below can stretch past the real 0.35 s and the
-    # first half of the word would get its own search. The behaviour under test is the debounce, not its length.
-    monkeypatch.setattr(screens, "DEBOUNCE", 1.5)
+    monkeypatch.setattr(screens, "DEBOUNCE", 1.5)  # the only test that waits for the timer: keep that wait short
 
     async def script(app, pilot, fake):
         await pilot.press(*"cow")
