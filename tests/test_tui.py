@@ -17,6 +17,7 @@ from nixin.tui.app import NixinApp
 from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, SetOptionModal, UpdateModal
 from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
+from nixin.tui import screens
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
 from nixin.ui import backend, view
@@ -485,12 +486,17 @@ def test_search(size):
     assert fake.verbs() == [["search", "--kind", "pkg", "--channel", "unstable", "--", "cowsay"]]
 
 
-def test_typing_is_debounced_and_kind_and_channel_rerun():
+def test_typing_is_debounced_and_kind_and_channel_rerun(monkeypatch):
+    # A wide window: on a loaded builder the 0.05 s gap below can stretch past the real 0.35 s and the
+    # first half of the word would get its own search. The behaviour under test is the debounce, not its length.
+    monkeypatch.setattr(screens, "DEBOUNCE", 1.5)
+
     async def script(app, pilot, fake):
         await pilot.press(*"cow")
         await pilot.pause(0.05)
         await pilot.press(*"say")
-        await settle(app, pilot, 0.5)  # one search after the pause, not one per key
+        assert fake.calls == []  # nothing yet: still inside the quiet window
+        await settle(app, pilot, 2.5)  # one search after the pause, not one per key
         assert len(fake.calls) == 1
         await pilot.press("escape", "k")  # to the results; next kind
         await settle(app, pilot)
