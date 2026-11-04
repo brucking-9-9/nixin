@@ -255,7 +255,9 @@ def test_a_search_from_elsewhere_shows_its_query(ui):
 def test_a_newer_search_supersedes_an_older_one(ui):
     first = {**load("search_pkg_firefox")}
     second = load("search_pkg_cowsay")
-    u = ui({"search": [first, second]}, delay=0.05)
+    # routed by query: the two calls run on worker threads, so under load the second can
+    # reach the fake before the first and a call-order list would hand it the wrong fixture
+    u = ui({"search firefox": first, "search cowsay": second}, delay=0.05)
     u.gui.search.search("firefox")
     u.gui.search.search("cowsay")
     settle(u)

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -221,7 +222,9 @@ def test_diff_human(repo, capsys, monkeypatch):
         "home brucking: only 19BK has this user (190 packages, none on mbp13; --home brucking "
         "lists them)" in out
     )
-    assert lines[-1] == "19BK evaluated in 0.0 s · mbp13 evaluated in 0.0 s"  # cold
+    assert re.fullmatch(
+        r"19BK evaluated in \d+\.\d+ s · mbp13 evaluated in \d+\.\d+ s", lines[-1]
+    ), lines[-1]  # cold
     assert all(len(ln) <= 80 for ln in lines if not ln.startswith("home brucking"))
     assert diff(capsys, "19BK", "mbp13", json_=False).splitlines()[-1] == (
         "19BK cached · mbp13 cached"
