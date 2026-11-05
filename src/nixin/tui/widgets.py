@@ -205,10 +205,18 @@ class BuildTracker(Static):
         if not snap or not (snap.get("total") or (snap.get("downloads") or {}).get("expected")):
             self.display = False
             return
-        parts = [Text(view.build_head(snap), style=rich_style(self.app, "accent"))]
+        accent = rich_style(self.app, "accent")
+        parts = [Text(view.build_head(snap), style=accent, no_wrap=True, overflow="ellipsis")]
         rows = view.build_rows(snap)
         if rows:
-            parts.append(fields_table(self.app, rows, 32))
+            # one line per derivation, clipped, the name column a third of a narrow screen
+            width = self.size.width or self.app.size.width
+            grid = Table.grid(padding=(0, 2), expand=True)
+            grid.add_column(width=min(32, max(12, width // 3)), no_wrap=True, overflow="ellipsis")
+            grid.add_column(ratio=1, no_wrap=True, overflow="ellipsis")
+            for f in rows:
+                grid.add_row(cell(self.app, f.label, ""), cell(self.app, f.value, f.style))
+            parts.append(grid)
         muted = rich_style(self.app, "dim")
         for ln in view.build_tail(snap):
             parts.append(Text(f"  {ln}", style=muted, no_wrap=True, overflow="ellipsis"))

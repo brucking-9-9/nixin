@@ -515,7 +515,7 @@ def status_line(snap: dict[str, Any], width: int = 100) -> str:
         tail = f" {f['name']}"
         if f.get("phase"):
             tail += f": {f['phase']}"
-        if f.get("host") and f["host"] != _hostname():
+        if f.get("host") and f["host"] != snap.get("local_host"):
             tail += f" on {f['host']}"
     line = f"{head}{tail} · {human_time(snap['elapsed_s'])}"
     if snap.get("eta_s") is not None:
