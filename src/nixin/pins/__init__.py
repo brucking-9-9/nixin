@@ -182,8 +182,9 @@ def _tarball(owner: str, repo: str, rev: str) -> str:
     return f"https://github.com/{owner}/{repo}/archive/{rev}.tar.gz"
 
 
-def _prefetch(repo: ConfigRepo, np: tgt.Nixpkgs, rev: str) -> tuple[str, str | None]:
-    """(narHash, date) of another commit of the locked repository (`nix flake prefetch`)."""
+def _prefetch(repo: ConfigRepo, np: tgt.Nixpkgs, rev: str) -> tuple[str, str | None, str]:
+    """(narHash, date, full commit) of another commit of the locked repository
+    (`nix flake prefetch`; a short `--rev` comes back as the 40-digit commit)."""
     lk = np.locked
     ref = f"github:{lk.owner}/{lk.repo}/{rev}"
     try:
@@ -198,9 +199,11 @@ def _prefetch(repo: ConfigRepo, np: tgt.Nixpkgs, rev: str) -> tuple[str, str | N
     nar = meta.get("hash") or (meta.get("locked") or {}).get("narHash")
     if not nar:
         raise NixinError("nix-failed", f"nix flake prefetch {ref} gave no hash")
-    lm = (meta.get("locked") or {}).get("lastModified")
+    locked = meta.get("locked") or {}
+    lm = locked.get("lastModified")
     date = dt.datetime.fromtimestamp(lm, dt.UTC).strftime("%Y-%m-%d") if lm else None
-    return nar, date
+    full = locked.get("rev") or meta.get("revision") or rev
+    return nar, date, full
 
 
 def _eval_check(repo: ConfigRepo, host: str, attrs: list[str], *, kernel: bool) -> dict[str, Any]:
@@ -363,10 +366,7 @@ def _pin(ns: argparse.Namespace) -> dict[str, Any]:
             raise NixinError(
                 "usage", f"--rev {ns.rev}: a commit (7-40 hex digits) of {lk.owner}/{lk.repo}"
             )
-        nar, date = _prefetch(repo, np, ns.rev)
-        rev = ns.rev
-        if len(rev) < 40:  # nix flake prefetch does not echo the full rev; keep what was given
-            rev = ns.rev
+        nar, date, rev = _prefetch(repo, np, ns.rev)
     url = _tarball(lk.owner or "nixos", lk.repo or "nixpkgs", rev)
     # the attributes
     if name == KERNEL:

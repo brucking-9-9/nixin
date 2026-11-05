@@ -75,8 +75,11 @@ class FakeNix:
         if args[:2] == ["flake", "metadata"]:
             return json.dumps({"path": STORE, "fingerprint": f"fp-{len(self.calls)}"})
         if args[:2] == ["flake", "prefetch"]:
-            rev = args[3].rsplit("/", 1)[-1]
-            return json.dumps({"hash": f"sha256-{rev[:8]}", "locked": {"lastModified": 1793726008}})
+            short = args[3].rsplit("/", 1)[-1]
+            rev = next(r for r in (OLD_REV, NEW_REV) if r.startswith(short))
+            return json.dumps(
+                {"hash": f"sha256-{rev[:8]}", "locked": {"lastModified": 1793726008, "rev": rev}}
+            )
         if args[:2] == ["flake", "update"]:
             lock_file = self.path / "flake.lock"
             lock = json.loads(lock_file.read_text())
@@ -246,13 +249,19 @@ def test_dry_run_writes_nothing(cfg):
 
 def test_pin_with_an_older_rev_prefetches_and_reads_the_pinned_tree(cfg):
     writer.NIX.pinned_versions = {"firefox": {"version": "158.0.1", "pname": "firefox"}}
-    rc, doc = run(cfg, "pin", "firefox", "--rev", OLD_REV)
+    rc, doc = run(cfg, "pin", "firefox", "--rev", OLD_REV[:7])  # a short commit, as typed
     assert rc == 0, doc
     p = doc["pins"][0]
     assert p["rev"] == OLD_REV and p["version"] == "158.0.1" and p["date"] == "2026-11-03"
+    assert f"archive/{OLD_REV}.tar.gz" in (cfg / "installer" / "19BK.nix").read_text()
     assert not p["stale"]
     assert state(cfg)["nixos"]["19BK"]["pins"]["firefox"]["nar_hash"] == f"sha256-{OLD_REV[:8]}"
-    assert ["flake", "prefetch", "--json", f"github:nixos/nixpkgs/{OLD_REV}"] in writer.NIX.calls
+    assert [
+        "flake",
+        "prefetch",
+        "--json",
+        f"github:nixos/nixpkgs/{OLD_REV[:7]}",
+    ] in writer.NIX.calls
     # glibc differs → gl-skew (firefox links libglvnd/gtk3), from the post-write eval
     ids = {c["id"]: c for c in doc["hold_checks"]}
     assert "pin-stale" not in ids

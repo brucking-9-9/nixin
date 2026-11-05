@@ -325,10 +325,14 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
 
 def _pins(ctx: Ctx) -> list[dict[str, Any]]:
     """The host's pins (nixin pin) for the document; a stale one is a warning."""
+    from ..outdated.target import nixpkgs_input  # the same input resolution as outdated
     from ..pins import stale_warnings, summary
 
-    lock = ctx.repo.lock()
-    items = summary(ctx.path, ctx.host, lock.rev if lock else None)
+    try:
+        lock_rev = nixpkgs_input(ctx.repo).locked.rev
+    except NixinError:
+        lock_rev = None
+    items = summary(ctx.path, ctx.host, lock_rev)
     ctx.warnings.extend(w for w in stale_warnings(items) if w not in ctx.warnings)
     return items
 
