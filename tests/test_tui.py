@@ -498,7 +498,9 @@ def test_search(size):
 
 
 def test_typing_is_debounced_and_kind_and_channel_rerun(monkeypatch):
-    monkeypatch.setattr(screens, "DEBOUNCE", 1.5)  # the only test that waits for the timer: keep that wait short
+    monkeypatch.setattr(
+        screens, "DEBOUNCE", 1.5
+    )  # the only test that waits for the timer: keep that wait short
 
     async def script(app, pilot, fake):
         await pilot.press(*"cow")

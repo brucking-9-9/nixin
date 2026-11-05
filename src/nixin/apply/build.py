@@ -8,7 +8,10 @@ authoritative clone builds after pulling the commit, so plan's out path is the o
 files into the store, under another fingerprint.)
 
 Two steps: evaluate `toplevel.drvPath` (failure: `eval-failed`), then build that
-derivation (failure: `build-failed`); nix's progress streams to stderr in human mode.
+derivation (failure: `build-failed`) with `--log-format internal-json`, parsed by the
+build tracker (progress.py): a UI reads the tracker through the run's `Cancel` token, human
+mode prints nix's readable output and a live status line on stderr, and the final `build`
+summary goes into the plan/apply document. The token also stops the build (`cancelled`).
 
 The cache maps the flake's *source store path* (a content hash of that tree, dirty edits
 included) to the out path. nix's fingerprint changes when the same tree is committed;
@@ -22,22 +25,31 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
 from ..cache import default_root
 from ..configrepo import ConfigRepo, NixinError, trim_nix_error
-from . import closure, proc
+from . import closure, proc, progress
 
 EVAL_TIMEOUT = 900.0
 KEEP = 40  # cache entries per kind and host
 _SAFE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
-def nix(args: list[str], *, code: str = "eval-failed", timeout: float | None = None) -> str:
+def nix(
+    args: list[str],
+    *,
+    code: str = "eval-failed",
+    timeout: float | None = None,
+    cancel: proc.Cancel | None = None,
+) -> str:
     """ConfigRepo's nix runner, through proc.run (so the apply tests fake one seam)."""
-    p = proc.run(["nix", *args, "--option", "warn-dirty", "false"], timeout=timeout)
+    p = proc.run(["nix", *args, "--option", "warn-dirty", "false"], timeout=timeout, cancel=cancel)
+    if cancel is not None:
+        cancel.check()
     if p.missing:
         raise NixinError("nix-missing", "`nix` is not on PATH")
     if p.rc == 124 and timeout is not None and not p.out:
@@ -48,8 +60,15 @@ def nix(args: list[str], *, code: str = "eval-failed", timeout: float | None = N
     return p.out
 
 
-def repo_at(path: Path) -> ConfigRepo:
-    return ConfigRepo(path, nix=nix)
+def repo_at(path: Path, cancel: proc.Cancel | None = None) -> ConfigRepo:
+    """A ConfigRepo whose nix calls the run's token can stop (an eval takes 30 s)."""
+    if cancel is None:
+        return ConfigRepo(path, nix=nix)
+
+    def runner(args: list[str], **kw: Any) -> str:
+        return nix(args, cancel=cancel, **kw)
+
+    return ConfigRepo(path, nix=runner)
 
 
 # --- cache ------------------------------------------------------------------------------
@@ -125,7 +144,7 @@ def build_command(repo: ConfigRepo, host: str) -> list[str]:
 
 def _build_error(stderr: str) -> str:
     """From the first `error: builder for …` block (it has nix's log tail) to the end."""
-    lines = stderr.splitlines()
+    lines = progress.ANSI.sub("", stderr).splitlines()
     for i, ln in enumerate(lines):
         if re.match(r"^\s*error:.*(builder for|Cannot build|build of)", ln):
             text = "\n".join(lines[i:]).strip()
@@ -133,18 +152,74 @@ def _build_error(stderr: str) -> str:
     return trim_nix_error(stderr) or "nix build failed"
 
 
-def build(repo: ConfigRepo, host: str, *, stream: bool) -> dict[str, Any]:
+LOG_FORMAT = ["--log-format", "internal-json", "-v"]  # what the tracker parses
+
+
+def _stderr_tty() -> bool:
+    try:
+        return sys.stderr.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def build(
+    repo: ConfigRepo, host: str, *, stream: bool, cancel: proc.Cancel | None = None
+) -> dict[str, Any]:
+    """Evaluate the toplevel's drvPath, then build it with the tracker reading nix's
+    events. `stream` (human mode): nix's readable output and the status line on stderr
+    (no status line when a UI watches the token: it shows the tracker itself). A
+    `cancelled` error (with the build summary as `.build`) when the token stops it."""
+    token = cancel or proc.Cancel()
     t0 = time.monotonic()
+    token.step = "eval"
     drv = repo.eval_raw(f"{toplevel_attr(repo, host)}.drvPath", timeout=EVAL_TIMEOUT).strip()
+    token.check()
     t1 = time.monotonic()
-    p = proc.run(
-        ["nix", "build", "--no-link", "--print-out-paths", f"{drv}^out"],
-        stream="stderr" if stream else False,
-    )
+    token.step = "build"
+    tracker = progress.Tracker(durations=progress.default_durations())
+    reporter = None
+    if stream and not token.watched:
+        reporter = progress.Reporter(tracker, tty=_stderr_tty())
+        reporter.start()
+    token.snapshot = tracker.snapshot
+
+    def on_line(line: str) -> str | None:
+        text = tracker.feed_line(line)
+        if reporter is not None:
+            reporter.line(text)
+        return text
+
+    try:
+        p = proc.run(
+            ["nix", "build", "--no-link", "--print-out-paths", *LOG_FORMAT, f"{drv}^out"],
+            stream="stderr" if stream and reporter is None else False,
+            on_stderr=on_line,
+            cancel=token,
+        )
+    finally:
+        if reporter is not None:
+            reporter.close()
+        token.snapshot = None
+    if token.requested:
+        tracker.finish("cancelled")
+        summary = tracker.summary()
+        c = summary["counts"]
+        err = NixinError(
+            "cancelled",
+            f"the build was stopped after {progress.human_time(summary['duration_s'])} "
+            f"({c['done']} of {summary['total']} derivations built, "
+            f"{summary['downloads']['done']} paths fetched); nothing was applied",
+            stderr=p.err,
+        )
+        err.build = summary  # type: ignore[attr-defined]
+        raise err
     if p.missing:
         raise NixinError("nix-missing", "`nix` is not on PATH")
+    tracker.finish("done" if p.ok else "failed")
     if not p.ok:
-        raise NixinError("build-failed", _build_error(p.err), stderr=p.err)
+        err = NixinError("build-failed", _build_error(p.err), stderr=p.err)
+        err.build = tracker.summary()  # type: ignore[attr-defined]
+        raise err
     outs = [ln.strip() for ln in p.out.splitlines() if ln.strip()]
     if not outs:
         raise NixinError("build-failed", f"nix build printed no out path for {drv}")
@@ -153,6 +228,7 @@ def build(repo: ConfigRepo, host: str, *, stream: bool) -> dict[str, Any]:
         "drv": drv,
         "eval_s": round(t1 - t0, 2),
         "build_s": round(time.monotonic() - t1, 2),
+        "build": tracker.summary(),
     }
 
 

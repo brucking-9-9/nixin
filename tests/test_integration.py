@@ -77,6 +77,7 @@ ERROR_CODES = {
     "unknown-generation",
     "workspace-dirty",
     "needs-tty",
+    "cancelled",
     "push-failed",
     "ssh-failed",
     "invalid-hosts-config",

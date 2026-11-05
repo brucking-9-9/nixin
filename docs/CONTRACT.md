@@ -1742,6 +1742,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `unfree` | try | nixpkgs refuses PKG's unfree license; `commands[]`: `NIXPKGS_ALLOW_UNFREE=1 nixin try PKG --impure` and the `nix run` equivalent |
 | `ambiguous-program` | try | PKG has several programs and none is meta.mainProgram; `programs[]`, repeat with `--program NAME` (the build is done: `out`, `size`, `cached`, `shell_command`) |
 | `no-program` | try | PKG has nothing in `bin/` to run; `programs[]` is empty, `shell_command` puts it on PATH |
+| `cancelled` | apply | `plan`/`apply` was stopped on request (Ctrl-C, a UI's Stop) while nix built: nix's process group was killed, nothing was applied; `build` is the tracker's summary so far (`cancelled: true`) and, for `apply`, `committed` says whether the commit had been made (it stays). Only the build can be stopped: a request during the commit, the pull or the switch is refused and the run finishes |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
 | `host-not-local` | apply, doctor | `rollback`, `history`, `generations`, `gc`, `doctor` with `--host H` for a host that is not this machine (`apply` goes there over ssh instead) |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |

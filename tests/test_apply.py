@@ -28,6 +28,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,9 @@ pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 
 HOST = "testhost"
 HISTORY = "installer/history.jsonl"
+EVENTS = (FIXTURES / "apply" / "build-events.jsonl").read_text().splitlines(keepends=True)
+# a build that succeeds: the events up to the first derivation's end (the tail fails)
+EVENTS_OK = EVENTS[: next(i for i, ln in enumerate(EVENTS) if '"stop","id":20' in ln) + 2]
 STATE = {"version": 1, "nixos": {HOST: {"packages": ["cowsay"], "options": {}}}, "home": {}}
 
 
@@ -64,6 +68,10 @@ class Machine:
         self.rebuild_rc = 0
         self.rebuild_salt = ""  # root's build lands elsewhere (verify-failed)
         self.fail_build = False
+        self.block_build = False  # the fake nix build waits for the token (cancel tests)
+        self.build_started = threading.Event()
+        self.cancel: proc.Cancel | None = None  # the token the last nix build got
+        self.refusals: list[bool] = []  # request() answers from inside the root steps
         self.activate_rc = 0
         self.boot_limit: int | None = 2
         self.boot_free = 10**9
@@ -174,7 +182,8 @@ class Machine:
     def toplevel_evals(self) -> int:
         return sum(1 for c in self.calls if c[:3] == ["nix", "eval", "--raw"])
 
-    def nix(self, argv: list[str]) -> proc.Proc:
+    def nix(self, argv: list[str], kw: dict | None = None) -> proc.Proc:
+        kw = kw or {}
         args = [a for a in argv[1:] if a not in ("--option", "warn-dirty", "false")]
         if args[:2] == ["flake", "metadata"]:
             repo = Path(args[-1])
@@ -190,17 +199,20 @@ class Machine:
             out = self.out_of(repo)
             return proc.Proc(argv, 0, out.replace("-nixos-system", "-nixos-sys") + ".drv", "")
         if args[:1] == ["build"]:
+            assert args[-4:-1] == ["--log-format", "internal-json", "-v"], args
             drv = args[-1].removesuffix("^out")
+            sink, self.cancel = kw.get("on_stderr"), kw.get("cancel")
+            lines = EVENTS if self.fail_build else EVENTS_OK
+            err = "".join(filter(None, map(sink, lines))) if sink else "building…\n"
+            if self.block_build and self.cancel is not None:
+                self.build_started.set()
+                self.cancel.wait(10)
+                if self.cancel.requested:
+                    return proc.Proc(argv, -15, "", err)
             if self.fail_build:
-                err = (
-                    "these 2 derivations will be built:\n"
-                    f"error: builder for '{drv}' failed with exit code 2;\n"
-                    "       last 2 log lines:\n       > make: *** [all] Error 2\n"
-                    "error: 1 dependencies of derivation 'x.drv' failed to build\n"
-                )
                 return proc.Proc(argv, 1, "", err)
             out = drv.removesuffix(".drv").replace("-nixos-sys", "-nixos-system")
-            return proc.Proc(argv, 0, self.realise(out) + "\n", "building…\n")
+            return proc.Proc(argv, 0, self.realise(out) + "\n", err)
         if args[:2] == ["store", "diff-closures"]:
             old, new = self.closures.get(args[2], set()), self.closures.get(args[3], set())
             lines = [f"{p}: ∅ → 3.8.4, \x1b[31;1m68.2 KiB\x1b[0m" for p in sorted(new - old)]
@@ -266,9 +278,11 @@ class Machine:
             if not self.sudo_ok:
                 return proc.Proc(argv, 1, "", "sudo: a password is required\n")
             assert argv[1] == "-n", argv
+            if self.cancel is not None:  # a Stop pressed while root works: refused
+                self.refusals.append(self.cancel.request())
             return self(argv[2:], **kw)
         if argv[0] == "nix":
-            return self.nix(argv)
+            return self.nix(argv, kw)
         if argv[0] == "nixos-rebuild":
             return self.rebuild(argv)
         if argv[0] == "nix-env":
@@ -1349,7 +1363,9 @@ class TicketSudo:
         if argv[:2] == ["sudo", "-v"]:
             assert kw.get("tty") is True, "sudo -v must keep the terminal"
             self.ticket = self.grant
-            return proc.Proc(argv, 0 if self.grant else 1, "", "" if self.grant else "Sorry, try again.\n")
+            return proc.Proc(
+                argv, 0 if self.grant else 1, "", "" if self.grant else "Sorry, try again.\n"
+            )
         if argv[:3] == ["sudo", "-A", "-v"]:
             assert not kw.get("tty"), "the askpass prompt needs no terminal"
             self.ticket = self.grant
@@ -1406,7 +1422,6 @@ def test_interactive_honours_the_env(monkeypatch):
     assert privilege.interactive() is False
 
 
-
 def test_sudo_uses_the_askpass_helper_under_json(monkeypatch, tmp_path):
     helper = tmp_path / "askpass"
     helper.write_text("#!/bin/sh\necho hunter2\n")
@@ -1417,7 +1432,11 @@ def test_sudo_uses_the_askpass_helper_under_json(monkeypatch, tmp_path):
     monkeypatch.setattr(privilege, "interactive", lambda: False)  # the GUI / TUI: no terminal
     p = privilege.Sudo().run(_step(), stream=False)
     assert p.ok
-    assert [c[:3] for c in fake.calls] == [["sudo", "-n", "git"], ["sudo", "-A", "-v"], ["sudo", "-n", "git"]]
+    assert [c[:3] for c in fake.calls] == [
+        ["sudo", "-n", "git"],
+        ["sudo", "-A", "-v"],
+        ["sudo", "-n", "git"],
+    ]
     assert "askpass helper" in (privilege.Sudo().probe() or "") or fake.ticket
 
 
@@ -1431,3 +1450,134 @@ def test_askpass_requires_an_executable_and_the_env_switch(monkeypatch, tmp_path
     assert privilege.askpass() == str(helper)
     monkeypatch.setenv("NIXIN_SUDO_PROMPT", "0")
     assert privilege.askpass() is None
+
+
+# --- the build tracker and stopping ----------------------------------------------------------
+
+
+def _in_thread(fn):
+    """Run fn in a thread (as the UIs run the verbs); returns the thread and its result box."""
+    box: dict = {}
+
+    def go() -> None:
+        box["doc"] = fn()
+
+    th = threading.Thread(target=go)
+    th.start()
+    return th, box
+
+
+def test_plan_and_apply_documents_carry_the_build_summary(m, capsys):
+    m.add_cowsay()
+    text = run(capsys, m, "apply", "-m", "cowsay", json_=False)  # no plan first: it builds
+    assert "build     1 of 3 derivations built, 2 paths fetched (1.5 MiB) in " in text
+    m.rm_cowsay()
+    d = run(capsys, m, "plan")
+    b = d["build"]
+    assert b["total"] == 3 and b["counts"]["done"] == 1 and b["state"] == "done"
+    assert b["downloads"] == {"done": 2, "bytes_done": 1048576 + 524288}
+    assert not b["cancelled"] and b["duration_s"] >= 0
+    d = run(capsys, m, "plan")
+    assert d["cached"] and d["build"] is None
+    d = run(capsys, m, "apply")
+    assert d["ok"] and d["cached"] and d["build"] is None  # plan's cache: nothing built
+
+
+def test_plan_human_mode_prints_nix_readable_output_and_the_build_line(m, capsys):
+    m.add_cowsay()
+    full = ["--host", HOST, "plan", "--config", str(m.ws)]
+    assert main(full) == 0
+    out, err = capsys.readouterr()
+    assert "these 3 derivations will be built:" in err
+    assert "building '/nix/store/0a1b" in err
+    assert "created 1234 symlinks" not in err  # build log lines are not printed
+    assert "\r" not in err and "[0/3 built, 0/2 fetched]" in err  # plain status lines
+    assert err.rstrip().endswith("2/2 fetched 1.5 MiB] · 0s")  # the final one, at the end
+    assert "build     1 of 3 derivations built, 2 paths fetched (1.5 MiB)" in out
+
+
+def test_build_failed_carries_the_summary_and_the_failing_block(m, capsys):
+    m.fail_build = True
+    m.add_cowsay()
+    d = run(capsys, m, "plan")
+    assert d["error"]["code"] == "build-failed"
+    assert d["error"]["message"].startswith("error: builder for '/nix/store/9z8y")
+    assert d["error"]["build"]["failed"] == ["unit-dbus.service"]
+    assert d["error"]["build"]["counts"]["skipped"] == 1
+
+
+def test_plan_can_be_stopped(m, capsys):
+    m.add_cowsay()
+    m.block_build = True
+    th, box = _in_thread(lambda: ap.plan(_ns(m)))
+    assert m.build_started.wait(5)
+    tok = m.cancel
+    assert tok is not None and tok.step == "build" and tok.stoppable
+    snap = tok.snapshot()
+    assert snap["total"] == 3 and snap["counts"]["done"] == 1
+    assert tok.request()
+    th.join(5)
+    d = box["doc"]
+    assert d["error"]["code"] == "cancelled" and "nothing was applied" in d["error"]["message"]
+    assert d["error"]["build"]["cancelled"] and d["error"]["build"]["counts"]["queued"] == 2
+    assert tok.snapshot is None and tok.step == "build"
+    # nothing cached: the next plan builds
+    m.block_build = False
+    d = run(capsys, m, "plan")
+    assert d["ok"] and not d["cached"]
+
+
+def _ns(m: Machine, verb: str = "plan", **extra):
+    from nixin.cli import _parser
+
+    argv = ["--json", "--host", HOST, verb, "--config", str(m.ws)]
+    for k, v in extra.items():
+        argv += [f"--{k}", v] if v is not True else [f"--{k}"]
+    ns = _parser().parse_args(argv)
+    ns.config = ns.config or ns.config_before_verb
+    return ns
+
+
+def test_apply_stopped_during_the_build_keeps_the_commit(m, capsys):
+    m.add_cowsay()
+    m.block_build = True
+    head0 = git(m.ws, "rev-parse", "HEAD")
+    th, box = _in_thread(lambda: ap.apply(_ns(m, "apply", message="test: cowsay")))
+    assert m.build_started.wait(5)
+    assert m.cancel.request()
+    th.join(5)
+    d = box["doc"]
+    assert d["error"]["code"] == "cancelled"
+    committed = d["error"]["committed"]
+    assert committed and committed == git(m.ws, "rev-parse", "HEAD") != head0
+    assert d["error"]["build"]["cancelled"]
+    assert m.count("sudo") == 0  # nothing ran as root
+    assert m.generation() == 1
+    # the retry finishes the job: no new commit, a build, pull, switch
+    m.block_build = False
+    d = run(capsys, m, "apply")
+    assert d["ok"] and d["committed"] is None and d["generation"] == 2
+    assert d["build"]["total"] == 3
+
+
+def test_stop_is_refused_once_root_works(m, capsys):
+    m.add_cowsay()
+    d = run(capsys, m, "apply", "-m", "cowsay")
+    assert d["ok"] and d["generation"] == 2
+    # the fake sudo asked to stop inside the pull and inside the switch: both refused
+    assert m.refusals == [False, False]
+    assert m.cancel is not None and not m.cancel.requested
+    assert "cannot be stopped" in m.cancel.refused
+
+
+def test_cli_cancel_token_lives_in_the_namespace(m, capsys):
+    """The UIs hand their token in through ns.cancel (backend.run); the CLI makes one."""
+    m.add_cowsay()
+    ns = _ns(m)
+    tok = proc.Cancel(watched=True)
+    ns.cancel = tok
+    d = ap.plan(ns)
+    assert d["ok"] and m.cancel is tok and tok.step == "diff"
+    ns = _ns(m)
+    ap.plan(ns)
+    assert isinstance(ns.cancel, proc.Cancel) and ns.cancel is not tok

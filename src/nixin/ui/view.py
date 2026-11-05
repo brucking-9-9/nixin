@@ -80,7 +80,7 @@ def store_name(path: str | None) -> str:
 
 # --- errors -------------------------------------------------------------------------------
 
-INFO_CODES = frozenset({"nothing-to-apply"})  # a refusal that only says "all done"
+INFO_CODES = frozenset({"nothing-to-apply", "cancelled"})  # "all done", or stopped on request
 ACTION_CODES = frozenset({"needs-sudo"})  # the person has something to run
 
 
@@ -98,6 +98,8 @@ class Notice:
 
     @property
     def title(self) -> str:
+        if self.code == "cancelled":
+            return "stopped"
         return {"info": "nothing to do", "action": "root is needed"}.get(self.severity, "error")
 
     @property
@@ -568,6 +570,89 @@ def _gen(run: dict[str, Any] | None) -> str:
     return f"generation {g}" if g is not None else "not a profile generation"
 
 
+# --- the build tracker (apply.progress's snapshot) ---------------------------------------
+
+BUILD_ROWS = 6  # derivations shown while a build runs: the ones building, then the queue
+BUILD_TAIL = 6  # log lines of the current build
+_STATUS_STYLE = {"building": "accent", "done": "ok", "failed": "error", "skipped": "warn"}
+
+
+def build_head(snap: Doc | None) -> str:
+    """The one-line state of a running build (the CLI's status line)."""
+    if not snap:
+        return ""
+    from ..apply.progress import status_line
+
+    return status_line(snap, 200)
+
+
+def build_rows(snap: Doc | None, limit: int = BUILD_ROWS) -> list[Field]:
+    """The derivations building now (with their phase and time), then the failed and the
+    next queued ones: `name  building 12s · configurePhase`."""
+    if not snap:
+        return []
+    drvs = snap.get("drvs") or []
+    order = {"building": 0, "failed": 1, "queued": 2}
+    shown = sorted(
+        (d for d in drvs if d.get("status") in order),
+        key=lambda d: (order[d["status"]], -(d.get("seconds") or 0)),
+    )[:limit]
+    out = []
+    for d in shown:
+        status = str(d.get("status"))
+        bits = [status]
+        if status == "building":
+            if d.get("seconds") is not None:
+                bits[0] = f"building {int(d['seconds'])}s"
+            if d.get("expected_s"):
+                bits[0] += f" of ~{int(d['expected_s'])}s"
+            if d.get("phase"):
+                bits.append(str(d["phase"]))
+            if d.get("host") and d["host"] != snap.get("local_host"):
+                bits.append(f"on {d['host']}")
+        elif status == "failed" and d.get("last_log_line"):
+            bits.append(clip(d["last_log_line"], 80))
+        out.append(Field(clip(d.get("name"), 40), " · ".join(bits), _STATUS_STYLE.get(status, "")))
+    counts = snap.get("counts") or {}
+    rest = sum(1 for d in drvs if d.get("status") in order) - len(shown)
+    if rest > 0 or counts.get("done"):
+        bits = []
+        if counts.get("done"):
+            bits.append(f"{counts['done']} done")
+        if rest > 0:
+            bits.append(f"{rest} more queued")
+        out.append(Field("", ", ".join(bits), "dim"))
+    return out
+
+
+def build_tail(snap: Doc | None, n: int = BUILD_TAIL) -> list[str]:
+    """The last lines of the current build's log (the focus)."""
+    f = (snap or {}).get("focus") or {}
+    return [str(ln) for ln in (f.get("lines") or [])[-n:]]
+
+
+def build_summary(b: Doc | None) -> str:
+    """`39 of 39 derivations built, 12 paths fetched in 51 s` from a document's `build`."""
+    if not b:
+        return ""
+    c = b.get("counts") or {}
+    parts = [
+        f"{c.get('done', 0)} of {b.get('total', 0)} derivations built"
+        if b.get("total")
+        else "nothing to build"
+    ]
+    if c.get("failed"):
+        parts.append(f"{c['failed']} failed")
+    d = b.get("downloads") or {}
+    if d.get("done"):
+        from ..apply.progress import human_bytes
+
+        size = f" ({human_bytes(d['bytes_done'])})" if d.get("bytes_done") else ""
+        parts.append(f"{d['done']} paths fetched{size}")
+    text = ", ".join(parts) + f" in {b.get('duration_s')} s"
+    return text + " (stopped)" if b.get("cancelled") else text
+
+
 def plan_fields(doc: Doc) -> list[Field]:
     out = [
         Field(
@@ -584,6 +669,8 @@ def plan_fields(doc: Doc) -> list[Field]:
         out.append(
             Field("built", f"eval {t.get('eval_s', '?')} s, build {t.get('build_s', '?')} s", "dim")
         )
+        if doc.get("build"):
+            out.append(Field("build", build_summary(doc["build"]), "dim"))
     w = doc.get("workspace") or {}
     dirty = f", {len(w.get('dirty') or [])} changed" if w.get("dirty") else ""
     out.append(Field("workspace", f"{w.get('branch')} @ {short(w.get('head'))}{dirty}", ""))
@@ -732,6 +819,8 @@ def apply_fields(doc: Doc) -> list[Field]:
                 "dim",
             )
         )
+    if doc.get("build"):
+        out.append(Field("build", build_summary(doc["build"]), "dim"))
     for c in doc.get("privileged_commands") or []:
         out.append(Field("ran", str(c), "dim"))
     for w in doc.get("warnings") or []:
@@ -747,6 +836,8 @@ def progress_fields(doc: Doc) -> list[Field]:
         out.append(Field("committed", short(err["committed"]), "accent"))
     if err.get("out"):
         out.append(Field("built", store_name(err["out"]), "dim"))
+    if err.get("build"):
+        out.append(Field("build", build_summary(err["build"]), "dim"))
     if err.get("authoritative_head"):
         out.append(Field("authority", f"at {short(err['authoritative_head'])}", "dim"))
     for c in err.get("privileged_commands") or []:
