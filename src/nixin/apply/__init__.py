@@ -342,6 +342,13 @@ def _plan_run(ns: argparse.Namespace, token: proc.Cancel) -> dict[str, Any]:
     token.step = "diff"
     diff = build.diff(run["store_path"], out) if ctx.local else None
     boot = safety.compare(run["store_path"], out) if ctx.local else None
+    if token.requested:  # Ctrl-C during the diff: not a plan with "no diff"
+        raise ApplyError(
+            "cancelled",
+            "stopped on request after the build (the out path is cached; nothing was applied)",
+            build=target.get("build"),
+            out=out,
+        )
     if not ctx.local:
         ctx.warnings.append(
             f"{ctx.host} is not this machine ({local_hostname()}): no closure diff or boot "

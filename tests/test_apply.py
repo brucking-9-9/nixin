@@ -69,6 +69,7 @@ class Machine:
         self.rebuild_salt = ""  # root's build lands elsewhere (verify-failed)
         self.fail_build = False
         self.block_build = False  # the fake nix build waits for the token (cancel tests)
+        self.stop_in_diff = False  # the token is asked to stop during diff-closures
         self.build_started = threading.Event()
         self.cancel: proc.Cancel | None = None  # the token the last nix build got
         self.refusals: list[bool] = []  # request() answers from inside the root steps
@@ -214,6 +215,8 @@ class Machine:
             out = drv.removesuffix(".drv").replace("-nixos-sys", "-nixos-system")
             return proc.Proc(argv, 0, self.realise(out) + "\n", err)
         if args[:2] == ["store", "diff-closures"]:
+            if self.stop_in_diff and self.cancel is not None:  # Ctrl-C lands after the build
+                self.cancel.request()
             old, new = self.closures.get(args[2], set()), self.closures.get(args[3], set())
             lines = [f"{p}: ∅ → 3.8.4, \x1b[31;1m68.2 KiB\x1b[0m" for p in sorted(new - old)]
             lines += [f"{p}: 3.8.4 → ∅, \x1b[32;1m-68.2 KiB\x1b[0m" for p in sorted(old - new)]
@@ -1525,6 +1528,17 @@ def test_plan_can_be_stopped(m, capsys):
     m.block_build = False
     d = run(capsys, m, "plan")
     assert d["ok"] and not d["cached"]
+
+
+def test_plan_stopped_after_the_build_is_cancelled_not_a_plan_without_a_diff(m, capsys):
+    m.add_cowsay()
+    m.stop_in_diff = True
+    d = run(capsys, m, "plan")
+    assert d["error"]["code"] == "cancelled" and "after the build" in d["error"]["message"]
+    assert d["error"]["build"]["counts"]["done"] == 1 and d["error"]["out"]
+    m.stop_in_diff = False
+    d = run(capsys, m, "plan")
+    assert d["ok"] and d["cached"]  # the build was kept
 
 
 def _ns(m: Machine, verb: str = "plan", **extra):

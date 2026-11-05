@@ -1164,7 +1164,7 @@ class PendingVM(VM, _Tracking):
                 planned=False,
                 closureHead="",
                 planNote=f"plan: {n.code}: {n.brief}",
-                planNoteStyle="error",
+                planNoteStyle="dim" if n.severity == "info" else "error",  # stopped: calm
             )
             return
         self.rows("plan").reset(models.fields(view.plan_fields(doc)))

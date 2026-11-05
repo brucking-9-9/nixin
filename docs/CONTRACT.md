@@ -1903,6 +1903,7 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree, by `apply`, and by `rollback` for the authoritative HEAD it leaves); `status.pending`, `nothing-to-apply` and rollback's commit lookup read it without nix | last 40 per host |
 | `apply/apply.lock` | `flock` held while `apply`, `rollback` or `gc` runs (`busy`) | — |
 | `apply/closure-sizes.json` | `generations`/`gc`: `{store path: closure size}` from `nix path-info -S` (a closure never changes) | pruned to the generations on disk at each write |
+| `apply/durations.json` | `plan`/`apply`: `{derivation name without its version: seconds}` of the builds the tracker saw, for the ETA (smoothed 0.7 new / 0.3 old) | the newest 2000 names at each write; safe to delete (the next plans have no ETA until names repeat) |
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh
