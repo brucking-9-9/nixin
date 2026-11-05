@@ -4,12 +4,19 @@ state.json is the source of truth for everything nixin added; the generated modu
 pure function of it (rendered, then nixfmt'd), so re-rendering is always safe:
 
     {"version": 1,
-     "nixos": {"<host>": {"packages": ["cowsay"], "options": {"services.x.enable": "true"}}},
+     "nixos": {"<host>": {"packages": ["cowsay"], "options": {"services.x.enable": "true"},
+                          "pins": {"<name>": {"attrs": [...], "mode": "attr|kernel|kernel-set",
+                                              "rev": ..., "nar_hash": ..., "date": ..., "owner": ...,
+                                              "repo": ..., "version": ..., "pname": ..., "why": ...,
+                                              "since": ...}}}},
      "home":  {"<user>": {"packages": [...], "options": {...}}},
      "imports": {"<file>": "<the imports list as it was before nixin expanded it>"}}
 
 Packages are attribute paths under `pkgs`; option values are raw Nix expressions, rendered
-verbatim as `path = value;` (dotted attrpaths, not quoted flat keys).
+verbatim as `path = value;` (dotted attrpaths, not quoted flat keys). Pins (`nixin pin`, a
+NixOS host only) render as a second nixpkgs fetched by the lock's narHash (`builtins.fetchTarball`,
+a fixed-output fetch, so pure and offline once nix has the tree) and one overlay per pinned
+revision that takes the pinned attributes from it; `pins` is additive, the version stays 1.
 """
 
 from __future__ import annotations
@@ -62,11 +69,16 @@ class State:
         e = self.data[kind].setdefault(name, {})
         e.setdefault("packages", [])
         e.setdefault("options", {})
+        e.setdefault("pins", {})
         return e
 
     def peek(self, kind: str, name: str) -> dict[str, Any]:
         e = self.data[kind].get(name) or {}
-        return {"packages": list(e.get("packages", [])), "options": dict(e.get("options", {}))}
+        return {
+            "packages": list(e.get("packages", [])),
+            "options": dict(e.get("options", {})),
+            "pins": {k: dict(v) for k, v in (e.get("pins") or {}).items()},
+        }
 
     @property
     def imports(self) -> dict[str, str]:
@@ -76,7 +88,9 @@ class State:
         for kind in ("nixos", "home"):
             for name in list(self.data[kind]):
                 e = self.data[kind][name]
-                if not e.get("packages") and not e.get("options"):
+                if not e.get("pins"):
+                    e.pop("pins", None)  # older nixins read this file too: no empty new keys
+                if not e.get("packages") and not e.get("options") and not e.get("pins"):
                     del self.data[kind][name]
                 else:
                     e["packages"] = sorted(set(e["packages"]))
@@ -90,9 +104,75 @@ class State:
         return json.dumps(self.data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
+def is_empty_entry(entry: dict[str, Any]) -> bool:
+    return not entry.get("packages") and not entry.get("options") and not entry.get("pins")
+
+
+def pin_lines(name: str, pin: dict[str, Any]) -> list[str]:
+    """The overlay attributes one pin contributes, with its comment line."""
+    attrs = list(pin.get("attrs") or [])
+    mode = pin.get("mode") or "attr"
+    held = (
+        f"{', '.join(attrs[:1] if mode != 'attr' else attrs)} held at {pin.get('version') or '?'}"
+    )
+    why = f" — {pin['why']}" if pin.get("why") else ""
+    out = [
+        f"# pin {json.dumps(name)} ({pin.get('since') or '?'}): {held}{why}. `nixin unpin {name}`"
+    ]
+    if mode == "attr":
+        out += [f"{a} = pinned.{a};" for a in attrs]
+    else:
+        kernel, pkgset = attrs[0], (attrs[1] if len(attrs) > 1 else None)
+        out.append(f"{kernel} = pinned.{kernel};")
+        if pkgset and mode == "kernel":
+            out.append(f"{pkgset} = final.linuxPackagesFor final.{kernel};")
+        elif pkgset:
+            out.append(f"{pkgset} = pinned.{pkgset};")
+    return out
+
+
+def _pin_blocks(pins: dict[str, dict[str, Any]]) -> tuple[list[str], list[str]]:
+    """(let bindings, overlay elements) for the pins, grouped by pinned revision."""
+    by_rev: dict[str, list[str]] = {}
+    for name in sorted(pins):
+        by_rev.setdefault(pins[name]["rev"], []).append(name)
+    lets, overlays = [], []
+    for rev in sorted(by_rev, key=lambda r: pins[by_rev[r][0]].get("date") or ""):
+        first = pins[by_rev[rev][0]]
+        short = rev[:7]
+        url = f"https://github.com/{first['owner']}/{first['repo']}/archive/{rev}.tar.gz"
+        lets += [
+            f"  # nixpkgs {short} ({first.get('date') or '?'}), as flake.lock had it when the pin"
+            + " was made; the same tree the flake input had",
+            f"  nixpkgs-{short} = import (builtins.fetchTarball {{",
+            f"    url = {json.dumps(url)};",
+            f"    sha256 = {json.dumps(first['nar_hash'])};",
+            "  });",
+        ]
+        body = []
+        for name in by_rev[rev]:
+            body += [f"        {line}" for line in pin_lines(name, pins[name])]
+        overlays += [
+            "    (final: prev:",
+            "      # never the module's `pkgs` here: it depends on these overlays",
+            f"      let pinned = nixpkgs-{short} {{ inherit (prev.stdenv.hostPlatform) system;"
+            + " config = config.nixpkgs.config; overlays = [ ]; };",
+            "      in {",
+            *body,
+            "      })",
+        ]
+    return lets, overlays
+
+
 def render(kind: str, entry: dict[str, Any]) -> str:
     """The generated module for one host (kind "nixos") or HM user ("home"), before nixfmt."""
-    out = [HEADER, "{ config, lib, pkgs, ... }:", "{"]
+    pins = entry.get("pins") or {} if kind == "nixos" else {}
+    out = [HEADER, "{ config, lib, pkgs, ... }:"]
+    if pins:
+        lets, overlays = _pin_blocks(pins)
+        out += ["let", *lets, "in", "{", "  nixpkgs.overlays = [", *overlays, "  ];"]
+    else:
+        out.append("{")
     pkgs_ = sorted(set(entry.get("packages", [])))
     if pkgs_:
         out.append(f"  {LIST_OPTION[kind]} = [")

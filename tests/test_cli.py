@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from nixin import __version__, apply, outdated, truth, writer
+from nixin import __version__, apply, outdated, pins, truth, writer
 from nixin.cli import VERBS, main
 from nixin.discovery import VERBS as DISCOVERY_VERBS
 
@@ -30,7 +30,8 @@ def test_every_verb_speaks_json(verb, after, capsys):
     flags = ["--json", "--host", "testhost"]
     argv = [verb, *flags] if after else [*flags, verb]
     configured = verb in truth.VERBS or verb in writer.VERBS or verb in apply.VERBS
-    configured = (configured or verb in outdated.VERBS) and verb != "gc"  # gc has no config
+    configured = configured or verb in outdated.VERBS or verb in pins.VERBS
+    configured = configured and verb != "gc"  # gc has no config
     # doctor has a --config, but --host testhost is not this machine: it stops before
     if configured:
         argv += ["--config", "/nonexistent/nixin-test"]  # never touch the real config in tests

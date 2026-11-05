@@ -33,6 +33,7 @@ from . import (
     explain,
     gui,
     outdated,
+    pins,
     truth,
     tryout,
     tui,
@@ -63,6 +64,9 @@ VERBS: dict[str, tuple[str, str]] = {
     "gc": ("apply", "delete old system generations, collect garbage, refresh /boot (sudo)"),
     "outdated": ("outdated", outdated.HELP),
     "update": ("outdated", outdated.update.HELP),
+    "pin": ("pins", pins.HELP["pin"]),
+    "unpin": ("pins", pins.HELP["unpin"]),
+    "pins": ("pins", pins.HELP["pins"]),
     "try": ("try", tryout.HELP),
     "doctor": ("doctor", doctor.HELP),
     "tui": ("tui", "interactive terminal UI over the same documents"),
@@ -115,6 +119,7 @@ def _parser() -> argparse.ArgumentParser:
     explain.register(sub)
     apply.register(sub)
     outdated.register(sub)
+    pins.register(sub)
     tui.register(sub)
     gui.register(sub)
     for sp in sub.choices.values():  # the global flags also work after the verb

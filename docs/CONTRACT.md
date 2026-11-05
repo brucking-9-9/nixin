@@ -827,6 +827,7 @@ Result:
 | `pending_commits` | `[{commit, subject}]` the workspace has and the authoritative tree does not; null when `relation` is `diverged`/`unknown` |
 | `diff` | `{added: [{name, version, size}], removed: [{name, version, size}], changed: [{name, from, to, size_delta}], size_delta}` from `nix store diff-closures`; sizes in bytes, null where nix printed none (it omits deltas under 8 KiB); `from`/`to` are nix's version sets as one string (`"6.7.5, 6.7.5-qt5"`), both null for a size-only change; `unparsed[]` if nix printed a line nixin could not read. null for another host (`--host` is not this machine) |
 | `reboot_needed` | `boot.reboot_needed`; null for another host |
+| `pins[]` | the host's pins as `nixin pins` lists them (no eval); a stale one (its revision is the lock's: it holds nothing) adds a warning. `apply` and `apply --dry-run` carry it too |
 | `boot` | what the new system does to boot, against `/run/current-system` ([The boot block](#the-boot-block)); null for another host |
 | `warnings[]` | e.g. untracked files, another host, the boot block's `warnings[]` (needs a reboot, /boot tight or too small) |
 
@@ -1408,7 +1409,8 @@ Result:
 | `changed[]` | lock mode: `{pname, from, to, scope, user, direction}`. `--published`: `{pname, installed, published, attr, alternatives, channel, rev, scope, user, direction}` (`installed`: the versions, comma-separated when several; `attr`: the index's attribute compared; `alternatives`: how many other attributes share the pname). `scope` is `system` \| `home`, `user` null or the HM user; `direction` `up` \| `down` \| `same` (different text, same order) |
 | `added[]`, `removed[]` | lock mode: `{pname, version, scope, user}`. Always `[]` with `--published` |
 | `unpublished[]` | `--published`: installed pnames the channel has no package for (local packages, flake inputs' packages) |
-| `kernel` | `from`, `to`, `changed`; `--published` also `latest` (`to` is null when the series is gone from the channel) |
+| `kernel` | `from`, `to`, `changed`; `--published` also `latest` (`to` is null when the series is gone from the channel). Lock mode with a kernel pin: `held` = `{pin, available}` (the target's version of the pinned kernel attribute; both evals see the held one, so `changed` is false) |
+| `holds[]` | lock mode: the host's pins (`nixin pins`' fields) plus `available` (`{attr: version}` in the target nixpkgs without the overlay, one extra eval, cached as `outdated-holds`) and `behind` (the target has another version than the held one). A held package never appears in `changed[]`; this is where it shows |
 | `count` | `len(changed)` |
 | `total` | distinct pnames compared (the lock side, the scopes asked for) |
 | `scopes[]` | `{scope, user, total, changed}` plus `added`, `removed` in lock mode; system first, then each HM user (only `--home USER`'s with `--home`) |
@@ -1505,6 +1507,94 @@ nixpkgs tarball for a commit it has not fetched yet: about 60 s cold, a second o
 when `outdated` already fetched that commit. See [Costs](#costs-measured). The truth and
 `outdated` caches are keyed by the flake fingerprint, which includes the lock, so the next
 `status`, `list` or `outdated` evaluates the new lock.
+
+### `pin`
+
+```
+nixin pin NAME [--attr ATTR]... [--rev REV] [--whole-set] [--why TEXT] [--config DIR] [--dry-run] [--no-check]
+```
+
+Holds a package, or the kernel, at a nixpkgs revision while the rest of the lock moves on.
+The pin goes to `installer/state.json` (`nixos.<host>.pins.<NAME>`) and the generated
+`installer/<host>.nix` gains a second nixpkgs, fetched by the lock's narHash
+(`builtins.fetchTarball`: fixed-output, pure, offline once nix has the tree, which it does: it
+is the very tree the flake input had), and one overlay per pinned revision that takes the
+pinned attributes from it. On first use the generated module is imported from the host's
+entry module as `add` does. flake.nix and flake.lock are never touched by a pin. Pins are per
+host: a Home Manager user on a host with `home-manager.useGlobalPkgs` sees the overlay
+through the shared pkgs (`--home` is a `usage` error).
+
+| NAME | holds |
+|---|---|
+| `kernel` | the kernel attribute the host's top-level `boot.kernelPackages` names (read from the declaration's text: `pkgs.linux_7_2.override …` → `linux_7_2`; `pkgs.linuxPackages_7_2` → the same pair), as both aliases: `linux_X = pinned.linux_X` and `linuxPackages_X = final.linuxPackagesFor final.linux_X` (mode `kernel`: out-of-tree modules from the new nixpkgs, built against the held kernel). `--whole-set`: `linuxPackages_X = pinned.linuxPackages_X` (mode `kernel-set`, modules from the pin too). `--attr` picks the kernel attribute when the config names several. A user's `lib.mkForce`/`override` on `boot.kernelPackages` stays in charge: the overlay changes what `pkgs.linux_X` is, nothing else |
+| anything else | a top-level attribute of `pkgs` (NAME itself, or the `--attr`s under that name): `ATTR = pinned.ATTR` (mode `attr`) |
+
+`--rev REV` pins another commit of the locked repository (`nix flake prefetch` for its
+narHash; network); the default is the revision `flake.lock` has now, so the flow is pin
+first, `nixin update` second (`update --hold NAME,…` does both). Before writing, one eval
+reads what the attributes are now (`version`, `pname`; `unknown-package` when one is not in
+the host's pkgs; for the kernel, that `pkgs.<attr>` is the host's kernel). After the write,
+one eval checks that the pins hold and runs the compatibility checks (below); a `block`
+leaves the write in place and shows as `checks.eval.code: "pin-blocked"` plus a warning.
+
+Result: as `add` (`changes[]`, `actions[]` with `pinned`/`already-pinned`, `imports_added[]`,
+`checks`), plus `pin` (NAME), `pins[]` (the pin as `pins` lists it) and `hold_checks[]`:
+`{id, level, text, data}`, `level` ∈ `info`, `warn`, `block`:
+
+| id | level | when |
+|---|---|---|
+| `pin-stale` | info | the pin's revision is the lock's: it holds nothing until the lock moves |
+| `kernel-toolchain` | info | mode `kernel`: modules are built with the new toolchain against the held kernel (vermagic is by version) |
+| `eval-cost` | info | always: a second nixpkgs tree per pinned revision costs 1-2 s and ~300 MiB per eval, a re-download after gc |
+| `glibc-skew` / `gl-skew` | info / warn | the pinned tree's glibc differs from the host's; `gl-skew` when the package's build inputs name mesa, libglvnd, wayland, qt, gtk (the program may not find a GL/EGL driver at run time) |
+| `rebuilds-dependents` | info / warn (≥ 5) | installed packages (the running system's closure) depend on the pinned attribute and rebuild against it (`nix-store -q --referrers-closure`; skipped when the output is not in the store) |
+| `kernel-set-mismatch` | warn | a hand-written module takes `pkgs.linuxPackages_X` beside `config.boot.kernelPackages` (`file`, `line`) |
+| `kernel-modules-dropped` | block | with the kernel held, an out-of-tree module (`boot.extraModulePackages`, `hardware.nvidia.package`, the specialisations that share the kernel) does not evaluate to a derivation: hold the set too (`--whole-set`) |
+| `pin-not-holding` | block | the host evaluates to another version than the pin's: another overlay or override wins, or the attribute is gone |
+
+Errors: `usage`, `config-not-found`, `not-a-workspace`, `unknown-host`, `pin-unsupported`
+(a nested attribute or a language package set member — an overlay does not reach them —, a
+kernel from another input or an expression naming no `pkgs.linux…` attribute, several kernel
+attributes without `--attr`, a kernel attribute that is not the host's kernel, a nixpkgs
+input not locked as a github tree), `unknown-package`, `not-found` (no nixpkgs input),
+`network` / `bad-channel` / `nix-failed` (`--rev`), `eval-failed` (the host does not evaluate),
+the writer's `invalid-nix`, `import-site-missing`, `file-conflict`, `invalid-state`, `nix-missing`.
+
+Costs: two evals of the host (≈ 3-6 s each here; `--no-check` skips both), nixfmt, writes
+`installer/`. Network only with `--rev`.
+
+### `unpin`
+
+```
+nixin unpin NAME... | --all [--config DIR] [--dry-run] [--no-check]
+```
+
+Drops pins. The generated module is re-rendered (and removed, with its import line, when
+nothing of nixin's is left: `pin` then `unpin` leaves the tree byte for byte as it was). One
+eval after the write reports what the attributes are without the pin (`checks.eval.note`).
+Result: as `pin`, with `unpinned[]` and `actions[]` of `unpinned` (each with `rev`, so
+`error.undo[]` can pin again). Errors: `usage`, `not-found` (no such pin; the message lists
+the host's pins), the workspace and writer errors as `pin`.
+
+### `pins`
+
+```
+nixin pins [--check] [--config DIR]
+```
+
+Every pin of the host, read from `installer/state.json` of any config (`/etc/nixos` too: no
+workspace needed, nothing is written). Result: `pins[]` of `{name, mode, attrs[], pname,
+version, rev, short_rev, date, why, since, stale, stale_why, drop}` (`drop`: the `nixin
+unpin NAME` line; `stale`: the pin's revision is the lock's, so it holds nothing yet),
+`count`, `stale` (how many), `lock` (`input`, `node`, `rev`, `short_rev`, `date` of the
+nixpkgs input), `checked`, `checks[]`. Without `--check` nothing is evaluated. `--check` runs
+the eval `pin` runs after a write (`now`: the versions the host evaluates to, `size`: the
+closure size of outputs in the store) and the checks above against the lock as it is now:
+after `nixin update`, that is where `kernel-modules-dropped`, `gl-skew` and `pin-not-holding`
+show. Human: `19BK: 2 pins, 1 stale (flake.lock: nixpkgs 0bb2eed)`, an aligned table (`pin
+attrs  held at  nixpkgs`, `(stale: …)` and the `why`), the checks, the unpin line.
+
+Errors: `usage`, `config-not-found`, `eval-failed` (`--check`), `nix-missing`.
 
 ### `try`
 
@@ -1770,6 +1860,8 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `ssh-failed` | apply | `apply --host H` for another host: `ssh` is missing, could not connect (exit 255), or the session ended otherwise; `committed`, `pushed` say how far it got |
 | `invalid-hosts-config` | apply | `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/`) does not parse, or a value is of the wrong type or not a usable path / ssh destination |
 | `lock-moved-others` | outdated (`update`) | nix moved lock nodes other than the requested input and its private sub-inputs; `flake.lock` was put back as it was (`moved[]`: `{node, from, to}`); `--allow-others` takes nix's result |
+| `pin-unsupported` | pins | `pin`: an overlay cannot hold this: a nested attribute or a language package set member, a kernel from another flake input or an expression naming no `pkgs.linux…` attribute, a kernel attribute that is not the host's kernel, a nixpkgs input not locked as a github tree; nothing written |
+| `pin-blocked` | pins | not an error of the verb: `checks.eval.code` after a `pin` (and a warning) when a `block` check fired (`kernel-modules-dropped`, `pin-not-holding`); the write stays, `hold_checks[]` says what to do |
 | `gc-failed` | apply | `gc`: nix-env `--delete-generations`, the bootloader step or nix-collect-garbage failed, or a generation was still there after the delete; `step` says which, `deleted[]`/`done[]` how far it got |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's

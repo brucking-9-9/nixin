@@ -44,6 +44,8 @@ plan apply sync             apply       build + closure diff + boot check; commi
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
+                                        (update --hold NAME,...: pin first, then move; only the named input may move)
+pin unpin pins              pins        hold a package or the kernel at the lock's nixpkgs while the rest moves on; list pins
 try                         try         run a package from the locked nixpkgs without installing it (--shell: a shell with it)
 doctor                      doctor      read-only health check: index, timers, trees, hosts (--full), secrets, /boot
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)

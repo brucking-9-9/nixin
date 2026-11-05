@@ -63,6 +63,8 @@ ERROR_CODES = {
     "invalid-state",
     "needs-sudo",
     "lock-moved-others",
+    "pin-unsupported",
+    "pin-blocked",
     "build-failed",
     "nothing-to-apply",
     "host-not-local",
