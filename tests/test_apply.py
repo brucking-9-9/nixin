@@ -1331,3 +1331,68 @@ def test_rollback_outside_the_boot_window_warns(m, capsys):
     assert d["boot"]["boot_entry"] is False and d["reboot_needed"] is True
     assert d["boot"]["boot_space"]["window"] == [3]
     assert any("gets no boot entry" in w for w in d["warnings"])
+
+
+# --- the sudo backend asks on a terminal ------------------------------------------------
+
+
+class TicketSudo:
+    """sudo without a ticket until `sudo -v` ran; records every call."""
+
+    def __init__(self, grant: bool = True):
+        self.calls: list[list[str]] = []
+        self.ticket = False
+        self.grant = grant
+
+    def __call__(self, argv, **kw):
+        self.calls.append(list(argv))
+        if argv[:2] == ["sudo", "-v"]:
+            assert kw.get("tty") is True, "sudo -v must keep the terminal"
+            self.ticket = self.grant
+            return proc.Proc(argv, 0 if self.grant else 1, "", "" if self.grant else "Sorry, try again.\n")
+        if argv[:2] == ["sudo", "-n"]:
+            if self.ticket:
+                return proc.Proc(argv, 0, "", "")
+            return proc.Proc(argv, 1, "", "sudo: a password is required\n")
+        raise AssertionError(argv)
+
+
+def _step():
+    return privilege.pull_step(Path("/etc/nixos"), Path("/home/u/nixos"), "main")
+
+
+def test_sudo_asks_on_a_terminal_and_retries(monkeypatch, capsys):
+    fake = TicketSudo()
+    monkeypatch.setattr(proc, "RUN", fake)
+    monkeypatch.setattr(privilege, "interactive", lambda: True)
+    p = privilege.Sudo().run(_step(), stream=True)
+    assert p.ok
+    assert [c[:2] for c in fake.calls] == [["sudo", "-n"], ["sudo", "-v"], ["sudo", "-n"]]
+    assert "root is needed for `git -C /etc/nixos pull" in capsys.readouterr().err
+
+
+def test_sudo_does_not_ask_without_a_terminal_or_under_json(monkeypatch):
+    fake = TicketSudo()
+    monkeypatch.setattr(proc, "RUN", fake)
+    monkeypatch.setattr(privilege, "interactive", lambda: False)
+    p = privilege.Sudo().run(_step(), stream=True)
+    assert privilege.needs_password(p) and [c[:2] for c in fake.calls] == [["sudo", "-n"]]
+    fake = TicketSudo()
+    monkeypatch.setattr(proc, "RUN", fake)
+    monkeypatch.setattr(privilege, "interactive", lambda: True)
+    p = privilege.Sudo().run(_step(), stream=False)  # --json: never prompt
+    assert privilege.needs_password(p) and [c[:2] for c in fake.calls] == [["sudo", "-n"]]
+
+
+def test_sudo_wrong_password_still_needs_sudo(monkeypatch):
+    fake = TicketSudo(grant=False)
+    monkeypatch.setattr(proc, "RUN", fake)
+    monkeypatch.setattr(privilege, "interactive", lambda: True)
+    p = privilege.Sudo().run(_step(), stream=True)
+    assert privilege.needs_password(p)
+    assert [c[:2] for c in fake.calls] == [["sudo", "-n"], ["sudo", "-v"]]
+
+
+def test_interactive_honours_the_env(monkeypatch):
+    monkeypatch.setenv("NIXIN_SUDO_PROMPT", "0")
+    assert privilege.interactive() is False

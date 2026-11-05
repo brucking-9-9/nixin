@@ -17,8 +17,11 @@ gc has three:
     collect     nix-collect-garbage
 
 A `Backend` turns a step into what nixin runs and into what a person would type.
-`Sudo` (the default) prefixes `sudo -n`: it never prompts; without a cached ticket or a
-NOPASSWD rule it fails at once, and apply answers `needs-sudo` with the commands.
+`Sudo` (the default) prefixes `sudo -n`, which never prompts. When that is refused and a
+person is at a terminal (human mode, stdin and stderr are ttys, NIXIN_SUDO_PROMPT is not
+0), `Sudo` runs `sudo -v` once on that terminal, exactly what the needs-sudo hint tells
+people to type, and repeats the step with the fresh ticket. Without a terminal, under
+--json, or when the password is wrong, apply answers `needs-sudo` with the commands.
 `NixosSwitch` is the desktop helper on 19BK (`nixos-switch`, a transient user unit that
 authenticates with Touch ID / an askpass and runs `nixos-rebuild switch --flake
 /etc/nixos`). It returns immediately and leaves its result in
@@ -111,6 +114,17 @@ class Backend:
         raise NotImplementedError
 
 
+def interactive() -> bool:
+    """A person at a terminal who can answer sudo's prompt: stdin and stderr are ttys and
+    NIXIN_SUDO_PROMPT is not 0 (set it to 0 to keep the old never-prompt behaviour)."""
+    if os.environ.get("NIXIN_SUDO_PROMPT", "1") == "0":
+        return False
+    try:
+        return sys.stdin.isatty() and sys.stderr.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
 class Sudo(Backend):
     name = "sudo"
 
@@ -120,7 +134,10 @@ class Sudo(Backend):
             return None
         if p.missing:
             return "sudo is not on PATH"
-        return p.tail(1) or "sudo -n true failed (no cached ticket, no NOPASSWD rule)"
+        why = p.tail(1) or "sudo -n true failed (no cached ticket, no NOPASSWD rule)"
+        if interactive():
+            return f"{why}; nixin will ask for the password on this terminal (sudo -v)"
+        return why
 
     def argv(self, step: Step) -> list[str]:
         return ["sudo", "-n", *step.argv]
@@ -128,8 +145,17 @@ class Sudo(Backend):
     def display(self, step: Step) -> str:
         return proc.shown(["sudo", *step.argv])
 
+    def ask(self, step: Step) -> bool:
+        """`sudo -v` on the terminal, the ticket the `-n` steps then use. True = granted."""
+        sys.stderr.write(f"nixin: root is needed for `{proc.shown(step.argv)}`\n")
+        sys.stderr.flush()
+        return proc.run(["sudo", "-v"], tty=True).ok
+
     def run(self, step: Step, *, stream: bool) -> proc.Proc:
-        return proc.run(self.argv(step), stream="all" if stream else False)
+        p = proc.run(self.argv(step), stream="all" if stream else False)
+        if stream and needs_password(p) and interactive() and self.ask(step):
+            p = proc.run(self.argv(step), stream="all")
+        return p
 
 
 def needs_password(p: proc.Proc) -> bool:
