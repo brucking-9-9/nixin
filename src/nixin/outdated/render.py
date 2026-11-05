@@ -70,7 +70,33 @@ def kernel(k: dict[str, Any], mode: str) -> str:
         return bits
     if k.get("changed"):
         return f"kernel {k['from']} {ARROW} {k['to'] or '?'}"
+    held = k.get("held")
+    if held:
+        avail = held.get("available")
+        if avail and avail != k["from"]:
+            return f"kernel {k['from']} (held by pin {held['pin']}; {avail} available)"
+        return f"kernel {k['from']} (held by pin {held['pin']})"
     return f"kernel {k['from']} (unchanged)"
+
+
+def holds(doc: dict[str, Any]) -> list[str]:
+    """`holds:` block: what each pin keeps back, and whether it holds anything."""
+    items = doc.get("holds") or []
+    if not items:
+        return []
+    out = ["holds (nixin pins):"]
+    for h in items:
+        attr = h["attrs"][0]
+        avail = (h.get("available") or {}).get(attr)
+        line = f"  {h['name']}: {attr} held at {h.get('version') or '?'} (nixpkgs {h.get('short_rev') or '?'})"
+        if h.get("behind"):
+            line += f"; the target has {avail}"
+        elif avail:
+            line += f"; the target has the same {avail}"
+        if h.get("stale"):
+            line += f"  (stale: {h.get('stale_why')})"
+        out.append(line)
+    return out
 
 
 _WHY = {
@@ -141,11 +167,15 @@ def outdated(doc: dict[str, Any], host: str) -> str:
     mode = doc["mode"]
     lines = [header(doc, host)]
     if doc.get("up_to_date"):
-        return "\n".join([*lines, "", summary(doc)])
+        return "\n".join(
+            [*lines, "", summary(doc), *(["", *holds(doc)] if doc.get("holds") else [])]
+        )
     for s in doc["scopes"]:
         lines += ["", scope_line(doc, s)]
         lines += _table(_scope_rows(doc, s["scope"], s["user"]))
     lines += ["", summary(doc)]
+    if doc.get("holds"):
+        lines += ["", *holds(doc)]
     if mode == "lock":  # --published's caveat is in the document; the text says "as attr"
         lines += [textwrap.fill(n, 88) for n in doc.get("notes") or []]
     if doc.get("commands"):

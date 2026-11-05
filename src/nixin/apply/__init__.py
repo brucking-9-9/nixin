@@ -315,11 +315,22 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
         "diff": diff,
         "boot": boot,
         "reboot_needed": boot["reboot_needed"] if boot else None,
+        "pins": _pins(ctx),
         "warnings": ctx.warnings + (boot["warnings"] if boot else []),
     }
     if ctx.human:
         doc["message"] = render.plan(doc, ctx.host)
     return doc
+
+
+def _pins(ctx: Ctx) -> list[dict[str, Any]]:
+    """The host's pins (nixin pin) for the document; a stale one is a warning."""
+    from ..pins import stale_warnings, summary
+
+    lock = ctx.repo.lock()
+    items = summary(ctx.path, ctx.host, lock.rev if lock else None)
+    ctx.warnings.extend(w for w in stale_warnings(items) if w not in ctx.warnings)
+    return items
 
 
 def _boot_check(
@@ -532,6 +543,7 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
         "diff": diff,
         "boot": boot,
         "reboot_needed": boot["reboot_needed"] if boot else None,
+        "pins": _pins(ctx),
         "cached": target["cached"],
         "history": line,
         "timings": {
@@ -634,6 +646,7 @@ def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps,
         "diff": build.diff(before["store_path"], target["out"]) if target["out"] else None,
         "boot": boot,
         "reboot_needed": boot["reboot_needed"] if boot else None,
+        "pins": _pins(ctx),
         "duration_s": round(time.monotonic() - t0, 2),
         "warnings": ctx.warnings + (boot["warnings"] if boot else []),
     }

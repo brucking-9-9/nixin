@@ -289,7 +289,11 @@ def _check_callback(ctx: writer.Ctx, pins_: dict[str, dict[str, Any]], lock_rev:
         blocks = [c for c in items if c["level"] == "block"]
         attrs = [a for p in pins_.values() for a in p["attrs"]]
         versions = dict(zip(attrs, got.get("attrs") or [], strict=False))
-        now = ", ".join(f"{a} {((versions.get(a) or {}).get('version')) or '?'}" for a in attrs[:4])
+        now = ", ".join(  # a package set (linuxPackages_X) has no version: left out
+            f"{a} {(versions.get(a) or {}).get('version')}"
+            for a in attrs[:4]
+            if (versions.get(a) or {}).get("version")
+        )
         doc = {
             "ok": not blocks,
             "note": now if not blocks else blocks[0]["text"],
@@ -517,7 +521,11 @@ def _unpin(ns: argparse.Namespace) -> dict[str, Any]:
         except NixinError as e:
             return {"ok": False, "code": e.code, "message": e.message}
         versions = dict(zip(attrs, got.get("attrs") or [], strict=False))
-        now = ", ".join(f"{a} {((versions.get(a) or {}).get('version')) or '?'}" for a in attrs[:4])
+        now = ", ".join(  # a package set (linuxPackages_X) has no version: left out
+            f"{a} {(versions.get(a) or {}).get('version')}"
+            for a in attrs[:4]
+            if (versions.get(a) or {}).get("version")
+        )
         return {"ok": True, "note": f"now {now}" if now else "ok", "kernel": got.get("kernel")}
 
     summary_ = f"unpinned {', '.join(names)} on {sc.host}" if names else f"{sc.host} has no pins"

@@ -27,8 +27,9 @@ import time
 from importlib.resources import files
 from typing import Any
 
-from ..configrepo import ConfigRepo, NixinError
+from ..configrepo import ConfigRepo, NixinError, nix_value
 from ..truth.cache import TruthCache
+from ..writer.nixtext import parse_attrpath
 from . import compare, render, update
 from . import target as tgt
 
@@ -241,6 +242,11 @@ def _lock(
     if target.last_modified and np.locked.last_modified:
         days = round((target.last_modified - np.locked.last_modified) / 86400, 1)
     kernel_from, kernel_to = lock.get("kernel"), new.get("kernel")
+    kernel = {"from": kernel_from, "to": kernel_to, "changed": kernel_from != kernel_to}
+    holds = _holds(repo, host, np, None if same else target, cache, timings)
+    for h in holds:
+        if h["mode"] != "attr":
+            kernel["held"] = {"pin": h["name"], "available": h["available"].get(h["attrs"][0])}
     return {
         "mode": "lock",
         "target": {**target.doc(), "release": new.get("release"), "days_newer": days},
@@ -248,11 +254,8 @@ def _lock(
         "changed": d["changed"],
         "added": d["added"],
         "removed": d["removed"],
-        "kernel": {
-            "from": kernel_from,
-            "to": kernel_to,
-            "changed": kernel_from != kernel_to,
-        },
+        "kernel": kernel,
+        "holds": holds,
         "count": len(d["changed"]),
         "total": d["total"],
         "scopes": d["scopes"],
@@ -260,6 +263,55 @@ def _lock(
         "notes": [] if same else _notes(np, target),
         "_release": lock.get("release"),
     }
+
+
+def _holds(
+    repo: ConfigRepo,
+    host: str,
+    np: tgt.Nixpkgs,
+    target: tgt.Target | None,
+    cache: TruthCache,
+    timings: dict,
+) -> list[dict[str, Any]]:
+    """The host's pins, each with `available`: what the target nixpkgs has for its
+    attributes without the overlay (the two package-list evals see the held versions, so a
+    held package never shows as changed; this says what it is held back from)."""
+    from ..pins import summary
+
+    holds = summary(repo.path, host, np.locked.rev)
+    if not holds:
+        return []
+    attrs = sorted({a for h in holds for a in h["attrs"]})
+    available: dict[str, Any] = {}
+    if target is not None:
+        salt = f"{target.input}|{target.locked}|{','.join(attrs)}"
+        hit = cache.get("outdated-holds", salt)
+        if hit is None:
+            t = time.monotonic()
+            apply = (
+                "c: let p = import c.pkgs.path { inherit (c.pkgs.stdenv.hostPlatform) system; "
+                "config = c.config.nixpkgs.config; overlays = [ ]; }; lib = p.lib; "
+                "safe = x: let r = builtins.tryEval x; in if r.success then r.value else null; "
+                "in { __nixinHolds = true; versions = map (a: let v = safe (lib.attrByPath a null p); "
+                "in if v == null then null else safe (v.version or null)) "
+                + nix_value([parse_attrpath(a) for a in attrs])
+                + "; }"
+            )
+            args = ["eval", "--json", repo.installable(repo.host_attr(host)), "--apply", apply]
+            args += ["--override-input", target.input, target.locked, "--no-write-lock-file"]
+            try:
+                hit = json.loads(repo.nix(args))
+            except NixinError:
+                hit = {"versions": [None] * len(attrs)}
+            timings["holds"] = round(time.monotonic() - t, 2)
+            cache.put("outdated-holds", hit, salt)
+        available = dict(zip(attrs, hit.get("versions") or [], strict=False))
+    for h in holds:
+        h["available"] = {a: available.get(a) for a in h["attrs"]}
+        h["behind"] = bool(
+            h["version"] and h["available"].get(h["attrs"][0]) not in (None, h["version"])
+        )
+    return holds
 
 
 def _commands(repo: ConfigRepo, host: str, np: tgt.Nixpkgs, target: tgt.Target) -> list[str]:

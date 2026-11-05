@@ -82,6 +82,7 @@ class FakeNix:
             "github:nixos/nixpkgs/nixos-unstable": recorded("metadata-nixos-unstable.json"),
         }
         self.target_error: str | None = None
+        self.holds_versions: list = []  # `outdated-holds`: the target's versions of pinned attrs
 
     def evals(self) -> list[list[str]]:
         return [c for c in self.calls if "--apply" in c and "cfg:" in c[c.index("--apply") + 1]]
@@ -100,6 +101,8 @@ class FakeNix:
             return json.dumps(ans)
         if args[-1] == "builtins.attrNames":
             return '["19BK","mbp13"]'
+        if args[0] == "eval" and "__nixinHolds" in args[args.index("--apply") + 1]:
+            return json.dumps({"versions": self.holds_versions})
         if args[0] == "eval" and "--apply" in args:
             if "--override-input" in args:
                 if self.target_error:
@@ -430,6 +433,60 @@ def test_lock_mode_document(repo, capsys):
     assert "--no-write-lock-file" in target_eval
     assert all(c[2].endswith('#nixosConfigurations."19BK"') for c in repo.nix.evals())
     assert doc["cache"]["misses"] == ["outdated-lock", "outdated-target"]
+
+
+PIN = {
+    "attrs": ["linux_7_2", "linuxPackages_7_2"],
+    "mode": "kernel",
+    "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+    "nar_hash": "sha256-x",
+    "date": "2026-10-23",
+    "owner": "nixos",
+    "repo": "nixpkgs",
+    "version": "7.2.12",
+    "pname": "linux",
+    "why": "slow build",
+    "since": "2026-11-05",
+}
+
+
+def test_holds_say_what_a_pin_keeps_back(repo, capsys):
+    """With the kernel pinned (nixin pin kernel) both evals see the held kernel, so it is
+    not a change; `holds[]` and `kernel.held` say what the target has instead."""
+    (repo.path / "installer").mkdir()
+    (repo.path / "installer" / "state.json").write_text(
+        json.dumps({"version": 1, "nixos": {"19BK": {"pins": {"kernel": PIN}}}})
+    )
+    repo.nix.holds_versions = ["7.2.14", "7.2.14"]
+    rc, doc = run(capsys)
+    assert rc == 0 and doc["ok"]
+    (h,) = doc["holds"]
+    assert h["name"] == "kernel" and h["version"] == "7.2.12" and h["stale"]
+    assert h["available"] == {"linux_7_2": "7.2.14", "linuxPackages_7_2": "7.2.14"} and h["behind"]
+    assert doc["kernel"]["held"] == {"pin": "kernel", "available": "7.2.14"}
+    holds_calls = [c for c in repo.nix.calls if "__nixinHolds" in " ".join(c)]
+    assert len(holds_calls) == 1 and "--override-input" in holds_calls[0]
+    assert "holds" in doc["timings"]
+    rc, text = run(capsys, json_=False)
+    assert "holds (nixin pins):" in text
+    assert (
+        "  kernel: linux_7_2 held at 7.2.12 (nixpkgs 3ec6363); the target has 7.2.14"
+        "  (stale: flake.lock is at 3ec6363, the revision it pins)"
+    ) in text
+    # cached on the second run
+    rc, doc = run(capsys)
+    assert len([c for c in repo.nix.calls if "__nixinHolds" in " ".join(c)]) == 1
+    # the kernel line of the recorded fixture says 7.2.12 → 7.2.14; with a held kernel it
+    # would be unchanged, so render that case directly
+    from nixin.outdated import render
+
+    assert (
+        render.kernel(
+            {"from": "7.2.12", "to": "7.2.12", "changed": False, "held": doc["kernel"]["held"]},
+            "lock",
+        )
+        == "kernel 7.2.12 (held by pin kernel; 7.2.14 available)"
+    )
 
 
 def test_second_run_is_cached_and_refresh_is_not(repo, capsys):
