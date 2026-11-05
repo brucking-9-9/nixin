@@ -20,8 +20,10 @@ A `Backend` turns a step into what nixin runs and into what a person would type.
 `Sudo` (the default) prefixes `sudo -n`, which never prompts. When that is refused and a
 person is at a terminal (human mode, stdin and stderr are ttys, NIXIN_SUDO_PROMPT is not
 0), `Sudo` runs `sudo -v` once on that terminal, exactly what the needs-sudo hint tells
-people to type, and repeats the step with the fresh ticket. Without a terminal, under
---json, or when the password is wrong, apply answers `needs-sudo` with the commands.
+people to type, and repeats the step with the fresh ticket. Without a terminal or under
+--json (the GUI and the TUI run the verbs in-process that way), it runs `sudo -A -v`
+when SUDO_ASKPASS names an executable helper: the prompt is graphical and stdio stays
+clean. Otherwise, or when the password is wrong, apply answers `needs-sudo`.
 `NixosSwitch` is the desktop helper on 19BK (`nixos-switch`, a transient user unit that
 authenticates with Touch ID / an askpass and runs `nixos-rebuild switch --flake
 /etc/nixos`). It returns immediately and leaves its result in
@@ -114,15 +116,29 @@ class Backend:
         raise NotImplementedError
 
 
+def prompting_allowed() -> bool:
+    """NIXIN_SUDO_PROMPT=0 keeps the old never-prompt behaviour everywhere."""
+    return os.environ.get("NIXIN_SUDO_PROMPT", "1") != "0"
+
+
 def interactive() -> bool:
-    """A person at a terminal who can answer sudo's prompt: stdin and stderr are ttys and
-    NIXIN_SUDO_PROMPT is not 0 (set it to 0 to keep the old never-prompt behaviour)."""
-    if os.environ.get("NIXIN_SUDO_PROMPT", "1") == "0":
+    """A person at a terminal who can answer sudo's prompt there: stdin and stderr are ttys."""
+    if not prompting_allowed():
         return False
     try:
         return sys.stdin.isatty() and sys.stderr.isatty()
     except (AttributeError, ValueError):
         return False
+
+
+def askpass() -> str | None:
+    """A graphical askpass helper sudo can use without a terminal (`sudo -A`): the path in
+    SUDO_ASKPASS when it is executable. That is how the GUI and the TUI, which run the
+    verbs in-process under the --json contract, still get a Touch ID / password prompt."""
+    if not prompting_allowed():
+        return None
+    helper = os.environ.get("SUDO_ASKPASS", "")
+    return helper if helper and os.access(helper, os.X_OK) else None
 
 
 class Sudo(Backend):
@@ -137,6 +153,8 @@ class Sudo(Backend):
         why = p.tail(1) or "sudo -n true failed (no cached ticket, no NOPASSWD rule)"
         if interactive():
             return f"{why}; nixin will ask for the password on this terminal (sudo -v)"
+        if askpass():
+            return f"{why}; nixin will ask through the askpass helper (sudo -A -v)"
         return why
 
     def argv(self, step: Step) -> list[str]:
@@ -145,16 +163,23 @@ class Sudo(Backend):
     def display(self, step: Step) -> str:
         return proc.shown(["sudo", *step.argv])
 
-    def ask(self, step: Step) -> bool:
-        """`sudo -v` on the terminal, the ticket the `-n` steps then use. True = granted."""
-        sys.stderr.write(f"nixin: root is needed for `{proc.shown(step.argv)}`\n")
-        sys.stderr.flush()
-        return proc.run(["sudo", "-v"], tty=True).ok
+    def ask(self, step: Step, *, stream: bool) -> bool:
+        """Get a sudo ticket for the `-n` steps. On a terminal in human mode: `sudo -v`
+        there. Otherwise, with an askpass helper (SUDO_ASKPASS): `sudo -A -v`, which
+        prompts graphically and leaves stdout/stderr alone (the --json contract holds,
+        so the GUI and the TUI get the prompt too). True = granted."""
+        if stream and interactive():
+            sys.stderr.write(f"nixin: root is needed for `{proc.shown(step.argv)}`\n")
+            sys.stderr.flush()
+            return proc.run(["sudo", "-v"], tty=True).ok
+        if askpass():
+            return proc.run(["sudo", "-A", "-v"]).ok
+        return False
 
     def run(self, step: Step, *, stream: bool) -> proc.Proc:
         p = proc.run(self.argv(step), stream="all" if stream else False)
-        if stream and needs_password(p) and interactive() and self.ask(step):
-            p = proc.run(self.argv(step), stream="all")
+        if needs_password(p) and self.ask(step, stream=stream):
+            p = proc.run(self.argv(step), stream="all" if stream else False)
         return p
 
 

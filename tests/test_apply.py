@@ -1350,6 +1350,10 @@ class TicketSudo:
             assert kw.get("tty") is True, "sudo -v must keep the terminal"
             self.ticket = self.grant
             return proc.Proc(argv, 0 if self.grant else 1, "", "" if self.grant else "Sorry, try again.\n")
+        if argv[:3] == ["sudo", "-A", "-v"]:
+            assert not kw.get("tty"), "the askpass prompt needs no terminal"
+            self.ticket = self.grant
+            return proc.Proc(argv, 0 if self.grant else 1, "", "")
         if argv[:2] == ["sudo", "-n"]:
             if self.ticket:
                 return proc.Proc(argv, 0, "", "")
@@ -1362,6 +1366,7 @@ def _step():
 
 
 def test_sudo_asks_on_a_terminal_and_retries(monkeypatch, capsys):
+    monkeypatch.delenv("SUDO_ASKPASS", raising=False)
     fake = TicketSudo()
     monkeypatch.setattr(proc, "RUN", fake)
     monkeypatch.setattr(privilege, "interactive", lambda: True)
@@ -1372,6 +1377,7 @@ def test_sudo_asks_on_a_terminal_and_retries(monkeypatch, capsys):
 
 
 def test_sudo_does_not_ask_without_a_terminal_or_under_json(monkeypatch):
+    monkeypatch.delenv("SUDO_ASKPASS", raising=False)
     fake = TicketSudo()
     monkeypatch.setattr(proc, "RUN", fake)
     monkeypatch.setattr(privilege, "interactive", lambda: False)
@@ -1380,11 +1386,13 @@ def test_sudo_does_not_ask_without_a_terminal_or_under_json(monkeypatch):
     fake = TicketSudo()
     monkeypatch.setattr(proc, "RUN", fake)
     monkeypatch.setattr(privilege, "interactive", lambda: True)
-    p = privilege.Sudo().run(_step(), stream=False)  # --json: never prompt
+    monkeypatch.delenv("SUDO_ASKPASS", raising=False)
+    p = privilege.Sudo().run(_step(), stream=False)  # --json without an askpass: never prompt
     assert privilege.needs_password(p) and [c[:2] for c in fake.calls] == [["sudo", "-n"]]
 
 
 def test_sudo_wrong_password_still_needs_sudo(monkeypatch):
+    monkeypatch.delenv("SUDO_ASKPASS", raising=False)
     fake = TicketSudo(grant=False)
     monkeypatch.setattr(proc, "RUN", fake)
     monkeypatch.setattr(privilege, "interactive", lambda: True)
@@ -1396,3 +1404,30 @@ def test_sudo_wrong_password_still_needs_sudo(monkeypatch):
 def test_interactive_honours_the_env(monkeypatch):
     monkeypatch.setenv("NIXIN_SUDO_PROMPT", "0")
     assert privilege.interactive() is False
+
+
+
+def test_sudo_uses_the_askpass_helper_under_json(monkeypatch, tmp_path):
+    helper = tmp_path / "askpass"
+    helper.write_text("#!/bin/sh\necho hunter2\n")
+    helper.chmod(0o755)
+    monkeypatch.setenv("SUDO_ASKPASS", str(helper))
+    fake = TicketSudo()
+    monkeypatch.setattr(proc, "RUN", fake)
+    monkeypatch.setattr(privilege, "interactive", lambda: False)  # the GUI / TUI: no terminal
+    p = privilege.Sudo().run(_step(), stream=False)
+    assert p.ok
+    assert [c[:3] for c in fake.calls] == [["sudo", "-n", "git"], ["sudo", "-A", "-v"], ["sudo", "-n", "git"]]
+    assert "askpass helper" in (privilege.Sudo().probe() or "") or fake.ticket
+
+
+def test_askpass_requires_an_executable_and_the_env_switch(monkeypatch, tmp_path):
+    monkeypatch.setenv("SUDO_ASKPASS", str(tmp_path / "missing"))
+    assert privilege.askpass() is None
+    helper = tmp_path / "askpass"
+    helper.write_text("#!/bin/sh\n")
+    helper.chmod(0o755)
+    monkeypatch.setenv("SUDO_ASKPASS", str(helper))
+    assert privilege.askpass() == str(helper)
+    monkeypatch.setenv("NIXIN_SUDO_PROMPT", "0")
+    assert privilege.askpass() is None
