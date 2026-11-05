@@ -111,6 +111,22 @@ move back; only `nixin pin kernel --rev 0bb2eed` did.
   compares the move in 7 s offline → `update --undo` leaves the clone byte for byte at HEAD;
   update → `pin kernel --rev <HEAD's>` without prefetch → `pins` shows it not stale.
 
+## Left (step 6)
+
+- The pending comparison evaluates no `available` for the holds (`_holds(..., target=None)`):
+  with the kernel pinned at the old revision and the lock moved, the kernel line reads
+  `held by pin kernel` without the `7.2.15 available` tail and `behind` stays false. One
+  more `--override-input` eval at the working lock would give it.
+- While the move is uncommitted the branch head is not resolved, so `nixin-state outdated`
+  (the timer) records the move's changes in that window and `state.render_lock` prints
+  `locked X → X` (`target.rev == lock.rev` in pending mode); `summary.json` has no
+  `lock_change` field yet. Transient (until apply or undo), visible on the bar.
+- The drawer's Escape (`Keys.onEscapePressed` on `PaneDrawer`) works while the pane has
+  the focus; after a selection the focus stays in the list, so only the back button closes it
+  from there. A handler on the page Item would cover both.
+- The GUI's hold / hold-kernel controls were to be restyled as bordered buttons; the request
+  was cancelled: only their label text changed (`hold at 158.0 (3ec6363)`).
+
 ## Left
 
 - §4 security (vulnix, kernel.org, `reasons[]`): deferred by the user.
