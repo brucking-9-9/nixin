@@ -539,7 +539,14 @@ class PackagesScreen(Base):
         doc = self.nixin.outdated_docs.get(self.mode)  # only ok documents are kept
         args = view.update_args(doc) if doc is not None else []
         if args is None:
-            self.notify("nothing to update: the lock already has the target", severity="warning")
+            if doc is not None and view.can_undo(doc.get("lock_change")):
+                self.notify(
+                    "flake.lock already has it: p for Plan/Apply, z undoes it", severity="warning"
+                )
+            else:
+                self.notify(
+                    "nothing to update: the lock already has the target", severity="warning"
+                )
             return
 
         def dry(d: dict) -> None:

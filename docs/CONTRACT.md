@@ -1572,9 +1572,13 @@ through the shared pkgs (`--home` is a `usage` error).
 | `kernel` | the kernel attribute the host's top-level `boot.kernelPackages` names (read from the declaration's text: `pkgs.linux_7_2.override …` → `linux_7_2`; `pkgs.linuxPackages_7_2` → the same pair), as both aliases: `linux_X = pinned.linux_X` and `linuxPackages_X = final.linuxPackagesFor final.linux_X` (mode `kernel`: out-of-tree modules from the new nixpkgs, built against the held kernel). `--whole-set`: `linuxPackages_X = pinned.linuxPackages_X` (mode `kernel-set`, modules from the pin too). `--attr` picks the kernel attribute when the config names several. A user's `lib.mkForce`/`override` on `boot.kernelPackages` stays in charge: the overlay changes what `pkgs.linux_X` is, nothing else |
 | anything else | a top-level attribute of `pkgs` (NAME itself, or the `--attr`s under that name): `ATTR = pinned.ATTR` (mode `attr`) |
 
-`--rev REV` pins another commit of the locked repository (`nix flake prefetch` for its
-narHash; network); the default is the revision `flake.lock` has now, so the flow is pin
-first, `nixin update` second (`update --hold NAME,…` does both). Before writing, one eval
+`--rev REV` pins another commit of the locked repository; the default is the revision
+`flake.lock` has now, so the flow is pin first, `nixin update` second (`update --hold
+NAME,…` does both). After an update that is not applied yet the old revision is the way
+back for one thing: `pin kernel --rev <old>` holds the kernel the running system has while
+the rest of the lock moves. A `--rev` that is the committed lock's (`HEAD:flake.lock`) or
+the applied lock's (the authoritative tree's `flake.lock`) revision takes narHash and date
+from that lock, no network; any other commit is `nix flake prefetch`ed (network). Before writing, one eval
 reads what the attributes are now (`version`, `pname`; `unknown-package` when one is not in
 the host's pkgs; for the kernel, that `pkgs.<attr>` is the host's kernel). After the write,
 one eval checks that the pins hold and runs the compatibility checks (below); a `block`
@@ -1604,7 +1608,7 @@ input not locked as a github tree), `unknown-package`, `not-found` (no nixpkgs i
 the writer's `invalid-nix`, `import-site-missing`, `file-conflict`, `invalid-state`, `nix-missing`.
 
 Costs: two evals of the host (≈ 3-6 s each here; `--no-check` skips both), nixfmt, writes
-`installer/`. Network only with `--rev`.
+`installer/`. Network only with a `--rev` no lock of the workspace knows.
 
 ### `unpin`
 
@@ -1630,7 +1634,12 @@ workspace needed, nothing is written). Result: `pins[]` of `{name, mode, attrs[]
 version, rev, short_rev, date, why, since, stale, stale_why, drop}` (`drop`: the `nixin
 unpin NAME` line; `stale`: the pin's revision is the lock's, so it holds nothing yet),
 `count`, `stale` (how many), `lock` (`input`, `node`, `rev`, `short_rev`, `date` of the
-nixpkgs input), `checked`, `checks[]`. Without `--check` nothing is evaluated. `--check` runs
+nixpkgs input), `revisions[]` (the distinct nixpkgs revisions the host knows, the lock's
+first: `{source, rev, short_rev, date, last_modified, nar_hash, running}` with `source` ∈
+`lock`, `committed` (`HEAD:flake.lock`), `applied` (the authoritative tree's `flake.lock`),
+`running` (the running system's short revision alone, when it is none of the others);
+`running` says which one the running system was built from: the UIs' revision chooser for
+`pin NAME --rev`), `checked`, `checks[]`. Without `--check` nothing is evaluated. `--check` runs
 the eval `pin` runs after a write (`now`: the versions the host evaluates to, `size`: the
 closure size of outputs in the store) and the checks above against the lock as it is now:
 after `nixin update`, that is where `kernel-modules-dropped`, `gl-skew` and `pin-not-holding`
@@ -1767,7 +1776,11 @@ Its Updates tab holds a row (`h`: `pin PNAME`, or `unpin` for a held row) and th
 --check` and says how many warnings and blocks there are. While the moved lock is not
 committed, `status.lock_change` is a `lock` line in Pending's header and `z` (Pending, and
 the Updates tab, where `outdated` then compares the pending move) runs `update --undo`
-after `update --undo --dry-run` and a confirmation.
+after `update --undo --dry-run` and a confirmation. In that state the row hold and `k`
+pin at the committed revision (`pin NAME --rev <old>`: "hold kernel at 7.2.14 (0bb2eed)"),
+and the Pins tab's `p` (Pin…) asks for a name and a revision — `pins`' `revisions[]`
+(the lock's, the committed, the applied, the running system's) or a typed commit — and
+runs `pin NAME --rev REV` through the diff modal.
 The Options page shows `search --kind opt|hm --limit 50` and, for the selected option,
 `where NAME --kind option` (no `info`: the search row has the upstream fields); Set and
 Unset are `set`/`unset` (with `--home USER` for a Home Manager option) after their
@@ -1807,7 +1820,10 @@ confirmation). Its Packages and Options pages use the verbs the TUI's do, with t
 dialog's `hold` lines) and a Pins page (Ctrl+6: `pins`, Check = `pins --check`, Unpin
 through the diff dialog). "Undo lock move…" (Pending's header and the Updates tab, while
 `lock_change` is not committed) runs `update --undo` through the update dialog, after
-`update --undo --dry-run`. Try (the
+`update --undo --dry-run`; in that state the row hold reads "hold at 158.0 (0bb2eed)" and
+"hold kernel at …" names the committed revision: `pin NAME --rev <old>`. The Pins page's
+"Pin…" dialog (a name, a revision from `pins`' `revisions[]` or a typed commit) runs `pin
+NAME --rev REV` through the diff dialog. Try (the
 details pane) runs `try PKG --build-only` as the TUI does, then starts a graphical app
 detached, or opens a CLI program's `command` in the person's terminal (`$TERMINAL -e`,
 else the first of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal,

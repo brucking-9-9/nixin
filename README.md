@@ -45,7 +45,7 @@ history rollback            apply       the system generations with nixin's comm
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it
                                         (update --hold NAME,...: pin first, then move; only the named input may move)
-pin unpin pins              pins        hold a package or the kernel at the lock's nixpkgs while the rest moves on; list pins
+pin unpin pins              pins        hold a package or the kernel at the lock's nixpkgs (or --rev: an older one) while the rest moves on; list pins
 try                         try         run a package from the locked nixpkgs without installing it (--shell: a shell with it)
 doctor                      doctor      read-only health check: index, timers, trees, hosts (--full), secrets, /boot
 tui                         tui         the interactive terminal UI over the same documents (also nixin-tui)
@@ -229,9 +229,11 @@ for its user, with Remove) and, on its Updates tab, what a nixpkgs update would 
 (`outdated`, the lock's next commit or `--published`; the kernel line, the summary) with
 "Update nixpkgs lock": `update --dry-run` → confirm → `update` → Pending, where Plan and
 Apply take it as any other change; `h` holds a row back (`pin`, through the diff modal),
-`k` the kernel, `z` undoes an update that is not committed yet (also on Pending, whose
-header shows the lock move), and the Pins tab (`n`) lists what is held, checks it (`c`) and
-unpins (`u`).
+`k` the kernel (at the old revision once the lock has moved: `pin kernel --rev`), `z`
+undoes an update that is not committed yet (also on Pending, whose header shows the lock
+move), and the Pins tab (`n`) lists what is held, checks it (`c`), unpins (`u`) and pins
+something at a chosen revision (`p`: the committed lock's, the running system's, or a
+commit typed in).
 Options browses NixOS or Home Manager options (`search
 --kind opt|hm`, `k` toggles; name, type and the description) and shows one in full: type,
 default, example, the whole description, its value on this host and the file and line
@@ -282,9 +284,11 @@ combo; the selected row opens in the details pane for its user, with Remove) and
 (`outdated` against the lock's next commit or search.nixos.org, the kernel line, the
 summary; "Update nixpkgs lock…" opens a dialog with `update --dry-run` and the holds, then
 `update` runs and the window goes to Pending; a row's hold button and "hold kernel" pin
-things through the diff dialog; "Undo lock move…", here and on Pending, takes an update
-back before it is committed). **Pins** (Ctrl+6) lists what is held back, at which
-nixpkgs, whether it still holds anything; Check runs `pins --check`, Unpin drops one.
+things through the diff dialog, at the old revision once the lock has moved; "Undo lock
+move…", here and on Pending, takes an update back before it is committed). **Pins**
+(Ctrl+6) lists what is held back, at which nixpkgs, whether it still holds anything; Check
+runs `pins --check`, Unpin drops one, Pin… holds something at a chosen revision (the
+committed lock's, the running system's, or a commit typed in).
 **Options** searches NixOS or Home Manager options
 (a combo picks which) and shows the selected one beside the list: type, default, example,
 the description, its value on this host and where it is set (`where`; for a Home Manager

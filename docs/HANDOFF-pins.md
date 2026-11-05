@@ -72,6 +72,45 @@ output is in the store). Human renderings live in `pins/render.py` and `outdated
   (hold kernel → diff → write → held rows → hold a row → update dialog's holds → Pins → check → unpin);
   the GUI grabs test takes the Pins page too; the state test checks the `pins` part.
 
+## Step 6: undo and pin at a previous revision (branch `pin-previous`, 2026-11-05)
+
+The gap: after "Update nixpkgs lock" in the GUI the lock had moved (0bb2eed → 1d06008,
+uncommitted) and nothing in the UIs could hold the kernel at the *old* revision or take the
+move back; only `nixin pin kernel --rev 0bb2eed` did.
+
+- `src/nixin/lockstate.py`: `LockRevs.read(repo, input, host)` = the working lock, the
+  committed one (`git show HEAD:flake.lock`), the applied one (the authoritative tree's
+  `flake.lock`, `$NIXIN_AUTHORITATIVE`/`/etc/nixos`), the running system's short rev
+  (`nixos-version`; this machine only). `lock_change()` → `{from, to, committed, running}` or
+  None; `revisions()` for the chooser; `known(rev)` for a `--rev` that needs no prefetch.
+  No nix. Tests fake the running system (conftest autouse) and point the authoritative
+  tree at nothing, so a developer's own /etc/nixos never leaks in.
+- `update --undo [--dry-run]` (`outdated/update.py`): `git checkout HEAD -- flake.lock`
+  (index + worktree), `restored[]` every node that went back, `nothing-to-undo` with the
+  pin-at-the-applied-revision / `git revert` alternative when the move is a commit.
+- `outdated`: `lock_change` on every document; while the move is uncommitted and no target
+  is named, the comparison is the move itself (`_pending`): the committed node through
+  `--override-input … ?narHash=` (offline: nix has the tree) against the working lock,
+  `target.from = "pending"`, `lock_change.compared = true`, commands plan/apply/undo.
+  `status` carries `lock_change` too.
+- `pins`: `revisions[]`. `pin --rev`: a committed/applied revision takes narHash and date
+  from that lock (no `nix flake prefetch`).
+- `ui/view.py`: `UpdateRow.rev`/`hold_label`, `previous_rev`, `kernel_hold` with `--rev`,
+  `lock_change_field`, `can_undo`, `undo_confirm_fields`, `pin_rev_choices`, `pin_at_args`;
+  `update_args` is None for `target.from == "pending"` (the Update button disables itself).
+- TUI: `z` (Updates, Pending) = undo through `UpdateModal` (title/button switch on
+  `dry.undo`); `p` on the Pins tab = `PinModal` (name, a `RadioSet` of revisions + a free
+  field); `check_action` keeps `p` = Pending elsewhere. Both buttons hide on a phone (keys).
+- GUI: `PackagesVM.startUndo` through the update dialog (`updateConfirmLabel`), `canUndo`
+  on Packages and Pending; `PinsVM.startPin/confirmPin/cancelPin` + `PinDialog.qml`;
+  `UpdateRow` shows `holdLabel` ("hold at 158.0 (0bb2eed)"). The row buttons sit above the
+  row's MouseArea (`z: 1`, main's fix); the tests click them for real.
+- Fixtures: `outdated_19BK_moved`, `status_moved`, `update_undo{,_dry}`, `pins_19BK_revs`,
+  `pin_kernel_rev{,_dry}`; `lock_change: null` and `revisions[]` added to the recorded ones.
+- Live (clones of `~/nixos`, logs `/tmp/nixin-pinprev-live*.log`): update → `outdated`
+  compares the move in 7 s offline → `update --undo` leaves the clone byte for byte at HEAD;
+  update → `pin kernel --rev <HEAD's>` without prefetch → `pins` shows it not stale.
+
 ## Left
 
 - §4 security (vulnix, kernel.org, `reasons[]`): deferred by the user.

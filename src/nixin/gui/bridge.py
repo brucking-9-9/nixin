@@ -1663,7 +1663,12 @@ class PackagesVM(VM):
         doc = self.outdated_docs.get(self["mode"])
         args = view.update_args(doc) if doc is not None else []
         if args is None:
-            self.gui.notice.say("nothing to update: the lock already has the target", "info")
+            if doc is not None and view.can_undo(doc.get("lock_change")):
+                self.gui.notice.say(
+                    "flake.lock already has it: Pending's Plan/Apply, or Undo", "info"
+                )
+            else:
+                self.gui.notice.say("nothing to update: the lock already has the target", "info")
             return
         self._update_args = args
         started = self.gui.fetch(
