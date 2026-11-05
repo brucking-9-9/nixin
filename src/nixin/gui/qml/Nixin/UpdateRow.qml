@@ -44,6 +44,8 @@ Rectangle {
     Button {
         id: holdButton
         objectName: "hold-" + row.name
+        // above the row's MouseArea (declared last, so it would otherwise take the click)
+        z: 1
         anchors.right: parent.right
         anchors.rightMargin: 8
         anchors.bottom: parent.bottom
