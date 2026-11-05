@@ -19,6 +19,7 @@ from typing import Any, TextIO
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from .. import cli
+from ..apply.proc import Cancel
 from ..ui.backend import Backend
 
 
@@ -27,14 +28,22 @@ class JobSignals(QObject):
 
 
 class Job(QRunnable):
-    def __init__(self, backend: Backend, verb: str, args: list[str], stream: bool) -> None:
+    def __init__(
+        self,
+        backend: Backend,
+        verb: str,
+        args: list[str],
+        stream: bool,
+        cancel: Cancel | None = None,
+    ) -> None:
         super().__init__()
         self.backend, self.verb, self.args, self.stream = backend, verb, args, stream
+        self.cancel = cancel
         self.signals = JobSignals()
 
     def run(self) -> None:
         try:
-            doc = self.backend.call(self.verb, *self.args, stream=self.stream)
+            doc = self.backend.call(self.verb, *self.args, stream=self.stream, cancel=self.cancel)
         except Exception as exc:  # noqa: BLE001 -- a bug in the shim must not kill the UI
             doc = {"verb": self.verb, "host": self.backend.host, **cli._internal(exc)}
         self.signals.done.emit(doc)

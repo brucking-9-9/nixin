@@ -12,6 +12,11 @@ apply is `apply --dry-run` → confirm (message) → apply; writer, plan and app
 serialised by `busy` (two writer runs on one workspace race on installer/state.json);
 `status` is stale after a write or an apply, and a plan after an apply. A nixpkgs update is
 `update --dry-run` → confirm → `update` → Pending; it counts as a write (flake.lock).
+
+A plan or an apply runs with a `Cancel` token (nixin.apply.proc): while it runs, the
+Pending page and the apply dialog poll the build tracker's snapshot from it twice a second
+(`_Tracking`: the status line, the derivations building, the log tail, the step) and their
+Stop button asks it to stop; the verb refuses from the pull on and the notice says so.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from typing import Any, ClassVar
 from PySide6.QtCore import Property, QObject, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 
+from ..apply.proc import Cancel
 from ..ui import view
 from ..ui.backend import Backend, shell
 from . import models
@@ -951,10 +957,73 @@ class WriterVM(VM):
         self.set(setOpen=False)
 
 
+# --- the build tracker ----------------------------------------------------------------------
+
+TRACK_MS = 500  # how often a running plan/apply's tracker is read
+STEP_NOTE = {
+    "prepare": "reading the trees",
+    "eval": "evaluating the config",
+    "diff": "diffing the closures",
+    "commit": "committing (cannot be stopped)",
+    "pull": "pulling into the authoritative tree (cannot be stopped)",
+    "switch": "switching (cannot be stopped)",
+    "verify": "verifying (cannot be stopped)",
+}
+TRACKING_STATE = {"buildHead": "", "stepNote": "", "stopEnabled": False, "stopLabel": "Stop"}
+TRACKING_LISTS = {"build": models.FIELD, "tail": models.LINE}
+
+
+class _Tracking:
+    """Mixed into a VM that runs a build: `track(token)` polls the token's snapshot every
+    TRACK_MS into `buildHead`, `stepNote`, `stopEnabled`, `stopLabel` and the `build` and
+    `tail` models; `untrack()` clears them. The VM declares TRACKING_STATE and
+    TRACKING_LISTS and a `stop` slot."""
+
+    _token: Cancel | None = None
+    _timer: QTimer | None = None
+
+    def track(self: Any, token: Cancel) -> None:
+        self._token = token
+        if self._timer is None:
+            self._timer = QTimer(self)
+            self._timer.setInterval(TRACK_MS)
+            self._timer.timeout.connect(self.tick)
+        self._timer.start()
+        self.tick()
+
+    def untrack(self: Any) -> None:
+        self._token = None
+        if self._timer is not None:
+            self._timer.stop()
+        self.rows("build").reset([])
+        self.rows("tail").reset([])
+        self.set(**TRACKING_STATE)
+
+    def tick(self: Any) -> None:
+        token = self._token
+        if token is None:
+            return
+        snapshot = token.snapshot
+        snap = snapshot() if snapshot else None
+        self.rows("build").reset(models.fields(view.build_rows(snap)))
+        self.rows("tail").reset([{"text": ln} for ln in view.build_tail(snap)])
+        note = STEP_NOTE.get(token.step, "")
+        self.set(
+            buildHead=view.build_head(snap),
+            stepNote=note if (snap is None or token.step != "build") else "",
+            stopEnabled=token.stoppable,
+            stopLabel="Stopping…" if token.requested else "Stop",
+        )
+
+    def stop_run(self: Any) -> None:
+        self.gui.stop()
+        self.tick()
+
+
 # --- pending + plan -------------------------------------------------------------------------
 
 
-class PendingVM(VM):
+class PendingVM(VM, _Tracking):
     changed = Signal()
     defaults: ClassVar = {
         "loading": False,
@@ -969,6 +1038,7 @@ class PendingVM(VM):
         "closureHead": "",
         "syncing": False,
         "synced": False,
+        **TRACKING_STATE,
     }
     lists: ClassVar = {
         "pending": models.FIELD,
@@ -976,6 +1046,7 @@ class PendingVM(VM):
         "plan": models.FIELD,
         "closure": models.CLOSURE,
         "sync": models.FIELD,
+        **TRACKING_LISTS,
     }
     logs: ClassVar = ("log",)
     loading = state(bool, "loading", changed)
@@ -990,12 +1061,18 @@ class PendingVM(VM):
     closureHead = state(str, "closureHead", changed)
     syncing = state(bool, "syncing", changed)
     synced = state(bool, "synced", changed)
+    buildHead = state(str, "buildHead", changed)
+    stepNote = state(str, "stepNote", changed)
+    stopEnabled = state(bool, "stopEnabled", changed)
+    stopLabel = state(str, "stopLabel", changed)
     pending = model("pending")
     session = model("session")
     plan = model("plan")
     closure = model("closure")
     sync = model("sync")
     log = model("log")
+    build = model("build")
+    tail = model("tail")
 
     def visit(self) -> None:
         self.render_session()
@@ -1037,6 +1114,7 @@ class PendingVM(VM):
     @Slot()
     def startPlan(self) -> None:
         log = self.logmodel("log")
+        token = Cancel(watched=True)
         started = self.gui.fetch(
             "plan",
             done=self._planned,
@@ -1044,15 +1122,22 @@ class PendingVM(VM):
             log=log,
             busy="planning",
             label="plan: building the workspace",
-            hint="38 s for nothing new, minutes for new packages, hours for a kernel",
+            hint="38 s for nothing new, minutes for new packages, hours for a kernel; Stop stops",
+            cancel=token,
         )
         if started:
             log.clear()
             self.gui.plan_doc = None
             self.set(planning=True)
             self.render_plan()
+            self.track(token)
+
+    @Slot()
+    def stop(self) -> None:
+        self.stop_run()
 
     def _planned(self, doc: Doc) -> None:
+        self.untrack()
         self.gui.plan_doc = doc
         self.set(planning=False)
         if not doc.get("ok"):
@@ -1114,14 +1199,16 @@ class PendingVM(VM):
 # --- apply ----------------------------------------------------------------------------------
 
 
-class ApplyVM(VM):
+class ApplyVM(VM, _Tracking):
     """The apply dialog: `apply --dry-run` → confirm (the commit message) → `apply` with its
-    log streaming → the new generation; for `needs-sudo` the commands to copy and Retry."""
+    log streaming and the build tracker → the new generation; for `needs-sudo` the commands
+    to copy and Retry. Stop stops the build (phase `stopped`, Retry); from the pull on the
+    verb refuses it."""
 
     changed = Signal()
     defaults: ClassVar = {
         "open": False,
-        "phase": "",  # checking | confirm | running | done | needs-sudo | failed
+        "phase": "",  # checking | confirm | running | done | needs-sudo | failed | stopped
         "placeholder": "",
         "message": "",
         "closureHead": "",
@@ -1130,8 +1217,9 @@ class ApplyVM(VM):
         "noticeMessage": "",
         "noticeSeverity": "",
         "commands": "",
+        **TRACKING_STATE,
     }
-    lists: ClassVar = {"dry": models.FIELD, "result": models.FIELD}
+    lists: ClassVar = {"dry": models.FIELD, "result": models.FIELD, **TRACKING_LISTS}
     logs: ClassVar = ("log",)
     open = state(bool, "open", changed)
     phase = state(str, "phase", changed)
@@ -1143,9 +1231,15 @@ class ApplyVM(VM):
     noticeMessage = state(str, "noticeMessage", changed)
     noticeSeverity = state(str, "noticeSeverity", changed)
     commands = state(str, "commands", changed)
+    buildHead = state(str, "buildHead", changed)
+    stepNote = state(str, "stepNote", changed)
+    stopEnabled = state(bool, "stopEnabled", changed)
+    stopLabel = state(str, "stopLabel", changed)
     dry = model("dry")
     result = model("result")
     log = model("log")
+    build = model("build")
+    tail = model("tail")
 
     @Slot()
     def start(self) -> None:
@@ -1193,6 +1287,7 @@ class ApplyVM(VM):
     def _run(self) -> None:
         log = self.logmodel("log")
         msg = self["message"]
+        token = Cancel(watched=True)
         started = self.gui.fetch(
             "apply",
             *(["-m", msg] if msg else []),
@@ -1201,21 +1296,33 @@ class ApplyVM(VM):
             log=log,
             busy="applying",
             label="apply: commit, build, pull, switch",
-            hint="about 30 s after a plan; nixos-rebuild evaluates again as root",
+            hint="about 30 s after a plan; nixos-rebuild evaluates again as root; "
+            "Stop stops the build, not the switch",
+            cancel=token,
         )
         if started:
             log.clear()
             self.rows("result").reset([])
             self.set(phase="running", noticeCode="", commands="", closureHead="")
+            self.track(token)
+
+    @Slot()
+    def stop(self) -> None:
+        self.stop_run()
 
     def _done(self, doc: Doc) -> None:
         g = self.gui
+        self.untrack()
         g.applied_doc(doc)
         n = view.notice(doc)
         if n is not None:
             self.rows("result").reset(models.fields(view.progress_fields(doc)))
             self.set(
-                phase="needs-sudo" if n.commands else "failed",
+                phase="needs-sudo"
+                if n.commands
+                else "stopped"
+                if n.code == "cancelled"
+                else "failed",
                 noticeCode=n.code,
                 noticeTitle=n.title,
                 noticeMessage=n.brief,
@@ -1228,7 +1335,7 @@ class ApplyVM(VM):
 
     @Slot()
     def retry(self) -> None:
-        if self["phase"] in ("needs-sudo", "failed"):
+        if self["phase"] in ("needs-sudo", "failed", "stopped"):
             self._run()
 
     @Slot()
@@ -2096,6 +2203,7 @@ class Gui(VM):
         self._edits = 0  # writes and applies so far: a status started before one is stale
         self._status_waiting: dict[bool, list[Callable[[Doc], None]]] = {}
         self._tokens: dict[str, int] = {}
+        self._cancel: Cancel | None = None  # the busy run's stop token (plan, apply)
         self._jobs: set[JobSignals] = set()
         self._acts: list[Activity] = []
         self._refused = 0.0
@@ -2147,23 +2255,26 @@ class Gui(VM):
         busy: str = "",
         label: str = "",
         hint: str = "",
+        cancel: Cancel | None = None,
     ) -> bool:
         """Run `verb args` on the thread pool; `done(doc)` on the UI thread unless a newer
         call in the same exclusive group superseded it. `stream`: the verb's log goes to
         `log` while it runs. `busy` marks a run that must not overlap another; False when
-        one is already running (and the notice says so)."""
+        one is already running (and the notice says so). `cancel`: the run's stop token
+        (plan, apply), which `stop()` asks."""
         if busy:
             if self["busy"]:
                 self.notice.say(f"wait: {self['busy']} is still running", "warn")
                 return False
             self.set(busy=busy)
+            self._cancel = cancel
         key = group or verb
         token = self._tokens.get(key, 0) + 1
         self._tokens[key] = token
         act = Activity(label or verb, hint, time.monotonic())
         self._acts.append(act)
         self._activity()
-        job = Job(self.backend, verb, list(args), stream)
+        job = Job(self.backend, verb, list(args), stream, cancel)
         signals = job.signals
         if stream and log is not None:
             self.router.attach(log.incoming.emit)
@@ -2177,6 +2288,7 @@ class Gui(VM):
             self._activity()
             if busy:
                 self.set(busy="")
+                self._cancel = None
             if exclusive and self._tokens.get(key) != token:
                 return
             done(doc)
@@ -2204,6 +2316,17 @@ class Gui(VM):
     @property
     def idle(self) -> bool:
         return not self._jobs
+
+    @Slot()
+    def stop(self) -> None:
+        """Stop the running plan or apply (its build); the notice says why when refused."""
+        token = self._cancel
+        if token is None:
+            self.notice.say("nothing is running that could be stopped", "info")
+        elif token.request():
+            self.notice.say("stopping: waiting for nix to clean up…", "warn")
+        else:
+            self.notice.say(token.refused, "warn")
 
     def _activity(self) -> None:
         if not self._acts:

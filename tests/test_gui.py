@@ -1003,3 +1003,72 @@ def test_self_test_reports_qml_errors(qapp, monkeypatch, tmp_path):
     doc = run_app(FakeBackend(dict(COWSAY)), self_test=True)
     assert doc["ok"] is False and doc["error"]["code"] == "internal"
     assert doc["error"]["message"].startswith("QML: ")
+
+
+# --- the build tracker and Stop -------------------------------------------------------------
+
+
+def test_plan_shows_the_tracker_and_stop_cancels_it(ui):
+    u = ui()
+    u.fake.build_delay = 5.0
+    u.gui.go("pending")
+    settle(u)
+    assert not shown(u, "stopButton") and not shown(u, "planBuild")
+    p = u.gui.pending
+    p.startPlan()  # not click(): that waits for the verb, which is "building" for 5 s
+    u.qtbot.wait(700)  # the tracker is read twice a second
+    assert p["planning"] and p["buildHead"].startswith("[7/39 built, 2 building")
+    assert shown(u, "planBuild") and prop(u, "buildHead", "text") == p["buildHead"]
+    assert shown(u, "stopButton") and prop(u, "stopButton", "enabled")
+    rows = {r["label"]: r["value"] for r in p.rows("build").rows}
+    assert rows["etc-hosts"] == "building 3s · unpackPhase · on mbp13"
+    assert rows["system-path"].startswith("building ") and rows["unit-dbus.service"] == "queued"
+    token = u.fake.tokens[-1]
+    assert token.watched and token.step == "build" and token.stoppable
+    click(u, "stopButton")  # settles: the fake answers the cancelled document
+    assert token.requested
+    assert u.gui.plan_doc["error"]["code"] == "cancelled"
+    assert not p["planning"] and p["buildHead"] == "" and p.rows("build").count == 0
+    assert not shown(u, "stopButton") and not shown(u, "planBuild")
+    n = u.gui.notice
+    assert n["visible"] and n["code"] == "cancelled" and n["severity"] == "info"
+    assert p["planNote"].startswith("plan: cancelled: the build was stopped")
+    assert u.fake.verbs()[-1] == ["plan"]
+
+
+def test_apply_stop_refused_while_root_works_then_stops_the_build(ui):
+    u = ui()
+    u.gui.go("pending")
+    settle(u)
+    click(u, "applyButton")
+    a = u.gui.apply
+    assert a["phase"] == "confirm"
+    u.fake.build_delay = 5.0
+    a.confirm("test: cowsay")
+    u.qtbot.wait(700)
+    assert a["phase"] == "running" and a["buildHead"].startswith("[7/39 built")
+    assert shown(u, "applyBuild") and shown(u, "stopApply") and prop(u, "stopApply", "enabled")
+    token = u.fake.tokens[-1]
+    with token.shielded("switch"):  # as apply does from the pull on
+        a.tick()
+        assert not a["stopEnabled"] and not prop(u, "stopApply", "enabled")
+        a.stop()
+        assert not token.requested
+        assert u.gui.notice["severity"] == "warn" and "switch is running" in u.gui.notice["message"]
+    a.tick()
+    assert a["stopEnabled"]
+    click(u, "stopApply")
+    assert token.requested and a["phase"] == "stopped" and a["noticeCode"] == "cancelled"
+    assert a["noticeSeverity"] == "info" and a["noticeTitle"] == "stopped"
+    result = {r["label"]: r["value"] for r in a.rows("result").rows}
+    assert result["committed"] == "716ed68" and result["build"].endswith("(stopped)")
+    assert shown(u, "retryApply") and not shown(u, "stopApply") and not shown(u, "applyBuild")
+    assert u.gui.applied == [] and u.gui["busy"] == ""
+    click(u, "applyClose")
+    assert not shown(u, "applyDialog")
+
+
+def test_stop_without_a_run_is_a_calm_notice(ui):
+    u = ui()
+    u.gui.stop()
+    assert u.gui.notice["severity"] == "info" and "nothing is running" in u.gui.notice["message"]

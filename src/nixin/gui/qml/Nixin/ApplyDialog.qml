@@ -23,7 +23,8 @@ Dialog {
     width: Math.min(parent ? parent.width - 80 : 900, 960)
     height: Math.min(parent ? parent.height - 60 : 640, 720)
     title: "apply → " + host + ({ checking: " — checking", running: " — running", done: " — done",
-                                 "needs-sudo": " — root is needed", failed: " — failed" }[phase] || "")
+                                 "needs-sudo": " — root is needed", failed: " — failed",
+                                 stopped: " — stopped" }[phase] || "")
     closePolicy: working ? Popup.NoAutoClose : Popup.CloseOnEscape
 
     onWantChanged: want ? open() : close()
@@ -46,13 +47,23 @@ Dialog {
             Text {
                 Layout.fillWidth: true
                 text: dlg.phase === "checking" ? "apply --dry-run: what would be committed, what root would run…"
-                                               : "commit, build, pull into the authoritative tree, switch (about 30 s after a plan)"
+                    : dlg.apply.stepNote !== "" ? dlg.apply.stepNote
+                    : "commit, build, pull into the authoritative tree, switch (about 30 s after a plan)"
                 textFormat: Text.PlainText
                 color: Theme.dim2
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize
                 elide: Text.ElideRight
             }
+        }
+
+        BuildTracker {
+            objectName: "applyBuild"
+            Layout.fillWidth: true
+            visible: dlg.phase === "running" && dlg.apply.buildHead !== ""
+            head: dlg.apply.buildHead
+            rows: dlg.apply.build
+            tail: dlg.apply.tail
         }
 
         ScrollView {
@@ -94,7 +105,7 @@ Dialog {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: 120
-            visible: dlg.phase === "running" || ((dlg.phase === "done" || dlg.phase === "failed" || dlg.phase === "needs-sudo") && count > 0)
+            visible: dlg.phase === "running" || ((dlg.phase === "done" || dlg.phase === "failed" || dlg.phase === "stopped" || dlg.phase === "needs-sudo") && count > 0)
             model: dlg.apply.log
         }
 
@@ -157,7 +168,7 @@ Dialog {
         FieldList {
             objectName: "applyResult"
             Layout.fillWidth: true
-            visible: dlg.phase === "done" || dlg.phase === "failed" || dlg.phase === "needs-sudo"
+            visible: dlg.phase === "done" || dlg.phase === "failed" || dlg.phase === "stopped" || dlg.phase === "needs-sudo"
             model: dlg.apply.result
             labelWidth: 90
         }
@@ -184,9 +195,16 @@ Dialog {
             text: "Copy commands"
             onClicked: dlg.apply.copyCommands()
         }
+        DangerButton {
+            objectName: "stopApply"
+            visible: dlg.phase === "running"
+            enabled: dlg.apply.stopEnabled
+            text: dlg.apply.stopLabel
+            onClicked: dlg.apply.stop()
+        }
         Button {
             objectName: "retryApply"
-            visible: dlg.phase === "needs-sudo" || dlg.phase === "failed"
+            visible: dlg.phase === "needs-sudo" || dlg.phase === "failed" || dlg.phase === "stopped"
             text: "Retry"
             onClicked: dlg.apply.retry()
         }
