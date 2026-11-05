@@ -98,8 +98,21 @@ Real nix 2.34.9 events through the tracker (`/tmp/nixin-progress-probe/smoke*.py
 trivial derivation builds with the readable lines and the status line as expected (`[0/1
 built, 1 building] … · 1s`, then `[1/1 built]`); a busy-loop derivation stopped through
 the token 1 s after its build started: nix prints `error: interrupted by the user`,
-exits 1 within the same tick, no builder process left behind (`ps`). The `nixin plan
---config ~/nixos` run: see the report.
+exits 1 within the same tick, no builder process left behind (`ps`).
+
+Against the real config, in a throwaway clone of `~/nixos` (`/tmp/nixin-progress-probe/
+live/ws`; `~/nixos` itself was only read: its `plan` was `cached`, generation 27):
+
+| run | result |
+|---|---|
+| `add cowsay`, `plan` (human, stderr to a file) | eval ~24 s, build 15.8 s: the lists, `building '…'` lines, plain status lines (`[13/17 built, 1 building, 2/2 fetched 16.1 KiB] system-units · 12s`, final `[17/17 built, 2/2 fetched 16.1 KiB] · 15s`), stdout `build     17 of 17 derivations built, 2 paths fetched (16.1 KiB) in 15.8 s`, `+ cowsay 3.8.4` |
+| `--json plan` | `cached: true`, `build: null`, 0 bytes on stderr |
+| `add hello`, `plan` with SIGINT 30 s in (3 s into the build) | `nixin plan: stopping (Ctrl-C): waiting for nix to clean up…`, nix's `error: interrupted by the user`, `nixin plan: the build was stopped after 3s (0 of 17 derivations built, 0 paths fetched); nothing was applied`, exit 1 **0.03 s after the signal**; no `nix build` left (`ps`); the ETA showed (`eta 1m25s`, from the first run's durations) |
+| `--json plan` after the stop | no cache entry, so it built again: `build.counts.done 17`, 9.5 s; stderr empty |
+
+Not run live: a stopped `apply` (it needs a commit in a real workspace and sudo), the
+UIs against the real config (fixture-tested and screenshotted offscreen only:
+`/tmp/nixin-progress-probe/shots/`).
 
 ### Judgement calls
 
