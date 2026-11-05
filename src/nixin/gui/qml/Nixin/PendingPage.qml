@@ -63,6 +63,15 @@ Item {
                 onClicked: page.p.startPlan()
             }
             DangerButton {
+                objectName: "stopButton"
+                text: page.p.stopLabel
+                visible: page.p.planning
+                enabled: page.p.stopEnabled
+                ToolTip.visible: hovered
+                ToolTip.text: "stop the build (nothing is applied by a plan)"
+                onClicked: page.p.stop()
+            }
+            DangerButton {
                 objectName: "applyButton"
                 text: "Apply…"
                 enabled: page.backend.busy === ""
@@ -114,6 +123,15 @@ Item {
                     Layout.topMargin: 6
                     text: "plan"
                     loading: page.p.planning
+                }
+                BuildTracker {
+                    objectName: "planBuild"
+                    Layout.fillWidth: true
+                    visible: page.p.planning && (page.p.buildHead !== "" || page.p.stepNote !== "")
+                    head: page.p.buildHead
+                    note: page.p.stepNote
+                    rows: page.p.build
+                    tail: page.p.tail
                 }
                 LogView {
                     objectName: "planLog"

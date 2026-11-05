@@ -1,0 +1,44 @@
+@nix {"action":"msg","level":4,"msg":"evaluating file '«nix-internal»/derivation-internal.nix'"}
+@nix {"action":"start","id":5,"level":6,"parent":0,"text":"querying info about missing paths","type":0}
+@nix {"action":"stop","id":5}
+@nix {"action":"msg","level":3,"msg":"these 3 derivations will be built:"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/0a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p-system-path.drv"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/m7v2c3k1q9z8x6w5v4u3t2s1r0p9o8n7-nixos-system-mbp13-26.11.20261023.3ec6363.drv"}
+@nix {"action":"msg","level":3,"msg":"these 2 paths will be fetched (1.50 MiB download, 6.00 MiB unpacked):"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ayc0-cowsay-3.8.4"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ay11-cowsay-3.8.4-man"}
+@nix {"action":"start","id":1,"level":0,"parent":0,"text":"","type":102}
+@nix {"action":"start","id":2,"level":0,"parent":0,"text":"","type":104}
+@nix {"action":"start","id":3,"level":0,"parent":0,"text":"","type":103}
+@nix {"action":"result","fields":[100,2],"id":1,"type":106}
+@nix {"action":"start","fields":["/nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ayc0-cowsay-3.8.4","https://cache.nixos.org"],"id":10,"level":3,"parent":3,"text":"copying path '/nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ayc0-cowsay-3.8.4' from 'https://cache.nixos.org'","type":100}
+@nix {"action":"start","fields":["https://cache.nixos.org/nar/1abc.nar.xz"],"id":11,"level":4,"parent":10,"text":"downloading 'https://cache.nixos.org/nar/1abc.nar.xz'","type":101}
+@nix {"action":"result","fields":[524288,1048576,0,0],"id":11,"type":105}
+@nix {"action":"result","fields":[1048576,1048576,0,0],"id":11,"type":105}
+@nix {"action":"stop","id":11}
+@nix {"action":"stop","id":10}
+@nix {"action":"start","fields":["/nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ay11-cowsay-3.8.4-man","https://cache.nixos.org"],"id":12,"level":3,"parent":3,"text":"copying path '/nix/store/c0w5ayc0w5ayc0w5ayc0w5ayc0w5ay11-cowsay-3.8.4-man' from 'https://cache.nixos.org'","type":100}
+@nix {"action":"start","fields":["https://cache.nixos.org/nar/2def.nar.xz"],"id":13,"level":4,"parent":12,"text":"downloading 'https://cache.nixos.org/nar/2def.nar.xz'","type":101}
+@nix {"action":"result","fields":[262144,524288,0,0],"id":13,"type":105}
+@nix {"action":"start","fields":["/nix/store/0a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p-system-path.drv","",1,1],"id":20,"level":3,"parent":2,"text":"building '/nix/store/0a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p-system-path.drv'","type":105}
+@nix {"action":"result","fields":[0,3,1,0],"id":2,"type":105}
+@nix {"action":"result","fields":["buildPhase"],"id":20,"type":104}
+@nix {"action":"result","fields":["created 1234 symlinks in user environment"],"id":20,"type":101}
+@nix {"action":"result","fields":["\u001b[1mbuilding\u001b[0m the system path\r"],"id":20,"type":101}
+@nix {"action":"result","fields":[524288,524288,0,0],"id":13,"type":105}
+@nix {"action":"stop","id":13}
+@nix {"action":"stop","id":12}
+@nix {"action":"stop","id":20}
+@nix {"action":"result","fields":[1,3,0,0],"id":2,"type":105}
+@nix {"action":"start","fields":["/nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv","ssh-ng://master@mbp13",1,1],"id":21,"level":3,"parent":2,"text":"building '/nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv' on 'ssh-ng://master@mbp13'","type":105}
+@nix {"action":"result","fields":[1,3,1,0],"id":2,"type":105}
+@nix {"action":"result","fields":["configuring"],"id":21,"type":101}
+@nix {"action":"result","fields":["make: *** [all] Error 2"],"id":21,"type":101}
+@nix {"action":"stop","id":21}
+@nix {"action":"result","fields":[1,3,0,1],"id":2,"type":105}
+@nix {"action":"msg","level":0,"msg":"\u001b[31;1merror:\u001b[0m builder for '/nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv' failed with exit code 2;\n       last 2 log lines:\n       > configuring\n       > make: *** [all] Error 2\n       For full logs, run 'nix log /nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv'."}
+@nix {"action":"msg","level":0,"msg":"\u001b[31;1merror:\u001b[0m 1 dependencies of derivation '/nix/store/m7v2c3k1q9z8x6w5v4u3t2s1r0p9o8n7-nixos-system-mbp13-26.11.20261023.3ec6363.drv' failed to build"}
+@nix {"action":"stop","id":3}
+@nix {"action":"stop","id":2}
+@nix {"action":"stop","id":1}

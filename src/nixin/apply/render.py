@@ -8,6 +8,7 @@ from typing import Any
 
 from ..truth.render import row, sub
 from .closure import human_size
+from .progress import human_bytes
 from .safety import reboot_text, space_text
 
 SHOWN = 25  # closure rows printed per kind
@@ -45,6 +46,25 @@ def diff_lines(diff: dict[str, Any] | None) -> list[str]:
     if more:
         lines.append(sub("…", f"{more} more (--json has all)"))
     return lines
+
+
+def build_line(b: dict[str, Any] | None) -> list[str]:
+    """`build     39 derivations built, 12 paths fetched (35.1 MiB) in 51 s`; nothing when
+    the out path came from the cache."""
+    if not b:
+        return []
+    c = b["counts"]
+    parts = [f"{c['done']} of {b['total']} derivations built" if b["total"] else "nothing to build"]
+    if c["failed"]:
+        parts.append(f"{c['failed']} failed")
+    d = b.get("downloads") or {}
+    if d.get("done"):
+        size = f" ({human_bytes(d['bytes_done'])})" if d.get("bytes_done") else ""
+        parts.append(f"{d['done']} paths fetched{size}")
+    text = ", ".join(parts) + f" in {b['duration_s']} s"
+    if b.get("cancelled"):
+        text += " (stopped)"
+    return [row("build", text)]
 
 
 def boot_lines(b: dict[str, Any] | None) -> list[str]:
@@ -103,6 +123,7 @@ def plan(d: dict[str, Any], host: str) -> str:
         ),
         row("pending", _pending(d["pending_commits"])),
         row("running", f"{_gen(d['running'])} {_store(d['running']['store_path'])}"),
+        *build_line(d.get("build")),
         *diff_lines(d["diff"]),
         *boot_lines(d["boot"]),
     ]
@@ -137,6 +158,7 @@ def apply(d: dict[str, Any], host: str) -> str:
     lines.append(row("authorit.", f"@ {_short(d['authoritative_head'])}"))
     for c in d["privileged_commands"]:
         lines.append(sub("[root]", c))
+    lines += build_line(d.get("build"))
     lines += diff_lines(d["diff"])
     lines += boot_lines(d["boot"])
     t = d["timings"]

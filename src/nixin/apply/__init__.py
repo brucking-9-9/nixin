@@ -25,6 +25,16 @@ refreshes the boot menu and collects the garbage (generations.py, gc.py).
 `apply --host H` for another host commits, pushes to the hub and runs the pulls and
 the switch on H over `ssh -t` (remote.py; hosts.py reads ~/.config/nixin/hosts.toml).
 
+Progress and stopping: the build runs under the tracker (build.py, progress.py) and a
+`Cancel` token (proc.py) that lives in `ns.cancel`: the UIs pass one in (backend.run)
+and read the tracker and the current step from it; the CLI makes its own and turns
+Ctrl-C into a request (`proc.interrupts`). plan can be stopped at any time (nothing is
+written but caches); apply only until its build is done: the commit is shielded (it is
+quick and leaves a consistent tree), and from the pull on nothing can be stopped (a
+half-done pull or switch is worse than a finished one): `Cancel.shielded` refuses the
+request and the root steps run in their own process group, out of Ctrl-C's reach. A
+stopped run answers `cancelled`, with `committed` when apply had committed already.
+
 `register(subparsers)` is the only thing cli.py calls (same pattern as truth/writer).
 """
 
@@ -137,10 +147,20 @@ class Ctx:
     local: bool
     cache: build.PlanCache = field(default_factory=build.PlanCache)
     warnings: list[str] = field(default_factory=list)
+    cancel: proc.Cancel = field(default_factory=proc.Cancel)
 
     @property
     def human(self) -> bool:
         return not self.ns.json
+
+
+def _token(ns: argparse.Namespace) -> proc.Cancel:
+    """The run's stop token: the UI's (`ns.cancel`), else a new one left there."""
+    token = getattr(ns, "cancel", None)
+    if token is None:
+        token = proc.Cancel()
+        ns.cancel = token
+    return token
 
 
 def authoritative_path(explicit: str | None = None) -> Path:
@@ -163,7 +183,8 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
     auth_path = authoritative_path(getattr(ns, "authoritative", None))
     if auth_path.exists() and auth_path.resolve() == ws.root:
         raise NixinError("not-a-workspace", f"{ws.root} is the authoritative tree itself")
-    repo = build.repo_at(ws.root)
+    token = _token(ns)
+    repo = build.repo_at(ws.root, token)
     host = ns.host
     if check_host and host not in _text_hosts(ws):  # flake.nix as text, else one eval
         hosts = repo.hosts()
@@ -172,7 +193,16 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
                 "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
             )
     return Ctx(
-        ns, ws.root, repo, git, branch, auth_path, Git(auth_path), host, host == local_hostname()
+        ns,
+        ws.root,
+        repo,
+        git,
+        branch,
+        auth_path,
+        Git(auth_path),
+        host,
+        host == local_hostname(),
+        cancel=token,
     )
 
 
@@ -244,11 +274,19 @@ def _workspace_doc(ctx: Ctx, st: Status, head: str | None) -> dict[str, Any]:
 # --- the build, with plan's cache ---------------------------------------------------------
 
 
-def _target(ctx: Ctx, st: Status, head: str | None, *, dry: bool = False) -> dict[str, Any]:
+def _target(
+    ctx: Ctx,
+    st: Status,
+    head: str | None,
+    *,
+    dry: bool = False,
+    progress: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The workspace host's toplevel out path: from the cache, else built (not when dry).
 
     A tree whose only change is installer/history.jsonl builds what HEAD builds (no module
-    reads that file), so the commit map answers it without an eval."""
+    reads that file), so the commit map answers it without an eval. A build that fails or
+    is stopped raises with its `build` summary (and `progress`: how far apply got)."""
     real = [f for f in st.dirty if f != HISTORY]
     if not real and head:
         hit = ctx.cache.by_commit(ctx.host, head)
@@ -262,7 +300,14 @@ def _target(ctx: Ctx, st: Status, head: str | None, *, dry: bool = False) -> dic
         return {**hit, "cached": True, "cache_key": f"source {src.source_hash}"}
     if dry:
         return {"out": None, "drv": None, "cached": False, "cache_key": None}
-    b = build.build(ctx.repo, ctx.host, stream=ctx.human)
+    ctx.cancel.check()
+    try:
+        b = build.build(ctx.repo, ctx.host, stream=ctx.human, cancel=ctx.cancel)
+    except NixinError as e:
+        summary = getattr(e, "build", None)
+        if summary is None and not progress:
+            raise
+        raise ApplyError(e.code, e.message, build=summary, **(progress or {})) from None
     entry = {"out": b["out"], "drv": b["drv"]}
     ctx.cache.put_source(ctx.host, src.source_hash, entry)
     if not real and head:
@@ -278,7 +323,14 @@ def plan(ns: argparse.Namespace) -> dict[str, Any]:
 
 
 def _plan(ns: argparse.Namespace) -> dict[str, Any]:
+    token = _token(ns)
+    with proc.interrupts(token, "nixin plan"):
+        return _plan_run(ns, token)
+
+
+def _plan_run(ns: argparse.Namespace, token: proc.Cancel) -> dict[str, Any]:
     t0 = time.monotonic()
+    token.step = "prepare"
     ctx = _context(ns)
     st = ctx.git.status()
     head = ctx.git.head()
@@ -287,8 +339,16 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
     run = system.running()
     target = _target(ctx, st, head)
     out = target["out"]
+    token.step = "diff"
     diff = build.diff(run["store_path"], out) if ctx.local else None
     boot = safety.compare(run["store_path"], out) if ctx.local else None
+    if token.requested:  # Ctrl-C during the diff: not a plan with "no diff"
+        raise ApplyError(
+            "cancelled",
+            "stopped on request after the build (the out path is cached; nothing was applied)",
+            build=target.get("build"),
+            out=out,
+        )
     if not ctx.local:
         ctx.warnings.append(
             f"{ctx.host} is not this machine ({local_hostname()}): no closure diff or boot "
@@ -308,6 +368,7 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
         "up_to_date": out == run["store_path"],
         "duration_s": round(time.monotonic() - t0, 2),
         "timings": {k: target[k] for k in ("eval_s", "build_s") if k in target},
+        "build": target.get("build"),
         "workspace": _workspace_doc(ctx, st, head),
         "authoritative": {**auth, "relation": rel["state"]},
         "running": run,
@@ -384,7 +445,14 @@ def _apply_locked(ns: argparse.Namespace) -> dict[str, Any]:
 
 
 def _apply(ns: argparse.Namespace) -> dict[str, Any]:
+    token = _token(ns)
+    with proc.interrupts(token, "nixin apply"):
+        return _apply_run(ns, token)
+
+
+def _apply_run(ns: argparse.Namespace, token: proc.Cancel) -> dict[str, Any]:
     t0 = time.monotonic()
+    token.step = "prepare"
     ctx = _context(ns)
     mode = "boot" if ns.no_switch else "switch"
     if not ctx.local:  # push to the hub, then pull and switch there over ssh
@@ -452,21 +520,25 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
     pre = _target(ctx, st, head, dry=True) if to_commit else None
     boot = _boot_check(before["store_path"], pre["out"]) if pre and pre["out"] else None
     if to_commit:
-        committed = ctx.git.commit(message, add_history)
-        head = committed
-        ctx.repo = build.repo_at(ctx.path)  # the tree nix sees changed (same content though)
-        st = ctx.git.status()
+        with token.shielded("commit"):  # quick, and it leaves a consistent tree
+            committed = ctx.git.commit(message, add_history)
+            head = committed
+            ctx.repo = build.repo_at(ctx.path, token)  # the tree nix sees changed (same content)
+            st = ctx.git.status()
     t_build = time.monotonic()
     if pre and pre["out"]:
         target = pre
         ctx.cache.put_commit(ctx.host, head, {"out": pre["out"], "drv": pre.get("drv")})
     else:
-        target = _target(ctx, st, head)
+        target = _target(ctx, st, head, progress={"committed": committed})
     out = target["out"]
     progress: dict[str, Any] = {"committed": committed, "out": out}
     if boot is None:
         boot = _boot_check(before["store_path"], out, progress)
+    token.step = "diff"
     diff = build.diff(before["store_path"], out)
+    if token.requested:  # the last chance: from the pull on nothing is stopped
+        raise ApplyError("cancelled", "stopped on request before the pull", **progress)
     ran: list[str] = []
 
     def privileged(step: privilege.Step, remaining: list[privilege.Step]) -> proc.Proc:
@@ -492,77 +564,80 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
             **progress,
         )
     t_switch = time.monotonic()
-    p = privileged(steps[1], steps[1:])
-    if not p.ok:
-        raise ApplyError(
-            "switch-failed",
-            f"nixos-rebuild {mode} failed ({ctx.auth_path} is already at {head[:7]}):\n"
-            + p.tail(20),
-            privileged_commands=ran,
-            **progress,
-        )
-    t_done = time.monotonic()
-    switch_log = p.tail(20)
-    now = system.realpath(system.CURRENT if mode == "switch" else system.PROFILE)
-    if now != out:
-        what = "/run/current-system" if mode == "switch" else system.PROFILE
-        raise ApplyError(
-            "verify-failed",
-            f"{what} is {now}, but nixin built {out} from the same commit; the authoritative "
-            "tree evaluated differently (impure config, or a change between plan and apply?)",
-            privileged_commands=ran,
-            **progress,
-        )
-    after = system.running()
-    generation = system.generation_of(out) if mode == "switch" else after["profile_generation"]
-    subject = message.splitlines()[0] if message else ""
-    line = {
-        "ts": system.now(),
-        "host": ctx.host,
-        "out": out,
-        "generation": generation,
-        "commit": head,
-        "message": subject,
-        "mode": mode,
-    }
-    try:
-        system.append_history(ctx.path, line)
-    except OSError as e:
-        ctx.warnings.append(f"could not append to {HISTORY}: {e}")
-    ctx.cache.put_commit(ctx.host, head, {"out": out, "drv": target.get("drv")})
-    doc = {
-        "ok": True,
-        "committed": committed,
-        "commit_message": subject if committed else None,
-        "authoritative_head": auth_head,
-        "out": out,
-        "generation": generation,
-        "switched": mode == "switch",
-        "mode": mode,
-        "previous": before,
-        "running": after,
-        "privileged_commands": ran,
-        "backends": {s.name: bk[s.name].name for s in steps},
-        "switch_log": switch_log,
-        "diff": diff,
-        "boot": boot,
-        "reboot_needed": boot["reboot_needed"] if boot else None,
-        "pins": _pins(ctx),
-        "cached": target["cached"],
-        "history": line,
-        "timings": {
-            "prepare": round(t_commit - t0, 2),
-            "commit": round(t_build - t_commit, 2),
-            "build": round(t_pull - t_build, 2),
-            "pull": round(t_switch - t_pull, 2),
-            "switch": round(t_done - t_switch, 2),
-            "total": round(time.monotonic() - t0, 2),
-        },
-        "warnings": ctx.warnings + (boot["warnings"] if boot else []),
-    }
-    if ctx.human:
-        doc["message"] = render.apply(doc, ctx.host)
-    return doc
+    with token.shielded("switch"):  # the switch and what follows it are not stopped
+        p = privileged(steps[1], steps[1:])
+        if not p.ok:
+            raise ApplyError(
+                "switch-failed",
+                f"nixos-rebuild {mode} failed ({ctx.auth_path} is already at {head[:7]}):\n"
+                + p.tail(20),
+                privileged_commands=ran,
+                **progress,
+            )
+        t_done = time.monotonic()
+        token.step = "verify"
+        switch_log = p.tail(20)
+        now = system.realpath(system.CURRENT if mode == "switch" else system.PROFILE)
+        if now != out:
+            what = "/run/current-system" if mode == "switch" else system.PROFILE
+            raise ApplyError(
+                "verify-failed",
+                f"{what} is {now}, but nixin built {out} from the same commit; the authoritative "
+                "tree evaluated differently (impure config, or a change between plan and apply?)",
+                privileged_commands=ran,
+                **progress,
+            )
+        after = system.running()
+        generation = system.generation_of(out) if mode == "switch" else after["profile_generation"]
+        subject = message.splitlines()[0] if message else ""
+        line = {
+            "ts": system.now(),
+            "host": ctx.host,
+            "out": out,
+            "generation": generation,
+            "commit": head,
+            "message": subject,
+            "mode": mode,
+        }
+        try:
+            system.append_history(ctx.path, line)
+        except OSError as e:
+            ctx.warnings.append(f"could not append to {HISTORY}: {e}")
+        ctx.cache.put_commit(ctx.host, head, {"out": out, "drv": target.get("drv")})
+        doc = {
+            "ok": True,
+            "committed": committed,
+            "commit_message": subject if committed else None,
+            "authoritative_head": auth_head,
+            "out": out,
+            "generation": generation,
+            "switched": mode == "switch",
+            "mode": mode,
+            "previous": before,
+            "running": after,
+            "privileged_commands": ran,
+            "backends": {s.name: bk[s.name].name for s in steps},
+            "switch_log": switch_log,
+            "diff": diff,
+            "boot": boot,
+            "reboot_needed": boot["reboot_needed"] if boot else None,
+            "pins": _pins(ctx),
+            "cached": target["cached"],
+            "build": target.get("build"),
+            "history": line,
+            "timings": {
+                "prepare": round(t_commit - t0, 2),
+                "commit": round(t_build - t_commit, 2),
+                "build": round(t_pull - t_build, 2),
+                "pull": round(t_switch - t_pull, 2),
+                "switch": round(t_done - t_switch, 2),
+                "total": round(time.monotonic() - t0, 2),
+            },
+            "warnings": ctx.warnings + (boot["warnings"] if boot else []),
+        }
+        if ctx.human:
+            doc["message"] = render.apply(doc, ctx.host)
+        return doc
 
 
 def run_privileged(
@@ -580,7 +655,9 @@ def run_privileged(
     if why:
         raise ApplyError("switch-failed", why, privileged_commands=ran, **progress)
     ran.append(proc.shown(b.argv(step)))
-    p = b.run(step, stream=ctx.human)
+    token = getattr(ctx, "cancel", None) or proc.Cancel()
+    with token.shielded(step.name):  # a root step runs to its end: no stop, no Ctrl-C
+        p = b.run(step, stream=ctx.human)
     if isinstance(b, privilege.Sudo) and (p.missing or privilege.needs_password(p)):
         cmds = [bk[s.name].display(s) for s in remaining]
         verb = getattr(ctx.ns, "verb", None) or "apply"

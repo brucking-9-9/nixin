@@ -804,8 +804,27 @@ tracked files with their working-tree contents (the writer's new files are
 intent-to-add, so they count), nothing untracked. That is exactly what `apply` commits
 and what the authoritative tree builds after pulling it, so plan's `out` is the path
 `nixos-rebuild` will produce there. Two nix steps: evaluate `toplevel.drvPath`
-(`eval-failed`), then `nix build <drv>^out` (`build-failed`). In human mode nix's build
-output streams to stderr; under `--json` nothing does.
+(`eval-failed`), then `nix build <drv>^out --log-format internal-json -v`
+(`build-failed`), whose events nixin parses into a build tracker: every derivation of
+the plan with a status (queued, building and on which builder, done, failed with nix's
+log tail, skipped because a dependency failed), the current build's phase and log tail,
+the paths fetched from the binary caches, and an ETA from the durations of earlier builds
+of the same names (kept in the cache, `apply/durations.json`). In human mode nix's
+readable output streams to stderr as before (the "will be built" lists, `building '…'`,
+`copying path …`, warnings and errors; not the per-line build logs) plus one live status
+line, `[7/39 built, 2 building, 12/40 fetched 35.1 MiB] system-path: buildPhase · 1m12s
+(eta 3m)`, redrawn in place when stderr is a terminal and printed as a plain line when the
+counts change (at most every 10 s, and once at the end) otherwise. Under `--json` nothing
+goes to stderr; the document gets the final `build` summary.
+
+**Stopping.** Ctrl-C while `plan` builds (or evaluates) stops nix (its process group gets
+SIGTERM, SIGKILL after 5 s) and the verb answers `cancelled` with the summary so far;
+nothing is written but caches. The UIs do the same with their Stop button. `apply` can be
+stopped until its build is done: the commit stays (`committed` in the error) and the next
+`apply` continues from it. From the pull on a stop is refused: Ctrl-C prints one line
+(`pull`/`switch` "is running and cannot be stopped; waiting for it") and the root steps
+run in their own process group, so the terminal's Ctrl-C never reaches `nixos-rebuild`
+half-way through an activation; the UIs' Stop button is disabled meanwhile.
 
 The out path is cached by the flake's *source store path* (a content hash of that tree,
 dirty edits included) and by commit (see [Caches](#caches)), so `apply` right after
@@ -821,6 +840,7 @@ Result:
 | `cached` | `out` came from plan's cache (nothing evaluated or built); `cache_key` says which entry (`source <hash>` or `commit <sha>`) |
 | `up_to_date` | `out` is `/run/current-system` |
 | `duration_s`, `timings` | total seconds; `eval_s`, `build_s` when it built |
+| `build` | the tracker's summary when it built, null when `cached`: `state` (`done`, `failed`, `cancelled`), `cancelled`, `duration_s`, `total` (derivations in the plan), `counts` (`queued`, `building`, `done`, `failed`, `skipped`), `failed[]` (names), `downloads` (`done` paths, `bytes_done`). The same object is in `error.build` of `build-failed` and `cancelled` |
 | `workspace` | `path`, `branch`, `head`, `dirty[]` (tracked files that differ from HEAD), `untracked[]` (not part of the build) |
 | `authoritative` | `path`, `exists`, `head`, `branch`, `dirty[]`, `relation`: `same`, `ahead` (the workspace has commits to apply), `behind` (the authoritative tree has commits the workspace lacks), `diverged`, `unknown` (its HEAD is not a commit the workspace has) |
 | `running` | `store_path` (`/run/current-system`), `generation` (the newest system profile generation pointing at it, or null), `profile_generation`, `profile` |
@@ -928,6 +948,7 @@ Result:
 | field | meaning |
 |---|---|
 | `committed` | the new commit, or null when nothing was committed; `commit_message` its subject |
+| `build` | as `plan`'s: the tracker's summary when apply built, null when plan's cache had the out path |
 | `authoritative_head` | the authoritative HEAD after the pull (= the workspace HEAD) |
 | `out`, `generation` | the system that now runs (`--no-switch`: the boot default) and its profile generation |
 | `switched`, `mode` | true / `switch`; false / `boot` with `--no-switch` |
@@ -1842,6 +1863,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `unfree` | try | nixpkgs refuses PKG's unfree license; `commands[]`: `NIXPKGS_ALLOW_UNFREE=1 nixin try PKG --impure` and the `nix run` equivalent |
 | `ambiguous-program` | try | PKG has several programs and none is meta.mainProgram; `programs[]`, repeat with `--program NAME` (the build is done: `out`, `size`, `cached`, `shell_command`) |
 | `no-program` | try | PKG has nothing in `bin/` to run; `programs[]` is empty, `shell_command` puts it on PATH |
+| `cancelled` | apply | `plan`/`apply` was stopped on request (Ctrl-C, a UI's Stop) while nix built: nix's process group was killed, nothing was applied; `build` is the tracker's summary so far (`cancelled: true`) and, for `apply`, `committed` says whether the commit had been made (it stays). Only the build can be stopped: a request during the commit, the pull or the switch is refused and the run finishes |
 | `nothing-to-apply` | apply | no uncommitted change, the authoritative tree has the workspace HEAD, and it is what runs; `rollback`: GEN runs, is the boot default, and the config builds it |
 | `host-not-local` | apply, doctor | `rollback`, `history`, `generations`, `gc`, `doctor` with `--host H` for a host that is not this machine (`apply` goes there over ssh instead) |
 | `authoritative-missing` | apply | no git checkout at the authoritative path |
@@ -1984,6 +2006,7 @@ ignored, so `~/.cache/nixin/`). It is safe to delete at any time.
 | `apply/commit-<host>-<sha>.json` | the same, per commit (written by `plan` on a clean tree, by `apply`, and by `rollback` for the authoritative HEAD it leaves); `status.pending`, `nothing-to-apply` and rollback's commit lookup read it without nix | last 40 per host |
 | `apply/apply.lock` | `flock` held while `apply`, `rollback` or `gc` runs (`busy`) | — |
 | `apply/closure-sizes.json` | `generations`/`gc`: `{store path: closure size}` from `nix path-info -S` (a closure never changes) | pruned to the generations on disk at each write |
+| `apply/durations.json` | `plan`/`apply`: `{derivation name without its version: seconds}` of the builds the tracker saw, for the ETA (smoothed 0.7 new / 0.3 old) | the newest 2000 names at each write; safe to delete (the next plans have no ETA until names repeat) |
 
 Flags: discovery `--refresh` ignores cached answers, refetches and stores; `--no-cache`
 neither reads nor writes. Truth `--refresh` skips reads and still writes the fresh

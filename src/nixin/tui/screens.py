@@ -16,8 +16,19 @@ from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Button, DataTable, Footer, Input, Static, Tab, Tabs, TextArea
 
+from ..apply.proc import Cancel
 from ..ui import view
-from .widgets import Fields, Line, LogView, NoticeBox, Spinner, Title, cell, spans_text
+from .widgets import (
+    BuildTracker,
+    Fields,
+    Line,
+    LogView,
+    NoticeBox,
+    Spinner,
+    Title,
+    cell,
+    spans_text,
+)
 
 if TYPE_CHECKING:
     from .app import NixinApp
@@ -62,6 +73,55 @@ class Base(Screen):
     @property
     def nixin(self) -> NixinApp:
         return self.app  # type: ignore[return-value]
+
+
+class BuildScreen(Base):
+    """A screen that runs a build (Pending's plan, Apply): the tracker widget `#build` and
+    the Stop button `#stop-btn` follow the run's token (`watch_token`) twice a second."""
+
+    STEP_LABEL: ClassVar[dict[str, str]] = {
+        "prepare": "reading the trees",
+        "eval": "evaluating the config",
+        "build": "building",
+        "diff": "diffing the closures",
+        "commit": "committing (cannot be stopped)",
+        "pull": "pulling into the authoritative tree (cannot be stopped)",
+        "switch": "switching (cannot be stopped)",
+        "verify": "verifying (cannot be stopped)",
+    }
+
+    def watch_token(self, token: Cancel | None, label: str) -> None:
+        self._token, self._label = token, label
+        if getattr(self, "_tick_timer", None) is not None:
+            self._tick_timer.stop()  # type: ignore[union-attr]
+        self._tick_timer: Timer | None = None
+        if token is not None:
+            self._tick_timer = self.set_interval(0.5, self._tick)
+            self._tick()
+        else:
+            self.query_one("#build", BuildTracker).hide()
+            self.query_one("#stop-btn", Button).display = False
+
+    def _tick(self) -> None:
+        token = self._token
+        if token is None:
+            return
+        snapshot = token.snapshot
+        self.query_one("#build", BuildTracker).show(snapshot() if snapshot else None)
+        btn = self.query_one("#stop-btn", Button)
+        btn.display = True
+        btn.disabled = not token.stoppable
+        btn.label = "Stopping…" if token.requested else "Stop (x)"
+        spinner = self.query_one(".run-spin", Spinner)
+        step = self.STEP_LABEL.get(token.step)
+        if step and spinner.running:
+            spinner.relabel(f"{self._label}: {step}")
+
+    def action_stop(self) -> None:
+        if self._token is None:
+            return
+        self.nixin.stop()
+        self._tick()
 
 
 # --- search -------------------------------------------------------------------------------------
@@ -467,12 +527,13 @@ class DetailsScreen(Base):
 # --- pending + plan -----------------------------------------------------------------------------
 
 
-class PendingScreen(Base):
+class PendingScreen(BuildScreen):
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "back", "Back"),
         Binding("b", "plan", "Plan", show=False),
         Binding("a", "apply", "Apply", show=False),
         Binding("y", "sync", "Sync", show=False),
+        Binding("x", "stop", "Stop", show=False),
         Binding("r", "refresh", "Refresh"),
     ]
 
@@ -485,7 +546,8 @@ class PendingScreen(Base):
             yield Title("this session")
             yield Fields(id="session", label_width=10)
             yield Title("plan", id="plan-title")
-            yield Spinner(id="plan-spin")
+            yield Spinner(id="plan-spin", classes="run-spin")
+            yield BuildTracker(id="build")
             yield LogView(id="log")
             yield NoticeBox(id="notice")
             yield Fields(id="plan", label_width=10)
@@ -494,12 +556,15 @@ class PendingScreen(Base):
             yield Fields(id="sync", label_width=10)
         with Horizontal(id="actions"):
             yield Button("Plan (b)", id="plan-btn", variant="primary", compact=True)
+            yield Button("Stop (x)", id="stop-btn", variant="warning", compact=True)
             yield Button("Apply… (a)", id="apply-btn", variant="error", compact=True)
             yield Button("Sync (y)", id="sync-btn", compact=True)
         yield from self.compose_bottom()
 
     def on_mount(self) -> None:
         self.query_one("#closure", DataTable).display = False
+        self.query_one("#stop-btn", Button).display = False
+        self._token: Cancel | None = None
 
     def on_screen_resume(self) -> None:  # also on the first push
         self.render_session()
@@ -536,7 +601,8 @@ class PendingScreen(Base):
         log = self.query_one("#log", LogView)
         log.reset()
         self.query_one("#notice", NoticeBox).show(None)
-        self.nixin.fetch(
+        token = Cancel(watched=True)
+        started = self.nixin.fetch(
             "plan",
             done=self.show_plan,
             stream=True,
@@ -544,10 +610,14 @@ class PendingScreen(Base):
             busy="planning",
             spinner=self.query_one("#plan-spin", Spinner),
             label="plan: building the workspace",
-            hint="38 s for nothing new, minutes for new packages, hours for a kernel",
+            hint="38 s for nothing new, minutes for new packages, hours for a kernel; x stops",
+            cancel=token,
         )
+        if started is not None:
+            self.watch_token(token, "plan")
 
     def show_plan(self, doc: dict) -> None:
+        self.watch_token(None, "")
         self.nixin.plan_doc = doc
         self.render_plan()
         # the result is the bottom of this screen: bring it into view (a phone shows ~15 rows)
@@ -615,6 +685,7 @@ class PendingScreen(Base):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         {
             "plan-btn": self.action_plan,
+            "stop-btn": self.action_stop,
             "apply-btn": self.action_apply,
             "sync-btn": self.action_sync,
         }[event.button.id or ""]()
@@ -626,14 +697,16 @@ class PendingScreen(Base):
 # --- apply ----------------------------------------------------------------------------------------
 
 
-class ApplyScreen(Base):
+class ApplyScreen(BuildScreen):
     """Runs `apply [-m MESSAGE]` with its log streaming; then the result, or the notice —
-    for `needs-sudo` the exact commands to run, selectable and copyable."""
+    for `needs-sudo` the exact commands to run, selectable and copyable. Stop (x) stops the
+    build; from the pull on it is refused."""
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "back", "Back"),
         Binding("c", "copy", "Copy commands", show=False),
         Binding("r", "retry", "Retry", show=False),
+        Binding("x", "stop", "Stop", show=False),
     ]
 
     def __init__(self, message: str) -> None:
@@ -645,7 +718,8 @@ class ApplyScreen(Base):
         yield from self.compose_top()
         with VerticalScroll(id="body"):
             yield Title(f"apply → {self.nixin.backend.host}")
-            yield Spinner(id="apply-spin")
+            yield Spinner(id="apply-spin", classes="run-spin")
+            yield BuildTracker(id="build")
             yield LogView(id="log")
             yield NoticeBox(id="notice")
             yield Line("", id="sudo-help")
@@ -653,6 +727,7 @@ class ApplyScreen(Base):
             yield Fields(id="result", label_width=10)
             yield Line("", id="closure-head")
         with Horizontal(id="actions"):
+            yield Button("Stop (x)", id="stop-btn", variant="warning", compact=True)
             yield Button("Copy commands (c)", id="copy", compact=True)
             yield Button("Retry (r)", id="retry", compact=True)
             yield Button("Done (esc)", id="done", compact=True)
@@ -662,12 +737,15 @@ class ApplyScreen(Base):
         self.query_one("#commands", TextArea).display = False
         self.query_one("#copy", Button).display = False
         self.query_one("#retry", Button).display = False
+        self.query_one("#stop-btn", Button).display = False
+        self._token: Cancel | None = None
         self.run_apply()
 
     def run_apply(self) -> None:
         args = ["-m", self.message] if self.message else []
         self.query_one("#log", LogView).reset()
-        self.nixin.fetch(
+        token = Cancel(watched=True)
+        started = self.nixin.fetch(
             "apply",
             *args,
             done=self.show,
@@ -676,10 +754,15 @@ class ApplyScreen(Base):
             busy="applying",
             spinner=self.query_one("#apply-spin", Spinner),
             label="apply: commit, build, pull, switch",
-            hint="about 30 s after a plan; nixos-rebuild evaluates again as root",
+            hint="about 30 s after a plan; nixos-rebuild evaluates again as root; "
+            "x stops the build (not the switch)",
+            cancel=token,
         )
+        if started is not None:
+            self.watch_token(token, "apply")
 
     def show(self, doc: dict) -> None:
+        self.watch_token(None, "")
         self.doc = doc
         self.nixin.applied_doc(doc)
         n = view.notice(doc)
@@ -690,7 +773,7 @@ class ApplyScreen(Base):
             self.query_one("#result", Fields).show(view.progress_fields(doc))
             cmds.display = bool(n.commands)
             self.query_one("#copy", Button).display = bool(n.commands)
-            self.query_one("#retry", Button).display = n.severity != "info"
+            self.query_one("#retry", Button).display = n.severity != "info" or n.code == "cancelled"
             if n.commands:
                 cmds.text = "\n".join(n.commands)
                 help_.show(
@@ -717,9 +800,12 @@ class ApplyScreen(Base):
         self.run_apply()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        {"copy": self.action_copy, "retry": self.action_retry, "done": self.action_back}[
-            event.button.id or ""
-        ]()
+        {
+            "copy": self.action_copy,
+            "retry": self.action_retry,
+            "done": self.action_back,
+            "stop-btn": self.action_stop,
+        }[event.button.id or ""]()
 
     def action_back(self) -> None:
         if self.nixin.busy == "applying":

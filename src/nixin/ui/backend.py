@@ -12,6 +12,11 @@ the UI's terminal to the program); the UI routes that into its log view (the TUI
 App.begin_capture_print, the GUI with a sys.stderr proxy). The document is the same apart
 from `message`, the human rendering, which the UIs ignore.
 
+`cancel=` hands plan/apply a `Cancel` token (nixin.apply.proc): the verb puts the build
+tracker's snapshot and its current step on it while it runs, and `request()` stops the
+build (the Stop button). A token made with `watched=True` tells the verb a UI shows the
+tracker, so no status line goes to stderr.
+
 Tests replace `Backend` with a fake that answers from recorded documents.
 """
 
@@ -23,6 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import cli
+from ..apply.proc import Cancel
 
 # verbs whose human mode streams a log worth showing (CONTRACT.md: the slow ones)
 STREAMING = frozenset({"plan", "apply", "try"})
@@ -62,16 +68,19 @@ class Backend:
             head += ["--config", self.config]
         return [*head, verb, *args]
 
-    def call(self, verb: str, *args: str, stream: bool = False) -> dict[str, Any]:
+    def call(
+        self, verb: str, *args: str, stream: bool = False, cancel: Cancel | None = None
+    ) -> dict[str, Any]:
         argv = self.argv(verb, *args)
         t0 = time.monotonic()
-        doc = run(argv, stream=stream)
+        doc = run(argv, stream=stream, cancel=cancel)
         self.calls.append(Call(argv, doc, round(time.monotonic() - t0, 2)))
         return doc
 
 
-def run(argv: list[str], *, stream: bool = False) -> dict[str, Any]:
-    """What `nixin --json ARGV` prints, as a dict. `stream`: human mode (see the module doc)."""
+def run(argv: list[str], *, stream: bool = False, cancel: Cancel | None = None) -> dict[str, Any]:
+    """What `nixin --json ARGV` prints, as a dict. `stream`: human mode (see the module doc);
+    `cancel`: the run's stop token (plan, apply)."""
     try:
         ns = cli._parser().parse_args(argv)
     except cli.UsageError as e:
@@ -79,6 +88,8 @@ def run(argv: list[str], *, stream: bool = False) -> dict[str, Any]:
         host = argv[argv.index("--host") + 1] if "--host" in argv else None
         return {"ok": False, "verb": verb, "host": host, "error": usage(str(e))}
     ns.json = not stream
+    if cancel is not None:
+        ns.cancel = cancel
     doc = cli.document(ns)
     return {"verb": ns.verb, "host": ns.host, **doc}
 

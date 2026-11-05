@@ -21,6 +21,7 @@ from textual.screen import Screen
 from textual.worker import Worker, get_current_worker
 
 from .. import cli
+from ..apply.proc import Cancel
 from ..ui import view
 from ..ui.backend import Backend
 from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal
@@ -64,6 +65,7 @@ class NixinApp(App[str]):
         self.backend = backend
         self.channel = channel
         self.busy = ""  # "writing" | "planning" | "applying" while one runs
+        self.cancel_token: Cancel | None = None  # the busy run's stop token (plan, apply)
         self.writes: list[str] = []  # writer_summary of each write this session
         self.applied: list[Doc] = []  # apply documents this session
         self.status_doc: Doc | None = None
@@ -94,15 +96,19 @@ class NixinApp(App[str]):
         spinner: Spinner | None = None,
         label: str = "",
         hint: str = "",
+        cancel: Cancel | None = None,
     ) -> Worker | None:
         """Run `verb args` in a worker thread; `done(doc)` on the UI thread unless a newer
         call in the same exclusive group superseded it. `stream`: the verb's log goes to
-        `log` while it runs. `busy` marks a run that must not overlap another."""
+        `log` while it runs. `busy` marks a run that must not overlap another. `cancel`:
+        the run's stop token (plan, apply): the screen reads the build tracker from it and
+        `stop()` asks it to stop."""
         if busy:
             if self.busy:
                 self.notify(f"wait: {self.busy} is still running", severity="warning")
                 return None
             self.set_busy(busy)
+        self.cancel_token = cancel if busy else self.cancel_token
         if spinner is not None:
             spinner.start(label or verb, hint)
         if log is not None:
@@ -110,7 +116,7 @@ class NixinApp(App[str]):
 
         def work() -> Doc:
             try:
-                doc = self.backend.call(verb, *args, stream=stream)
+                doc = self.backend.call(verb, *args, stream=stream, cancel=cancel)
             except Exception as exc:  # noqa: BLE001 -- a bug in the shim must not kill the UI
                 doc = {"verb": verb, "host": self.backend.host, **cli._internal(exc)}
             if not get_current_worker().is_cancelled:
@@ -125,6 +131,7 @@ class NixinApp(App[str]):
                 spinner.stop()
             if busy:
                 self.set_busy("")
+                self.cancel_token = None
             done(doc)
 
         return self.run_worker(
@@ -135,6 +142,17 @@ class NixinApp(App[str]):
         self.busy = what
         for bar in self.screen.query(TopBar):
             bar.refresh_bar()
+
+    def stop(self) -> None:
+        """Stop the running plan or apply (its build); says why when that is refused."""
+        token = self.cancel_token
+        if token is None:
+            self.notify("nothing is running that could be stopped", severity="information")
+            return
+        if token.request():
+            self.notify("stopping: waiting for nix to clean up…", severity="warning")
+        else:
+            self.notify(token.refused, severity="warning")
 
     def cycle_channel(self) -> None:
         chans = view.CHANNELS

@@ -1,5 +1,170 @@
 # HANDOFF: apply layer (branch `apply`; then `core-history-safety`, `hosts-remote-diff`,
-`gc-generations-speed`)
+`gc-generations-speed`, `plan-progress`)
+
+## `plan-progress`: the build tracker and stopping a build (2026-11-04)
+
+Written on 19BK in a worktree (`~/Projects/nixin-wt-progress`, branch `plan-progress` cut
+from `main` @ 61fde16). Nothing pushed or merged; no sudo; the live checks ran against
+`~/nixos` read-only (plan only).
+
+### State
+
+Done: parser, CLI, cancel, TUI, GUI, tests, docs. Nothing half-done.
+
+- **The progress model** (`apply/progress.py`, ported from `nix-plan` in the user's config,
+  `hosts/mbp13/companion/plan.py`, with nix's own enum values). `nix build` runs with
+  `--log-format internal-json -v`; every stderr line goes through `Tracker.feed_line`,
+  which keeps the derivations of the plan ("these N derivations will be built:" and the
+  path lines after it, each its own `msg` event) with a status each — queued, building
+  (and the builder host from the activity's machine field), done, failed (nix's "last N
+  log lines" block), skipped (a dependency failed) —, the newest build's log tail, phase
+  and last line, the downloads (copy-path activities for the count, their NAR transfers
+  for the bytes, the "these N paths will be fetched (X MiB download …)" line for the
+  expected), and an ETA from `Durations` (`<cache>/apply/durations.json`: seconds per
+  name without its version, smoothed 0.7/0.3; names without a history count at the known
+  average; `eta_s` null without any). `snapshot()` is the UI document (`state`,
+  `elapsed_s`, `total`, `counts`, `progress` = the builds activity's [done, expected,
+  running, failed], `drvs[]`, `focus` with `lines`, `downloads`, `eta_s`, `eta_known`,
+  `errors`, `local_host`); `summary()` the documents' `build` object. `feed_line` also
+  returns the readable form (level ≤ 3 msgs, build and copy-path starts; not the per-line
+  build logs), so `Proc.err` is what nix prints without the JSON format and
+  `build-failed`'s "builder for … failed" block still comes from it (ANSI stripped first:
+  nix colours the error msgs even into the JSON).
+- **CLI human mode**: `Reporter` prints the readable lines and one status line,
+  `[7/39 built, 2 building, 12/40 fetched 35.1 MiB] system-path: buildPhase · 1m12s (eta
+  3m)`: redrawn in place (`\r`, clear to end of line) on a terminal, refreshed by a 1 s
+  ticker; a plain line when the counts change (at most every 10 s) and once at the end
+  otherwise. It waits until the "will be built/fetched" lists are in. Under `--json` no
+  reporter. The documents: `build` (plan, apply; null when the out path was cached),
+  `error.build` for `build-failed` and `cancelled`; human output has a `build` row.
+- **Stopping** (`proc.Cancel`, in `ns.cancel`). The UIs hand one in (`backend.call(…,
+  cancel=)` → `backend.run` → `ns.cancel`, `watched=True`: no status line, the UI shows
+  the tracker); the CLI makes its own (`apply._token`) and `proc.interrupts` turns SIGINT
+  on the main thread into `request()`. The build's nix (and the drvPath eval: `repo_at(path,
+  token)`) runs in its own process group (`process_group=0`, same session: the sudo
+  ticket of the terminal stays valid) and `request()` SIGTERMs the group (nix answers
+  "interrupted by the user", rc 1; SIGKILL after 5 s if needed); `check()` raises
+  `cancelled`. Windows: plan stops anywhere (prepare/eval/build/diff; nothing but caches
+  is written). apply: the commit is `shielded("commit")` (a request is refused, one
+  already in is honoured before it), the build stops (`cancelled` with `committed`), one
+  last check before the pull, then `shielded("pull")`, `shielded("switch")` around the
+  switch, verify and record: `request()` returns False with `refused` ("switch is
+  running and cannot be stopped; waiting for it"), `stoppable` is False (the UIs disable
+  Stop), and `run_privileged` runs the root step inside `proc.shielded()`, a thread-local
+  that makes `run_process` start children in their own process group — so the terminal's
+  Ctrl-C does not reach `sudo nixos-rebuild switch` half-way through an activation
+  either; nixin prints one line and waits. Never for `tty=True` runs (`sudo -v`, `ssh -t`
+  must stay in the foreground group to read the terminal).
+- **TUI**: `BuildScreen` (Pending, Apply) polls the token twice a second into a
+  `BuildTracker` widget (status line, the derivations building/queued, the log tail; one
+  line per row, clipped, so a 50-column phone still reads it), relabels the spinner with
+  the step, shows `Stop (x)` only while its run goes and disables it when shielded.
+  `app.stop()` toasts the refusal. A stopped plan is the calm `stopped` notice; a stopped
+  apply keeps Retry.
+- **GUI**: `_Tracking` mixin on `PendingVM`/`ApplyVM` (a 500 ms QTimer: `buildHead`,
+  `stepNote`, `stopEnabled`, `stopLabel`, models `build` and `tail`), `BuildTracker.qml`
+  under the plan heading and in the running apply dialog, `Stop` next to Plan and in the
+  dialog footer, apply phase `stopped` (Retry). `Gui.stop()` toasts the refusal.
+- New error code `cancelled` (CONTRACT table, `tests/test_integration.py`); `view.notice`
+  gives it severity `info` and the title "stopped".
+
+Gates at the last commit: `nix develop -c pytest` green (test_progress 21, test_apply
++7, test_tui +3, test_gui +3); `nix build .#default` (the full check in the sandbox, with
+qmllint and the GUI self-test): see the report; `ruff check` clean but for the
+pre-existing `tests/test_tui.py` import order, `ruff format --check` clean.
+
+### Files
+
+| file | what |
+|---|---|
+| `src/nixin/apply/progress.py` | `Tracker` (events → snapshot/summary, readable text), `Durations`, `status_line`, `Reporter`, `human_time`/`human_bytes`, `drv_name`, `host_of` |
+| `apply/proc.py` | `Cancel` (request/refused/shielded/attach/check/wait, `step`, `snapshot`, `watched`), `kill_group`, `shielded()` + the thread-local, `interrupts()`, `run_process(on_stderr=, cancel=)` and `process_group=0` |
+| `apply/build.py` | `nix(…, cancel=)`, `repo_at(path, cancel)`, `build(…, cancel=)`: the tracker, the reporter, `LOG_FORMAT`, `cancelled`/`build-failed` with `.build`; `_build_error` strips ANSI |
+| `apply/__init__.py` | `Ctx.cancel`, `_token`, `interrupts` around plan/apply, the steps and shields, `_target(progress=)` wrapping build errors into `ApplyError(build=…)`, `build` in the documents |
+| `apply/render.py` | `build_line` in plan and apply |
+| `ui/backend.py`, `ui/view.py` | `call/run(cancel=)`; `build_head/rows/tail/summary`, `cancelled` as info, "stopped" |
+| `tui/widgets.py`, `tui/app.py`, `tui/screens.py`, `tui/nixin.tcss` | `BuildTracker`, `Spinner.relabel`; `fetch(cancel=)`, `cancel_token`, `stop()`; `BuildScreen`, the Stop buttons and `x` |
+| `gui/jobs.py`, `gui/bridge.py`, `gui/qml/Nixin/BuildTracker.qml`, `PendingPage.qml`, `ApplyDialog.qml`, `qmldir` | the token through `Job`; `_Tracking`, `Gui.stop`, `Gui.fetch(cancel=)`; the widget and the buttons |
+| `tests/fixtures/apply/build-events.jsonl` | canned `@nix` lines: the two lists, two copies with NAR transfers, a local build with phase and logs, a remote build that fails, the dependents skipped |
+| `tests/fixtures/tui/plan_building.json`, `plan_cancelled.json`, `apply_cancelled.json` | a 39-derivation plan mid-build (7 done, 2 building, one on mbp13), the stopped plan and apply documents |
+| `tests/test_progress.py` | the parser (lists, start/log/phase/stop, failure and skips, downloads, ETA, pass-through, finish), the status line and the reporter (tty, plain, ticker), the seam (sink, groups, the kill, late attach, the shield in a process of its own group, `interrupts`) |
+| `tests/test_apply.py` | the Machine's nix build speaks internal-json (`on_stderr`, `cancel`, `block_build`, the fake sudo asks to stop); summaries in the documents and the human output, `build-failed` with the summary, a stopped plan, a stopped apply keeps the commit and finishes on retry, refusals, the token in `ns` |
+| `tests/tui_fake.py`, `tests/test_tui.py`, `tests/test_gui.py` | `LIVE`, `build_delay`, `tokens`; the tracker and Stop on both UIs |
+| `docs/CONTRACT.md`, `README.md` | plan's tracker and stopping, `build` fields, `cancelled` |
+
+### Live checks (19BK, 2026-11-04)
+
+Real nix 2.34.9 events through the tracker (`/tmp/nixin-progress-probe/smoke*.py`): a
+trivial derivation builds with the readable lines and the status line as expected (`[0/1
+built, 1 building] … · 1s`, then `[1/1 built]`); a busy-loop derivation stopped through
+the token 1 s after its build started: nix prints `error: interrupted by the user`,
+exits 1 within the same tick, no builder process left behind (`ps`).
+
+Against the real config, in a throwaway clone of `~/nixos` (`/tmp/nixin-progress-probe/
+live/ws`; `~/nixos` itself was only read: its `plan` was `cached`, generation 27):
+
+| run | result |
+|---|---|
+| `add cowsay`, `plan` (human, stderr to a file) | eval ~24 s, build 15.8 s: the lists, `building '…'` lines, plain status lines (`[13/17 built, 1 building, 2/2 fetched 16.1 KiB] system-units · 12s`, final `[17/17 built, 2/2 fetched 16.1 KiB] · 15s`), stdout `build     17 of 17 derivations built, 2 paths fetched (16.1 KiB) in 15.8 s`, `+ cowsay 3.8.4` |
+| `--json plan` | `cached: true`, `build: null`, 0 bytes on stderr |
+| `add hello`, `plan` with SIGINT 30 s in (3 s into the build) | `nixin plan: stopping (Ctrl-C): waiting for nix to clean up…`, nix's `error: interrupted by the user`, `nixin plan: the build was stopped after 3s (0 of 17 derivations built, 0 paths fetched); nothing was applied`, exit 1 **0.03 s after the signal**; no `nix build` left (`ps`); the ETA showed (`eta 1m25s`, from the first run's durations) |
+| `--json plan` after the stop | no cache entry, so it built again: `build.counts.done 17`, 9.5 s; stderr empty |
+
+Not run live: a stopped `apply` (it needs a commit in a real workspace and sudo), the
+UIs against the real config (fixture-tested and screenshotted offscreen only:
+`/tmp/nixin-progress-probe/shots/`).
+
+### Judgement calls
+
+1. **Phase is result type 104, not 107.** nix-plan reads 107 as the phase; nix's
+   `logging.hh` (and the `hello --rebuild` probe) say `resSetPhase = 104`,
+   `resPostBuildLogLine = 107`. The user's nix-plan has that bug.
+2. **Only NAR transfers count as download bytes** (file transfers whose parent is a
+   copy-path activity): the `.narinfo` lookups are transfers too and would make every
+   cached plan "download" a few KiB.
+3. **Ctrl-C during the pull or the switch no longer interrupts them.** Today it killed
+   `nixos-rebuild` mid-activation; now nixin says "switch is running and cannot be
+   stopped; waiting for it" and the root steps run in their own process group. A hung
+   switch is stopped from another terminal. The brief asked for exactly this; it is the
+   one UX change a person at the CLI will notice.
+4. **`process_group=0`, not `start_new_session`**: a new session would drop the
+   controlling tty and with it sudo's per-tty ticket (the `sudo -v` → `nixin apply` flow).
+5. **`cancelled` is a calm notice** (severity `info`, title "stopped") in the UIs: the
+   person asked for it. Exit status at the CLI stays 1 (the contract's "verb failed"),
+   not 130.
+6. **No `-L` build logs on stderr** (as before); the log tail lives in the tracker. The
+   readable form keeps nix's `copying path` lines, as nix's own non-terminal output has.
+7. **The ETA history is nixin's own** (`durations.json`); nix-plan's seeding from
+   `/nix/var/log/nix/drvs` (a `find` over the daemon's log dir) was left out. The first
+   plan after this lands has no ETA; the second has one for repeated names.
+8. **The status line waits for the lists**: "[0/1 built]" while the "will be built" list
+   still streams in was wrong twice a second.
+9. **The UIs declare themselves with `watched=True`** rather than nixin guessing from
+   `isatty()`: Textual's print capture answers `isatty() == True`.
+
+### Gaps / next
+
+- `apply --host H` (remote) has no tracker: the build happens on H under `ssh -t`.
+- The root switch's own build (`nixos-rebuild` re-evaluates and may build what plan did
+  not) is not tracked: it streams as before.
+- `try` still streams nix's plain output (no tracker, no Stop).
+- The GUI's log tail under the tracker shows only when the focus build has printed
+  lines; a quiet build shows the rows alone.
+- A durations file never shrinks below 2000 names, nothing prunes stale ones.
+
+### How to test
+
+```
+nix develop -c pytest -q tests/test_progress.py                   # 21: parser, reporter, seam
+nix develop -c pytest -q tests/test_apply.py -k "build or stop or cancel"
+nix develop -c pytest -q tests/test_tui.py tests/test_gui.py -k "tracker or stop"
+nix build .#default
+nixin plan --config ~/nixos            # the status line; Ctrl-C → "cancelled", exit 1
+nixin --json plan --config ~/nixos | jq .build
+```
+
+---
+
 
 ## `hosts-remote-diff`: apply on another host over ssh (2026-11-02)
 

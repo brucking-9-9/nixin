@@ -103,6 +103,12 @@ which touch the network, run nix or write files, and the cache locations.
   `sudo -n` (or 19BK's `nixos-switch` helper for the switch). It checks that the system
   now running is the one it built and appends `installer/history.jsonl`. Without a sudo
   ticket it stops with `needs-sudo` and the exact commands; `--dry-run` prints them.
+  While nix builds, `plan` and `apply` read its events (`--log-format internal-json`)
+  into a build tracker: human mode shows nix's output plus a live line, `[7/39 built,
+  2 building, 12/40 fetched 35.1 MiB] system-path: buildPhase · 1m12s (eta 3m)`, redrawn
+  in place on a terminal; the documents end with a `build` summary. Ctrl-C stops the
+  build cleanly (`cancelled`; an apply keeps its commit and continues next time); once
+  apply pulls and switches it cannot be stopped any more, and says so.
   `plan` and `apply` also compare the new system's kernel, initrd, modules, kernel
   params, bootspec and specialisations with the running one: `reboot_needed` and a
   "needs a reboot" line; and they add up the new kernel/initrd files the bootloader will
@@ -207,10 +213,12 @@ handlers in-process, in worker threads, and renders their documents
 typing debounced, the CLI's `source channel@rev` footer) → Details (info, versions, and
 `where` for this host: installed? declared where?) → Add / Remove / Set / Unset, each
 previewed as the writer's `--dry-run` diff before anything is written, with a Home
-Manager user toggle → Pending (`status.pending`, `plan` with nix's build output streamed
-and the closure diff) → Apply (confirm with `apply --dry-run`'s commands and sudo
-readiness, a commit message, the switch log streamed, the new generation; without a sudo
-ticket the exact root commands to copy). Status shows the lock, HEAD, the running system,
+Manager user toggle → Pending (`status.pending`, `plan` with the build tracker — built/total,
+fetched, the derivations building, the log tail, the ETA — and nix's output streamed, then
+the closure diff; `x` / Stop stops the build) → Apply (confirm with `apply --dry-run`'s
+commands and sudo readiness, a commit message, the tracker and the switch log streamed,
+the new generation; Stop works until the pull starts; without a sudo ticket the exact
+root commands to copy). Status shows the lock, HEAD, the running system,
 counts and caches. Packages shows what is installed (`list`: system and each Home Manager
 user, a filter and a for-whom toggle on the loaded rows; Enter opens the row in Details
 for its user, with Remove) and, on its Updates tab, what a nixpkgs update would change
@@ -254,11 +262,13 @@ the results; the CLI's source footer) with the selected row's **details** beside
 versions from NixHub, `where` on this host: installed? set where? the value), and Add /
 Remove / Set… / Unset for the system or a Home Manager user. Every write opens the
 writer's `--dry-run` diff in a dialog first (the user can be changed there), then Write.
-**Pending** shows `status.pending`, this session's writes and applies, and Plan (nix's
-build output streamed, then the closure diff); Apply… opens the apply dialog (`apply
---dry-run`: what is committed, what root runs, sudo readiness; a commit message; the
-switch log streamed; the new generation; without a sudo ticket the exact root commands,
-with Copy and Retry). **Status** shows the lock, HEAD, the running system, pending,
+**Pending** shows `status.pending`, this session's writes and applies, and Plan (the build
+tracker while nix runs: built/total, fetched, the derivations building, the log tail, the
+ETA, with a Stop button next to Plan; nix's output streamed; then the closure diff);
+Apply… opens the apply dialog (`apply --dry-run`: what is committed, what root runs, sudo
+readiness; a commit message; the tracker and the switch log streamed, Stop until the pull
+starts; the new generation; without a sudo ticket the exact root commands, with Copy and
+Retry). **Status** shows the lock, HEAD, the running system, pending,
 counts and caches. **Packages** has the installed list (`list`: a filter and a for-whom
 combo; the selected row opens in the details pane for its user, with Remove) and Updates
 (`outdated` against the lock's next commit or search.nixos.org, the kernel line, the

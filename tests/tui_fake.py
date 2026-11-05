@@ -5,6 +5,11 @@ Routes map "verb [word...]" to a fixture name, a document, or a list of them (su
 calls get successive answers; the last repeats). The most specific route whose words all
 appear in the call wins. With stream=True a route's `<name>.log` lines are written to
 stderr the way plan/apply tee nix's output in human mode.
+
+A call with a `cancel` token (plan, apply from the UIs) shows a build in progress the way
+the real verbs do: `LIVE` names the snapshot the token answers while the call runs
+(`plan_building`) and the document a stopped run answers (`plan_cancelled`); the call
+waits `build_delay` seconds for the token (0: it returns at once, as before).
 """
 
 from __future__ import annotations
@@ -68,6 +73,10 @@ HM_OPTIONS = {
 }
 
 
+# verb → (the tracker's snapshot while the call runs, the document when it is stopped)
+LIVE = {"plan": ("plan_building", "plan_cancelled"), "apply": ("plan_building", "apply_cancelled")}
+
+
 def load(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / f"{name}.json").read_text())
 
@@ -77,9 +86,13 @@ class FakeBackend(Backend):
         super().__init__(host=host, config="/home/master/nixos")
         self.routes = {k: list(v) if isinstance(v, list) else [v] for k, v in routes.items()}
         self.delay = delay
+        self.build_delay = 0.0  # how long a plan/apply with a token stays "building"
         self.streamed: list[str] = []
+        self.tokens: list[Any] = []  # the Cancel tokens the UI handed in
 
-    def call(self, verb: str, *args: str, stream: bool = False) -> dict[str, Any]:
+    def call(
+        self, verb: str, *args: str, stream: bool = False, cancel: Any = None
+    ) -> dict[str, Any]:
         argv = self.argv(verb, *args)
         words = {verb, *args}
         match = [k for k in self.routes if k.split()[0] == verb and set(k.split()) <= words]
@@ -99,6 +112,17 @@ class FakeBackend(Backend):
                 sys.stderr.write(line)
                 sys.stderr.flush()
                 self.streamed.append(line)
+        if cancel is not None and verb in LIVE and "--dry-run" not in args:
+            self.tokens.append(cancel)
+            building, stopped = LIVE[verb]
+            snapshot = load(building)
+            cancel.step = "build"
+            cancel.snapshot = lambda: snapshot
+            try:
+                if cancel.wait(self.build_delay) and cancel.requested:
+                    doc = load(stopped)
+            finally:
+                cancel.snapshot = None
         doc = {**doc, "verb": verb, "host": self.host}
         self.calls.append(Call(argv, doc, 0.0))
         return doc

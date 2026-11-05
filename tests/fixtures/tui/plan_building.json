@@ -1,0 +1,431 @@
+{
+  "counts": {
+    "building": 2,
+    "done": 7,
+    "failed": 0,
+    "queued": 30,
+    "skipped": 0
+  },
+  "downloads": {
+    "bytes_done": 1310720,
+    "bytes_expected": 1572864,
+    "done": 1,
+    "expected": 2,
+    "running": 1
+  },
+  "drvs": [
+    {
+      "drv": "/nix/store/0a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p-system-path.drv",
+      "expected_s": 20,
+      "host": "19BK",
+      "last_log_line": "building the system path",
+      "name": "system-path",
+      "phase": "buildPhase",
+      "seconds": 24.5,
+      "status": "building"
+    },
+    {
+      "drv": "/nix/store/9z8y7x6w5v4u3t2s1r0q9p8o7n6m5l4k-unit-dbus.service.drv",
+      "expected_s": 10,
+      "host": null,
+      "last_log_line": null,
+      "name": "unit-dbus.service",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/m7v2c3k1q9z8x6w5v4u3t2s1r0p9o8n7-nixos-system-mbp13-26.11.20261023.3ec6363.drv",
+      "expected_s": 30,
+      "host": null,
+      "last_log_line": null,
+      "name": "nixos-system-mbp13-26.11.20261023.3ec6363",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000001-unit-polkit.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-polkit.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000002-unit-accounts-daemon.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-accounts-daemon.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000003-unit-dbus-broker.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-dbus-broker.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000004-unit-nscd.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-nscd.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000005-unit-systemd-logind.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-systemd-logind.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000006-unit-udev.service.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "unit-udev.service",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000007-etc-fstab.drv",
+      "expected_s": 2,
+      "host": "19BK",
+      "last_log_line": null,
+      "name": "etc-fstab",
+      "phase": null,
+      "seconds": 2.0,
+      "status": "done"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000008-etc-hosts.drv",
+      "expected_s": null,
+      "host": "mbp13",
+      "last_log_line": null,
+      "name": "etc-hosts",
+      "phase": "unpackPhase",
+      "seconds": 3.0,
+      "status": "building"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000009-etc-nix.conf.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-nix.conf",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000a-etc-pam.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-pam",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000b-etc-profile.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-profile",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000c-etc-shells.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-shells",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000d-etc-sudoers.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-sudoers",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000e-etc-zshrc.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc-zshrc",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000000f-etc.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "etc",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000010-users-groups.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "users-groups",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000011-firmware.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "firmware",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000012-kernel-modules.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "kernel-modules",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000013-initrd.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "initrd",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000014-boot.json.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "boot.json",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000015-specialisation.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "specialisation",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000016-nixos-help.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "nixos-help",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000017-dconf.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "dconf",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000018-fontconfig.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "fontconfig",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000019-gtk-portal.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "gtk-portal",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001a-pipewire-conf.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "pipewire-conf",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001b-wireplumber.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "wireplumber",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001c-x11-env.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "x11-env",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001d-sw.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "sw",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001e-hm-brucking.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "hm-brucking",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/0000000000000000000000000000001f-hm-activation.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "hm-activation",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000020-home-manager-generation.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "home-manager-generation",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000021-system-units.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "system-units",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000022-user-units.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "user-units",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000023-extra-utils.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "extra-utils",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    },
+    {
+      "drv": "/nix/store/00000000000000000000000000000024-setup-etc.drv",
+      "expected_s": null,
+      "host": null,
+      "last_log_line": null,
+      "name": "setup-etc",
+      "phase": null,
+      "seconds": null,
+      "status": "queued"
+    }
+  ],
+  "elapsed_s": 72.4,
+  "errors": 0,
+  "eta_known": [
+    3,
+    32
+  ],
+  "eta_s": 190,
+  "focus": {
+    "host": "mbp13",
+    "lines": [],
+    "name": "etc-hosts",
+    "phase": "unpackPhase",
+    "status": "building"
+  },
+  "local_host": "19BK",
+  "progress": [
+    0,
+    3,
+    1,
+    0
+  ],
+  "state": "running",
+  "total": 39
+}

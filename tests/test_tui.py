@@ -9,7 +9,7 @@ import asyncio
 import json
 
 import pytest
-from textual.widgets import DataTable, TextArea
+from textual.widgets import Button, DataTable, TextArea
 from tui_fake import COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
 
 from nixin.cli import main
@@ -19,7 +19,7 @@ from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
 from nixin.tui import options, screens
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
-from nixin.tui.widgets import Fields, Line, LogView, NoticeBox, Spans
+from nixin.tui.widgets import BuildTracker, Fields, Line, LogView, NoticeBox, Spans
 from nixin.ui import backend, view
 
 PHONE = (50, 25)
@@ -498,7 +498,9 @@ def test_search(size):
 
 
 def test_typing_is_debounced_and_kind_and_channel_rerun(monkeypatch):
-    monkeypatch.setattr(screens, "DEBOUNCE", 1.5)  # the only test that waits for the timer: keep that wait short
+    monkeypatch.setattr(
+        screens, "DEBOUNCE", 1.5
+    )  # the only test that waits for the timer: keep that wait short
 
     async def script(app, pilot, fake):
         await pilot.press(*"cow")
@@ -1331,3 +1333,95 @@ def test_details_show_appstream_as_text():
         assert "Prism Launcher" in screen_text(app)
 
     drive(script, routes={**COWSAY, "info": info})
+
+
+# --- the build tracker and Stop ----------------------------------------------------------------
+
+
+def test_build_tracker_rows():
+    snap = load("plan_building")
+    head = view.build_head(snap)
+    assert head.startswith(
+        "[7/39 built, 2 building, 1/2 fetched 1.2 MiB] etc-hosts: unpackPhase on mbp13"
+    )
+    assert head.endswith("· 1m12s (eta 3m10s)")
+    rows = view.build_rows(snap)
+    assert rows[0].label == "system-path" and rows[0].style == "accent"  # the longest running
+    assert rows[0].value.startswith("building ") and "of ~20s" in rows[0].value
+    assert rows[1].label == "etc-hosts" and rows[1].value == "building 3s · unpackPhase · on mbp13"
+    assert rows[2].label == "unit-dbus.service" and rows[2].value == "queued"
+    assert rows[-1].label == "" and rows[-1].value.startswith("7 done, ")
+    assert view.build_tail(snap) == []  # the focus (etc-hosts) has no log lines yet
+    assert view.build_summary(load("plan_cancelled")["error"]["build"]) == (
+        "8 of 39 derivations built, 2 paths fetched (1.5 MiB) in 74.1 s (stopped)"
+    )
+    n = view.notice(load("plan_cancelled"))
+    assert n.severity == "info" and n.title == "stopped" and n.code == "cancelled"
+    assert view.progress_fields(load("apply_cancelled"))[0] == view.Field(
+        "committed", "716ed68", "accent"
+    )
+
+
+def test_plan_shows_the_tracker_and_stop_cancels_it():
+    async def script(app, pilot, fake):
+        fake.build_delay = 5.0
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        screen = app.screen
+        assert isinstance(screen, PendingScreen)
+        stop = screen.query_one("#stop-btn", Button)
+        assert not stop.display
+        await pilot.press("b")
+        await pilot.pause(0.7)  # the fake is "building"; the screen ticks twice a second
+        tracker = screen.query_one("#build", BuildTracker)
+        assert tracker.display and tracker.text.startswith("[7/39 built, 2 building")
+        assert "etc-hosts building 3s · unpackPhase · on mbp13" in tracker.text
+        assert stop.display and not stop.disabled
+        assert "7/39 built" in screen_text(app)
+        token = fake.tokens[-1]
+        assert token.watched and token.step == "build"
+        await pilot.press("x")
+        await settle(app, pilot, 0.2)
+        assert token.requested
+        assert app.plan_doc["error"]["code"] == "cancelled"
+        notice = screen.query_one("#notice", NoticeBox)
+        assert notice.display and notice.notice.code == "cancelled"
+        assert "stopped" in screen_text(app)
+        assert not tracker.display and not stop.display
+        assert app.busy == "" and app.cancel_token is None
+
+    _, fake = drive(script)
+    assert fake.verbs()[-1] == ["plan"]
+
+
+def test_apply_stop_is_refused_once_root_works():
+    """The fake answers apply at once; a token shielded by the app's own hand stands in for
+    a pull or switch in progress: Stop says why and nothing changes."""
+
+    async def script(app, pilot, fake):
+        await pilot.press("escape", "p", "a")
+        await settle(app, pilot)
+        assert isinstance(app.screen, ApplyModal)
+        fake.build_delay = 5.0
+        await pilot.press("enter")
+        await pilot.pause(0.7)
+        apply = app.screen
+        assert isinstance(apply, ApplyScreen)
+        token = fake.tokens[-1]
+        stop = apply.query_one("#stop-btn", Button)
+        assert stop.display and not stop.disabled
+        assert "[7/39 built" in apply.query_one("#build", BuildTracker).text
+        with token.shielded("switch"):  # as apply does from the pull on
+            apply._tick()
+            assert stop.disabled
+            await pilot.press("x")
+            await pilot.pause(0.2)
+            assert not token.requested and "switch is running" in token.refused
+        await pilot.press("x")
+        await settle(app, pilot, 0.2)
+        assert token.requested and apply.doc["error"]["code"] == "cancelled"
+        assert "committed 716ed68" in apply.query_one("#result", Fields).text
+        assert apply.query_one("#retry", Button).display  # a stopped apply can be retried
+
+    app, _ = drive(script)
+    assert app.applied == []
