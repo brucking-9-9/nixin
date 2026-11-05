@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, local_hostname, running_system, unknown_host
+from ..lockstate import lock_change
 from . import hostdiff, listing, render, scan
 from . import options as opts
 from . import packages as pkgs
@@ -146,6 +147,7 @@ def _status(ns: argparse.Namespace) -> dict[str, Any]:
             "host_is_local": host == local_hostname(),
         },
         "lock": lock.doc() if lock else None,
+        "lock_change": lock_change(repo, lock.name if lock else "nixpkgs", host),
         "running": {
             **run,
             "hostname": local_hostname(),

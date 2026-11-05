@@ -190,6 +190,15 @@ Item {
                             }
                         }
                         Item { Layout.fillWidth: true }
+                        DangerButton {
+                            objectName: "undoButton"
+                            text: "Undo lock move…"
+                            visible: page.vm.canUndo
+                            enabled: page.backend.busy === "" && !page.vm.updatesLoading
+                            ToolTip.visible: hovered
+                            ToolTip.text: "update --undo: flake.lock back to the committed one (asks first); pins and other changes stay"
+                            onClicked: page.vm.startUndo()
+                        }
                         Button {
                             objectName: "updateButton"
                             text: "Update nixpkgs lock…"

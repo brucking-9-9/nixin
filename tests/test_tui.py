@@ -365,6 +365,45 @@ def test_update_documents():
 # --- the backend shim on the real handlers (no network, no nix: usage and config errors) --------
 
 
+def test_lock_change_and_undo_documents():
+    moved = load("outdated_19BK_moved")
+    assert view.update_args(moved) is None  # the lock already has it: undo or apply, not update
+    assert view.can_undo(moved["lock_change"]) and not view.can_undo(None)
+    assert not view.can_undo({**moved["lock_change"], "committed": True})
+    f = view.lock_change_field(moved["lock_change"], "z")
+    assert (f.label, f.style) == ("lock", "warn")
+    assert f.value == (
+        "3ec6363 → 0bb2eed in flake.lock, not committed — the running system has the old one (undo: z)"
+    )
+    assert view.lock_change_field({**moved["lock_change"], "committed": True}).value == (
+        "3ec6363 → 0bb2eed committed, not applied yet (Plan, Apply)"
+    )
+    assert view.lock_change_field(None) is None
+    st = load("status_moved")
+    labels = [f.label for f in view.pending_fields(st["pending"], st["lock_change"], "z")]
+    assert labels.count("lock") == 1 and labels.index("lock") < labels.index("running")
+    assert "lock" not in [f.label for f in view.pending_fields(st["pending"])]
+    assert view.outdated_head(moved, "19BK") == (
+        "19BK: nixpkgs 3ec6363 (2026-10-23) → 0bb2eed (2026-11-01) in flake.lock, not committed "
+        "(nixin update --undo takes it back)"
+    )
+    assert view.kernel_line(moved).text == "kernel 7.2.12 → 7.2.14"
+    dry = load("update_undo_dry")
+    fields = view.undo_confirm_fields(dry)
+    assert fields[0] == view.Field(
+        "runs", "git -C /home/master/nixos checkout HEAD -- flake.lock", "accent"
+    )
+    assert fields[1] == view.Field(
+        "nixpkgs", "0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (as committed)", "add"
+    )
+    assert [f.label for f in fields[2:]] == ["writes", "keeps", "then"]
+    done = load("update_undo")
+    assert view.update_summary(done) == "nixpkgs 0bb2eed → 3ec6363 (flake.lock back to HEAD's)"
+    assert view.update_fields(done)[0].value == (
+        "back to 3ec6363 (2026-10-23) as committed (nixpkgs_2 0bb2eed → 3ec6363)"
+    )
+
+
 def opt_rec(name: str, fixture: str = "options_search_openssh") -> dict:
     return next(r for r in load(fixture)["results"] if r["name"] == name)
 
@@ -1019,6 +1058,88 @@ def test_packages_updates_then_update_lock_to_pending(size):
     assert sorted(verbs[-2:]) == [["list"], ["outdated"]]  # both again, in two workers
     assert app.writes == ["nixpkgs 3ec6363 → 0bb2eed (flake.lock)"]
     assert app.return_value is None or "nothing changed" not in app.return_value
+
+
+MOVED = {
+    **PACKAGES,
+    "outdated": ["outdated_19BK", "outdated_19BK_moved"],
+    "status": "status_moved",
+    "update --undo --dry-run": "update_undo_dry",
+    "update --undo": "update_undo",
+}
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_packages_update_then_undo_from_pending_and_updates(size):
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot)
+        await pilot.press("t")
+        await settle(app, pilot)
+        assert screen.query_one("#up-undo", Button).has_class("hidden")
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert isinstance(app.screen, UpdateModal)
+        await pilot.press("u")
+        await settle(app, pilot)
+        pending = app.screen
+        assert isinstance(pending, PendingScreen)
+        text = pending.query_one("#pending", Fields).text
+        assert (
+            "lock 3ec6363 → 0bb2eed in flake.lock, not committed — the running system has the "
+            "old one (undo: z)"
+        ) in text
+        assert not pending.query_one("#undo-btn", Button).has_class("hidden")
+        if size == DESKTOP:
+            assert "Undo lock move (z)" in screen_text(app)
+        fits(app)
+        await pilot.press("z")  # update --undo --dry-run → the confirm modal
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, UpdateModal) and modal.undo
+        fields = modal.query_one("#update-fields", Fields).text
+        assert "runs git -C /home/master/nixos checkout HEAD -- flake.lock" in fields
+        assert "nixpkgs 0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (as committed)" in fields
+        assert "Undo (u)" in screen_text(app)
+        await pilot.press("u")  # update --undo, then status again
+        await settle(app, pilot)
+        assert app.screen is pending
+        assert app.writes == [
+            "nixpkgs 3ec6363 → 0bb2eed (flake.lock)",
+            "nixpkgs 0bb2eed → 3ec6363 (flake.lock back to HEAD's)",
+        ]
+        await pilot.press("escape")  # back: the Updates tab compares the pending move now
+        await settle(app, pilot)
+        assert app.screen is screen and screen.tab == "updates"
+        head = screen.query_one("#up-head", Line).value
+        assert head.endswith("in flake.lock, not committed (nixin update --undo takes it back)")
+        assert screen.query_one("#up-kernel", Line).value == "kernel 7.2.12 → 7.2.14"
+        assert screen.query_one("#up-update", Button).disabled  # nothing to update: undo or apply
+        undo = screen.query_one("#up-undo", Button)
+        assert not undo.has_class("hidden")
+        if size == DESKTOP:
+            assert "Undo lock move (z)" in screen_text(app)
+        fits(app)
+        await pilot.press("z")
+        await settle(app, pilot)
+        assert isinstance(app.screen, UpdateModal) and app.screen.undo
+        await pilot.press("escape")  # not this time
+        await settle(app, pilot)
+        assert app.screen is screen
+
+    _app, fake = drive(script, MOVED, size=size, host="19BK")
+    verbs = fake.verbs()
+    assert verbs[:8] == [
+        ["list"],
+        ["outdated"],
+        ["update", "--dry-run"],
+        ["update"],
+        ["status"],
+        ["update", "--undo", "--dry-run"],
+        ["update", "--undo"],
+        ["status"],
+    ]
+    assert sorted(verbs[8:10]) == [["list"], ["outdated"]]  # the lock moved back: both again
+    assert verbs[10:] == [["update", "--undo", "--dry-run"]]
 
 
 @pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])

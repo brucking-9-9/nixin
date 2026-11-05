@@ -14,6 +14,12 @@ the truth cache by (flake fingerprint, target rev).
 `--published` (brew-outdated style): the installed versions against search.nixos.org's
 channel index, one `terms` query per 50 pnames; no target eval.
 
+After `nixin update`, while the moved flake.lock is not committed, the default comparison
+is the pending move itself: the committed lock (HEAD:flake.lock, evaluated through
+`--override-input` with its narHash, so offline) against the working lock. The document
+says so in `lock_change` (`compared: true`); `nixin update --undo` takes the move back,
+`nixin pin NAME --rev <old>` holds one thing at the old revision.
+
 `register(subparsers)` is the only thing cli.py calls; the handler returns the --json
 document (cli adds verb/host), with the rendered text under "message" in human mode.
 """
@@ -28,6 +34,7 @@ from importlib.resources import files
 from typing import Any
 
 from ..configrepo import ConfigRepo, NixinError, nix_value
+from ..lockstate import LockRevs
 from ..truth.cache import TruthCache
 from ..writer.nixtext import parse_attrpath
 from . import compare, render, update
@@ -150,8 +157,14 @@ def _outdated(ns: argparse.Namespace) -> dict[str, Any]:
     np = tgt.nixpkgs_input(repo)
     cache = TruthCache(repo, host, enabled=not ns.refresh)
     timings: dict[str, float] = {}
+    revs = LockRevs.read(repo, np.input, host)
+    change = revs.lock_change()
+    if change is not None:
+        change["compared"] = False
     if ns.published:
         doc = _published(ns, repo, host, np, cache, timings)
+    elif _pending_move(ns, revs, change):
+        doc = _pending(ns, repo, host, np, cache, timings, revs, change)
     else:
         doc = _lock(ns, repo, host, np, cache, timings)
     doc.update(
@@ -159,6 +172,7 @@ def _outdated(ns: argparse.Namespace) -> dict[str, Any]:
             "ok": True,
             "config": {"path": str(repo.path), **repo.source().doc()},
             "lock": {**np.doc(), "release": doc.pop("_release")},
+            "lock_change": change,
             "cache": cache.doc(),
             "timings": {**timings, "total": round(time.monotonic() - t0, 2)},
         }
@@ -262,6 +276,119 @@ def _lock(
         "commands": [] if same else _commands(repo, host, np, target),
         "notes": [] if same else _notes(np, target),
         "_release": lock.get("release"),
+    }
+
+
+# --- the pending lock move ------------------------------------------------------------------
+
+
+def _pending_move(ns: argparse.Namespace, revs: LockRevs, change: dict[str, Any] | None) -> bool:
+    """The default comparison while an update is not committed: the move itself. A target
+    named on the command line (--nixpkgs, --channel) is compared as asked."""
+    if change is None or change["committed"] or ns.nixpkgs or ns.channel:
+        return False
+    head = revs.committed
+    return bool(head and head.type == "github" and head.owner and head.repo and head.nar_hash)
+
+
+def committed_target(revs: LockRevs) -> tgt.Target:
+    """The committed lock's node as a target: fully locked with its narHash, so nix takes it
+    from the store (it was the lock until the update) without asking GitHub."""
+    from urllib.parse import urlencode
+
+    head = revs.committed
+    assert head is not None and head.rev and head.nar_hash
+    ref = f"github:{head.owner}/{head.repo}/{head.rev}"
+    return tgt.Target(
+        input=head.name,
+        flakeref=ref,
+        source="committed",
+        rev=head.rev,
+        last_modified=head.last_modified,
+        locked=f"{ref}?{urlencode({'narHash': head.nar_hash})}",
+        path=None,
+    )
+
+
+def _pending(
+    ns: argparse.Namespace,
+    repo: ConfigRepo,
+    host: str,
+    np: tgt.Nixpkgs,
+    cache: TruthCache,
+    timings: dict,
+    revs: LockRevs,
+    change: dict[str, Any],
+) -> dict[str, Any]:
+    """committed lock → working lock: what the uncommitted `nixin update` brings."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    old_target = committed_target(revs)
+    repo.source()
+    timings["resolve"] = 0.0
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        lock_job = pool.submit(_lock_side, repo, host, cache, ns, timings)
+        old_error: NixinError | None = None
+        old = None
+        try:
+            old = _eval(repo, host, cache, old_target)
+        except NixinError as e:
+            old_error = e
+        new = lock_job.result()
+    if old_error is not None or old is None:
+        raise old_error or NixinError("internal", "no committed-side eval")
+    timings["target"] = 0.0 if old["cached"] else old["seconds"]
+    d = compare.diff(old, new, ns.home)
+    lk = np.locked
+    days = None
+    if lk.last_modified and old_target.last_modified:
+        days = round((lk.last_modified - old_target.last_modified) / 86400, 1)
+    kernel_from, kernel_to = old.get("kernel"), new.get("kernel")
+    kernel = {"from": kernel_from, "to": kernel_to, "changed": kernel_from != kernel_to}
+    holds = _holds(repo, host, np, None, cache, timings)
+    for h in holds:
+        if h["mode"] != "attr":
+            kernel["held"] = {"pin": h["name"], "available": h["available"].get(h["attrs"][0])}
+    change["compared"] = True
+    cfg = shlex.quote(str(repo.path))
+    nixin = f"--config {cfg} --host {shlex.quote(host)}"
+    old_short = old_target.short_rev
+    note = (
+        f"flake.lock moved {np.input} {old_short} → {lk.short_rev} but the move is not committed: "
+        f"these are the changes it brings. `nixin update --undo` puts the lock back; "
+        f"`nixin pin NAME --rev {old_short}` holds one package (or `kernel`) at the old revision "
+        "while the rest moves."
+    )
+    return {
+        "mode": "lock",
+        "target": {
+            "input": np.input,
+            "flakeref": np.original_ref,
+            "from": "pending",
+            "rev": lk.rev,
+            "short_rev": lk.short_rev,
+            "date": lk.date,
+            "last_modified": lk.last_modified,
+            "locked": f"{lk.flakeref}?narHash={lk.nar_hash}" if lk.flakeref else None,
+            "release": new.get("release"),
+            "days_newer": days,
+        },
+        "up_to_date": False,
+        "changed": d["changed"],
+        "added": d["added"],
+        "removed": d["removed"],
+        "kernel": kernel,
+        "holds": holds,
+        "count": len(d["changed"]),
+        "total": d["total"],
+        "scopes": d["scopes"],
+        "commands": [
+            f"nixin plan {nixin}",
+            f"nixin apply {nixin}",
+            f"nixin update --undo --config {cfg}",
+        ],
+        "notes": [note],
+        "_release": old.get("release"),
     }
 
 

@@ -53,6 +53,15 @@ Item {
                 ToolTip.text: "git fetch of the hub repository"
                 onClicked: page.p.startSync()
             }
+            DangerButton {
+                objectName: "pendingUndo"
+                text: "Undo lock move…"
+                visible: page.p.canUndo
+                enabled: page.backend.busy === ""
+                ToolTip.visible: hovered
+                ToolTip.text: "update --undo: flake.lock back to the committed one (asks first)"
+                onClicked: page.p.startUndo()
+            }
             Button {
                 objectName: "planButton"
                 text: "Plan"

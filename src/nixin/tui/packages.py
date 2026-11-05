@@ -8,6 +8,8 @@ Remove), for the row's Home Manager user. Updates: `outdated` (lock mode, `m` fo
 `--published`) on first view; `u` previews `update --dry-run`, confirms, runs `update`, and
 goes to Pending, where Plan builds it as for any other change. `h` on a row holds it (`pin
 PNAME`, through the writer's diff modal) or releases it (`unpin`); `k` holds the kernel.
+While the moved lock is not committed, `outdated` compares the move itself and `z` undoes
+it (`update --undo`: flake.lock back to the committed one).
 Pins: the host's pins (`pins`), `c` checks them against the lock (`pins --check`), `u`
 drops the one under the cursor.
 """
@@ -50,6 +52,7 @@ class PackagesScreen(Base):
         Binding("k", "hold_kernel", "Hold kernel", show=False),
         Binding("m", "mode", "Mode", show=False),
         Binding("u", "update", "Update lock", show=False),
+        Binding("z", "undo", "Undo lock move", show=False),
         Binding("u", "unpin", "Unpin", show=False),
         Binding("c", "check_pins", "Check", show=False),
         Binding("r", "refresh", "Refresh", show=False),  # ? lists it; a phone has no room
@@ -97,6 +100,9 @@ class PackagesScreen(Base):
                     )
                     yield Button("mode: lock (m)", id="up-mode", compact=True)
                     yield Button("hold kernel (k)", id="up-kernel-hold", compact=True)
+                    yield Button(
+                        "Undo lock move (z)", id="up-undo", variant="warning", compact=True
+                    )
             with Vertical(id="pk-pins"):
                 yield Line("", id="pn-head")
                 yield Spinner(id="pn-spin")
@@ -155,7 +161,7 @@ class PackagesScreen(Base):
             return parameters[0] != self.tab
         if action in ("focus_filter", "next_scope"):
             return self.tab == "installed"
-        if action in ("update", "mode", "hold", "hold_kernel"):
+        if action in ("update", "mode", "hold", "hold_kernel", "undo"):
             return self.tab == "updates"
         if action in ("unpin", "check_pins"):
             return self.tab == "pins"
@@ -333,6 +339,8 @@ class PackagesScreen(Base):
         mode.label = f"mode: {self.mode} (m)"
         mode.refresh(layout=True)  # an auto width keeps the first label's otherwise
         lines = ("#up-head", "#up-kernel", "#up-summary", "#up-notes")
+        undo = self.query_one("#up-undo", Button)
+        undo.set_class(not view.can_undo(doc.get("lock_change")), "hidden")
         if notice is not None:
             self.updates = []
             for name in lines:
@@ -543,6 +551,14 @@ class PackagesScreen(Base):
             "update", *args, "--dry-run", done=dry, busy="checking", label="update --dry-run"
         )
 
+    def action_undo(self) -> None:
+        """`update --undo`: flake.lock back to the committed one, then Updates again."""
+        doc = self.nixin.outdated_docs.get(self.mode)
+        if doc is None or not view.can_undo(doc.get("lock_change")):
+            self.notify("nothing to undo: flake.lock is as committed", severity="warning")
+            return
+        self.nixin.undo_update(after=lambda: self.tab == "updates" and self.load_updates())
+
     def _updated(self, doc: dict) -> None:
         if not doc.get("ok"):
             self.app.push_screen(NoticeModal(doc, "update"))
@@ -572,6 +588,7 @@ class PackagesScreen(Base):
             "up-update": self.action_update,
             "up-mode": self.action_mode,
             "up-kernel-hold": self.action_hold_kernel,
+            "up-undo": self.action_undo,
             "pn-check": self.action_check_pins,
             "pn-unpin": self.action_unpin,
         }[event.button.id or ""]()

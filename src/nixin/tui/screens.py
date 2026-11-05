@@ -534,6 +534,7 @@ class PendingScreen(BuildScreen):
         Binding("a", "apply", "Apply", show=False),
         Binding("y", "sync", "Sync", show=False),
         Binding("x", "stop", "Stop", show=False),
+        Binding("z", "undo", "Undo lock move", show=False),
         Binding("r", "refresh", "Refresh"),
     ]
 
@@ -559,11 +560,13 @@ class PendingScreen(BuildScreen):
             yield Button("Stop (x)", id="stop-btn", variant="warning", compact=True)
             yield Button("Apply… (a)", id="apply-btn", variant="error", compact=True)
             yield Button("Sync (y)", id="sync-btn", compact=True)
+            yield Button("Undo lock move (z)", id="undo-btn", variant="warning", compact=True)
         yield from self.compose_bottom()
 
     def on_mount(self) -> None:
         self.query_one("#closure", DataTable).display = False
         self.query_one("#stop-btn", Button).display = False
+        self.query_one("#undo-btn", Button).add_class("hidden")
         self._token: Cancel | None = None
 
     def on_screen_resume(self) -> None:  # also on the first push
@@ -595,7 +598,16 @@ class PendingScreen(BuildScreen):
             assert n is not None
             f.show([], f"status: {n.code}: {n.message}", "error")
             return
-        f.show(view.pending_fields(doc.get("pending")))
+        undo = view.can_undo(doc.get("lock_change"))
+        f.show(view.pending_fields(doc.get("pending"), doc.get("lock_change"), "z" if undo else ""))
+        self.query_one("#undo-btn", Button).set_class(not undo, "hidden")  # a phone: `z`
+
+    def action_undo(self) -> None:
+        doc = self.nixin.status_doc
+        if doc is None or not view.can_undo(doc.get("lock_change")):
+            self.notify("nothing to undo: flake.lock is as committed", severity="warning")
+            return
+        self.nixin.undo_update(after=lambda: self.action_refresh(force=True))
 
     def action_plan(self) -> None:
         log = self.query_one("#log", LogView)
@@ -688,6 +700,7 @@ class PendingScreen(BuildScreen):
             "stop-btn": self.action_stop,
             "apply-btn": self.action_apply,
             "sync-btn": self.action_sync,
+            "undo-btn": self.action_undo,
         }[event.button.id or ""]()
 
     def action_back(self) -> None:

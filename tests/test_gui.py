@@ -628,6 +628,68 @@ def test_packages_updates_then_update_lock_to_pending(ui):
     assert sorted(verbs[-2:]) == [["list"], ["outdated"]]
 
 
+MOVED = {
+    **PACKAGES,
+    "outdated": ["outdated_19BK", "outdated_19BK_moved"],
+    "status": "status_moved",
+    "update --undo --dry-run": "update_undo_dry",
+    "update --undo": "update_undo",
+}
+
+
+def test_packages_update_then_undo_from_pending_and_updates(ui):
+    u = ui(MOVED, host="19BK")
+    open_packages(u)
+    click(u, "pk-tab-updates")
+    vm = u.gui.packages
+    assert not shown(u, "undoButton")
+    click(u, "updateButton")
+    click(u, "updateConfirm")
+    assert u.gui["page"] == "pending" and shown(u, "pendingPage")
+    p = u.gui.pending
+    assert p["canUndo"] and shown(u, "pendingUndo")
+    lock = next(r for r in p.rows("pending").rows if r["label"] == "lock")
+    assert lock["value"].startswith("3ec6363 → 0bb2eed in flake.lock, not committed")
+    assert lock["style"] == "warn"
+    click(u, "pendingUndo")  # update --undo --dry-run → the dialog, Undo instead of Update
+    assert shown(u, "updateDialog") and vm["updatePhase"] == "confirm"
+    assert vm["updateConfirmLabel"] == "Undo" and prop(u, "updateConfirm", "text") == "Undo"
+    assert vm["updateTitle"].startswith("undo the nixpkgs lock move")
+    fields = {r["label"]: r["value"] for r in vm.rows("updateFields").rows}
+    assert fields["runs"] == "git -C /home/master/nixos checkout HEAD -- flake.lock"
+    assert fields["nixpkgs"] == "0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (as committed)"
+    click(u, "updateConfirm")
+    assert not shown(u, "updateDialog") and u.gui["page"] == "pending"
+    assert u.gui.notice["message"].startswith("undone: nixpkgs 0bb2eed → 3ec6363")
+    assert u.gui.writes == [
+        "nixpkgs 3ec6363 → 0bb2eed (flake.lock)",
+        "nixpkgs 0bb2eed → 3ec6363 (flake.lock back to HEAD's)",
+    ]
+    # the Updates tab compares the pending move now: Undo, no Update
+    open_packages(u)
+    settle(u)
+    assert vm["tab"] == "updates" and vm["canUndo"] and shown(u, "undoButton")
+    assert not prop(u, "updateButton", "enabled")
+    assert prop(u, "upKernel", "text") == "kernel 7.2.12 → 7.2.14"
+    assert prop(u, "upHead", "text").endswith("(nixin update --undo takes it back)")
+    click(u, "undoButton")
+    assert shown(u, "updateDialog") and vm["updateConfirmLabel"] == "Undo"
+    click(u, "updateCancel")
+    assert not shown(u, "updateDialog")
+    verbs = u.fake.verbs()
+    assert verbs[:2] == [["list"], ["outdated"]]
+    assert verbs[2:8] == [
+        ["update", "--dry-run"],
+        ["update"],
+        ["status"],
+        ["update", "--undo", "--dry-run"],
+        ["update", "--undo"],
+        ["status"],
+    ]
+    assert sorted(verbs[8:10]) == [["list"], ["outdated"]]
+    assert verbs[10:] == [["update", "--undo", "--dry-run"]]
+
+
 def test_packages_hold_kernel_and_row_then_pins_page(ui):
     u = ui(HOLDS, host="19BK")
     open_packages(u)

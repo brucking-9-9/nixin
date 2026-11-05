@@ -146,6 +146,7 @@
     "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
     "short_rev": "3ec6363"
   },
+  "lock_change": null,
   "mode": "lock",
   "notes": [],
   "ok": true,

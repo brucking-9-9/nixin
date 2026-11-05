@@ -199,6 +199,7 @@
     "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
     "short_rev": "3ec6363"
   },
+  "lock_change": null,
   "mode": "published",
   "notes": [
     "search.nixos.org has many attributes per pname; the one defined in the same file as the installed package is compared (else the same major version, then the attribute named like the pname). `nixin outdated` without --published is exact."

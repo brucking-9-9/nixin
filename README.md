@@ -154,7 +154,11 @@ which touch the network, run nix or write files, and the cache locations.
   **update** takes it: it runs the command `outdated` prints (`nix flake update nixpkgs
   --flake WORKSPACE`, or `nix flake lock --override-input nixpkgs REF` for `--to`) in the
   workspace only, and returns the input's commit before and after. It never builds or
-  switches: `plan` and `apply` do that, as for any other change.
+  switches: `plan` and `apply` do that, as for any other change. While that move is not
+  committed, `outdated` compares the move itself (the committed lock against the working
+  one, offline), `status` carries it as `lock_change`, and `update --undo` takes it back
+  (`git checkout HEAD -- flake.lock`; a move that is a commit already is answered with the
+  pin at the old revision or `git revert`).
 - **explain NAME** puts both sides of one option or package in one document: for an
   option its type, default, example, value per scope (NixOS, each Home Manager user),
   where the config sets it and where it is declared (linked on GitHub at the locked
@@ -225,7 +229,9 @@ for its user, with Remove) and, on its Updates tab, what a nixpkgs update would 
 (`outdated`, the lock's next commit or `--published`; the kernel line, the summary) with
 "Update nixpkgs lock": `update --dry-run` → confirm → `update` → Pending, where Plan and
 Apply take it as any other change; `h` holds a row back (`pin`, through the diff modal),
-`k` the kernel, and the Pins tab (`n`) lists what is held, checks it (`c`) and unpins (`u`).
+`k` the kernel, `z` undoes an update that is not committed yet (also on Pending, whose
+header shows the lock move), and the Pins tab (`n`) lists what is held, checks it (`c`) and
+unpins (`u`).
 Options browses NixOS or Home Manager options (`search
 --kind opt|hm`, `k` toggles; name, type and the description) and shows one in full: type,
 default, example, the whole description, its value on this host and the file and line
@@ -276,7 +282,8 @@ combo; the selected row opens in the details pane for its user, with Remove) and
 (`outdated` against the lock's next commit or search.nixos.org, the kernel line, the
 summary; "Update nixpkgs lock…" opens a dialog with `update --dry-run` and the holds, then
 `update` runs and the window goes to Pending; a row's hold button and "hold kernel" pin
-things through the diff dialog). **Pins** (Ctrl+6) lists what is held back, at which
+things through the diff dialog; "Undo lock move…", here and on Pending, takes an update
+back before it is committed). **Pins** (Ctrl+6) lists what is held back, at which
 nixpkgs, whether it still holds anything; Check runs `pins --check`, Unpin drops one.
 **Options** searches NixOS or Home Manager options
 (a combo picks which) and shows the selected one beside the list: type, default, example,

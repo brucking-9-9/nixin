@@ -24,7 +24,7 @@ from .. import cli
 from ..apply.proc import Cancel
 from ..ui import view
 from ..ui.backend import Backend
-from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal
+from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal, UpdateModal
 from .options import OptionsScreen
 from .packages import PackagesScreen
 from .screens import ApplyScreen, PendingScreen, SearchScreen, StatusScreen, TopBar
@@ -293,6 +293,46 @@ class NixinApp(App[str]):
             self.list_stale = True
             self.status_stale = True
             self.plan_doc = None
+
+    def undo_update(self, *, after: Callable[[], None] | None = None) -> None:
+        """`update --undo --dry-run` → confirm → `update --undo`: flake.lock back to HEAD's."""
+        if self.busy:
+            self.notify(f"wait: {self.busy} is still running", severity="warning")
+            return
+
+        def dry(d: Doc) -> None:
+            if not d.get("ok"):
+                self.push_screen(NoticeModal(d, "update --undo"))
+                return
+            self.push_screen(UpdateModal(d), lambda ok: ok and run())
+
+        def run() -> None:
+            self.fetch(
+                "update",
+                "--undo",
+                done=done,
+                busy="updating",
+                label="update --undo: git checkout HEAD -- flake.lock",
+                hint="instant",
+            )
+
+        def done(doc: Doc) -> None:
+            if not doc.get("ok"):
+                self.push_screen(NoticeModal(doc, "update --undo"))
+                return
+            self.updated(doc)
+            self.notify(view.update_summary(doc), title="undone")
+            if after:
+                after()
+
+        self.fetch(
+            "update",
+            "--undo",
+            "--dry-run",
+            done=dry,
+            busy="checking",
+            label="update --undo --dry-run",
+        )
 
     # --- apply flow --------------------------------------------------------------------------
 

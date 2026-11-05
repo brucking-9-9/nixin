@@ -6,7 +6,8 @@ import QtQuick.Layouts
 
 // update: `update --dry-run` (the command, the commit the lock has, the one it moves to and
 // what `outdated` said that changes) → Update → `update` runs (nix fetches the new nixpkgs)
-// → Pending, where Plan builds it and Apply… switches, as for any other change.
+// → Pending, where Plan builds it and Apply… switches, as for any other change. The same
+// dialog serves `update --undo` (flake.lock back to the committed one): Undo instead.
 Dialog {
     id: dlg
 
@@ -14,6 +15,7 @@ Dialog {
     readonly property string phase: packages.updatePhase
     readonly property bool want: packages.updateOpen
     readonly property bool working: phase === "checking" || phase === "running"
+    readonly property bool undo: packages.updateConfirmLabel === "Undo"
 
     objectName: "updateDialog"
     modal: true
@@ -40,8 +42,10 @@ Dialog {
             }
             Text {
                 Layout.fillWidth: true
-                text: dlg.phase === "checking" ? "update --dry-run: the command and the commit the lock has…"
-                                               : "nix flake update: fetching the new nixpkgs (about a minute the first time)…"
+                text: dlg.phase === "checking" ? (dlg.undo ? "update --undo --dry-run: the committed lock against the working one…"
+                                                           : "update --dry-run: the command and the commit the lock has…")
+                                               : (dlg.undo ? "git checkout HEAD -- flake.lock…"
+                                                           : "nix flake update: fetching the new nixpkgs (about a minute the first time)…")
                 textFormat: Text.PlainText
                 color: Theme.dim2
                 font.family: Theme.font
@@ -68,7 +72,7 @@ Dialog {
         }
         Button {
             objectName: "updateConfirm"
-            text: "Update"
+            text: dlg.packages.updateConfirmLabel
             highlighted: true
             enabled: dlg.phase === "confirm"
             onClicked: dlg.packages.confirmUpdate()

@@ -76,7 +76,8 @@ class FakeNix:
     stderr of its failure (a str); `target_error` makes the --override-input eval fail.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, path=None) -> None:
+        self.path = path  # with a path, the plain eval answers for the lock the file has
         self.calls: list[list[str]] = []
         self.metadata: dict[str, dict | str] = {
             "github:nixos/nixpkgs/nixos-unstable": recorded("metadata-nixos-unstable.json"),
@@ -109,8 +110,15 @@ class FakeNix:
                     raise NixinError(
                         code, trim_nix_error(self.target_error), stderr=self.target_error
                     )
-                return json.dumps(recorded("19BK-target.json"))
-            return json.dumps(recorded("19BK-lock.json"))
+                ref = args[args.index("--override-input") + 2]
+                side = "lock" if LOCK_REV in ref else "target"
+                return json.dumps(recorded(f"19BK-{side}.json"))
+            side = "lock"
+            if self.path is not None:
+                lock = json.loads((self.path / "flake.lock").read_text())
+                if lock["nodes"]["nixpkgs_2"]["locked"]["rev"] == TARGET_REV:
+                    side = "target"
+            return json.dumps(recorded(f"19BK-{side}.json"))
         raise AssertionError(f"unexpected nix call: {args}")
 
 
@@ -119,7 +127,7 @@ def repo(tmp_path, monkeypatch):
     (tmp_path / "flake.nix").write_text("{ }")
     (tmp_path / "flake.lock").write_text(json.dumps(fixture("flake.lock.json")))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    r = ConfigRepo(tmp_path, nix=FakeNix())
+    r = ConfigRepo(tmp_path, nix=FakeNix(tmp_path))
     monkeypatch.setattr(
         configrepo.ConfigRepo, "locate", classmethod(lambda cls, explicit=None, nix=None: r)
     )
@@ -487,6 +495,97 @@ def test_holds_say_what_a_pin_keeps_back(repo, capsys):
         )
         == "kernel 7.2.12 (held by pin kernel; 7.2.14 available)"
     )
+
+
+def test_lock_change_is_null_while_the_lock_is_as_committed(repo, capsys):
+    rc, doc = run(capsys)
+    assert rc == 0 and doc["lock_change"] is None
+
+
+def _git(path, *args: str) -> str:
+    import subprocess
+
+    p = subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True, check=True)
+    return p.stdout.strip()
+
+
+@pytest.fixture
+def moved(repo, monkeypatch):
+    """The lock committed at 3ec6363, then moved to 0bb2eed by an update that is not
+    committed; the running system was built from 3ec6363."""
+    import shutil
+
+    if shutil.which("git") is None:
+        pytest.skip("needs git")
+    _git(repo.path, "init", "-q", "-b", "main")
+    _git(repo.path, "config", "user.name", "T")
+    _git(repo.path, "config", "user.email", "t@example.org")
+    _git(repo.path, "add", "-A")
+    _git(repo.path, "commit", "-q", "-m", "lock")
+    lock = json.loads((repo.path / "flake.lock").read_text())
+    lock["nodes"]["nixpkgs_2"]["locked"].update(
+        rev=TARGET_REV,
+        lastModified=1793540411,
+        narHash="sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE=",
+    )
+    (repo.path / "flake.lock").write_text(json.dumps(lock, indent=2))
+    from nixin import lockstate
+
+    monkeypatch.setattr(lockstate, "running_system", lambda root="/x": {"nixpkgs_rev": "3ec6363"})
+    return repo
+
+
+def test_an_uncommitted_lock_move_is_compared_with_the_committed_lock(moved, capsys):
+    rc, doc = run(capsys)
+    assert rc == 0 and doc["ok"] and doc["mode"] == "lock"
+    assert doc["lock"]["rev"] == TARGET_REV  # the working lock, as the host evaluates
+    change = doc["lock_change"]
+    assert (change["from"]["rev"], change["to"]["rev"]) == (LOCK_REV, TARGET_REV)
+    assert change["committed"] is False and change["running"] is True and change["compared"] is True
+    assert change["from"]["nar_hash"] == "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw="
+    t = doc["target"]
+    assert t["from"] == "pending" and t["rev"] == TARGET_REV and t["days_newer"] == 8.9
+    assert doc["up_to_date"] is False
+    assert doc["count"] == 13 and doc["kernel"] == {
+        "from": "7.2.12",
+        "to": "7.2.14",
+        "changed": True,
+    }
+    assert doc["commands"] == [
+        f"nixin plan --config {moved.path} --host 19BK",
+        f"nixin apply --config {moved.path} --host 19BK",
+        f"nixin update --undo --config {moved.path}",
+    ]
+    assert doc["notes"][0].startswith(
+        "flake.lock moved nixpkgs 3ec6363 → 0bb2eed but the move is not committed"
+    )
+    assert "nixin pin NAME --rev 3ec6363" in doc["notes"][0]
+    # the committed side: --override-input with the committed node's narHash (offline),
+    # no `nix flake metadata` on the branch
+    evals = moved.nix.evals()
+    old = next(e for e in evals if "--override-input" in e)
+    i = old.index("--override-input")
+    assert old[i + 1 : i + 3] == [
+        "nixpkgs",
+        f"github:nixos/nixpkgs/{LOCK_REV}?narHash=sha256-rZLrzrC6i%2BjnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw%3D",
+    ]
+    assert not [
+        c for c in moved.nix.calls if c[:2] == ["flake", "metadata"] and c[3].startswith("github:")
+    ]
+    assert doc["timings"]["resolve"] == 0.0
+    _, text = run(capsys, json_=False)
+    assert text.splitlines()[0] == (
+        "19BK: nixpkgs 3ec6363 (2026-10-23) → 0bb2eed (2026-11-01) in flake.lock, not committed "
+        "(nixin update --undo takes it back)"
+    )
+    assert "13 of 96 packages change with the lock move; kernel 7.2.12 → 7.2.14" in text
+    assert "flake.lock back to the committed one" in text
+    # a target named on the command line is compared as asked; lock_change stays informational
+    moved.nix.metadata[f"github:nixos/nixpkgs/{TARGET_REV}"] = recorded(
+        "metadata-nixos-unstable.json"
+    )
+    rc, doc = run(capsys, "--nixpkgs", TARGET_REV)
+    assert rc == 0 and doc["up_to_date"] is True and doc["lock_change"]["compared"] is False
 
 
 def test_second_run_is_cached_and_refresh_is_not(repo, capsys):

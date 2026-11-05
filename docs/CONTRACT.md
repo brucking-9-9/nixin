@@ -407,6 +407,7 @@ Result:
 | `config` | `path`, `head` (git HEAD), `dirty`, `source` (the `/nix/store/…-source` nix evaluates), `source_hash`, `fingerprint`, `last_modified`, `hosts[]`, `host_is_local` (`--host` = this machine's hostname) |
 | `lock` | the root flake's nixpkgs node: `input`, `node` (e.g. `nixpkgs_2`), `type`, `owner`, `repo`, `rev`, `ref`, `date`, `last_modified`, `flakeref`, `nar_hash`; null without `flake.lock` |
 | `running` | `/run/current-system` of *this machine*: `system`, `version`, `nixpkgs_rev`, `hostname`, `matches_lock` |
+| `lock_change` | the nixpkgs lock move that is not applied yet, or null: `{from, to, committed, running}`. `from`/`to` are `{rev, short_rev, date, last_modified, nar_hash}`; `committed: false` = the working `flake.lock` differs from `HEAD:flake.lock` (an `update` not committed yet: `from` is the committed node; `nixin update --undo` takes it back), `committed: true` = the lock is committed but the authoritative tree's `flake.lock` still has `from` (not applied yet); `running` says whether `from` is what the running system was built from (`nixos-version`'s short rev; null when unknown or `--host` is another machine). No nix: git and the file system only |
 | `eval` | `ok` (always true here; a host that does not evaluate is an `eval-failed` error instead), `toplevel` (drvPath), `seconds` |
 | `hm_users[]` | Home Manager users of the host |
 | `packages` | counts: `system`, `home.<user>` |
@@ -1399,6 +1400,19 @@ never assumed. Only that input moves; inputs that `follows` it move with it.
 `nix flake update` without an input name would also move the others (home-manager,
 nixos-hardware), and this comparison does not include them.
 
+**The pending move.** While the working `flake.lock` differs from `HEAD:flake.lock` (an
+`update` that is not committed yet) and no target is named, the comparison is the move
+itself: the *committed* node, evaluated with `--override-input <input>
+github:<owner>/<repo>/<rev>?narHash=<its narHash>` (nix takes the tree from the store, no
+network: it was the lock until the update), against the working lock as the host evaluates
+it. `changed[]`, `kernel` and the rest then describe what the uncommitted move brings;
+`lock_change.compared` is true, `target.from` is `pending` (the working lock itself: there
+is nothing to update, only to apply or to undo), `up_to_date` false, `commands[]` are
+`nixin plan`, `nixin apply` and `nixin update --undo`, and `notes[]` says so. `nixpkgs
+REV`/`--channel` compare as asked, with `lock_change` informational (`compared: false`).
+`--published` is not affected. The branch's head is not resolved in that state: deal with
+the pending move (apply or undo) before the next update.
+
 Comparison, per scope and pname (a package without a pname is keyed by its derivation
 name, so it never shows as changed): versions present on both sides cancel out. What is
 left pairs up in version order as `changed`. The rest is `removed` (lock side only) or
@@ -1425,7 +1439,8 @@ Result:
 | `mode` | `lock` \| `published` |
 | `config` | `path`, then as in `status`: `head`, `dirty`, `source`, `source_hash`, `fingerprint`, `last_modified` |
 | `lock` | the host's nixpkgs as locked: `input` (its name in flake.nix, what `--override-input` takes), `node` (`nixpkgs_2`), `rev`, `short_rev`, `date`, `last_modified`, `flakeref`, `original` (the lock's `original` as a flakeref), `release` (`system.nixos.release`) |
-| `target` | lock mode: `input`, `flakeref` (as asked), `from` (`lock` \| `nixpkgs` \| `channel`), `rev`, `short_rev`, `date`, `last_modified`, `locked` (the fully locked ref given to `--override-input`, with `narHash`), `release`, `days_newer` (target date minus lock date). `--published`: `source` (`search.nixos.org`), `channel` (concrete: `stable` → `26.05`), `index`, `rev` (the commit the index was built from), `short_rev`, `queries`, `cached` |
+| `lock_change` | as in `status` (`{from, to, committed, running}` or null), plus `compared`: true when this document compares the pending move (above) |
+| `target` | lock mode: `input`, `flakeref` (as asked), `from` (`lock` \| `nixpkgs` \| `channel` \| `pending`), `rev`, `short_rev`, `date`, `last_modified`, `locked` (the fully locked ref given to `--override-input`, with `narHash`), `release`, `days_newer` (target date minus lock date). `--published`: `source` (`search.nixos.org`), `channel` (concrete: `stable` → `26.05`), `index`, `rev` (the commit the index was built from), `short_rev`, `queries`, `cached` |
 | `up_to_date` | lock mode: the target commit is the locked one (no target eval; everything empty) |
 | `changed[]` | lock mode: `{pname, from, to, scope, user, direction}`. `--published`: `{pname, installed, published, attr, alternatives, channel, rev, scope, user, direction}` (`installed`: the versions, comma-separated when several; `attr`: the index's attribute compared; `alternatives`: how many other attributes share the pname). `scope` is `system` \| `home`, `user` null or the HM user; `direction` `up` \| `down` \| `same` (different text, same order) |
 | `added[]`, `removed[]` | lock mode: `{pname, version, scope, user}`. Always `[]` with `--published` |
@@ -1467,6 +1482,7 @@ makes HTTPS calls to search.nixos.org and evaluates nothing new. See
 
 ```
 nixin update [--input NAME] [--to FLAKEREF|REV] [--hold NAME,...] [--allow-others] [--dry-run] [--config DIR]
+nixin update --undo [--dry-run] [--config DIR]
 ```
 
 Takes the update `outdated` describes: it runs the command `outdated` prints under
@@ -1485,6 +1501,7 @@ without `$NIXIN_CONFIG`) and trees you cannot write are `not-a-workspace`.
 | `--dry-run` | nothing: the document says what would run (`command`), with `to` and `changed` null. Reads `flake.lock` only, no nix |
 | `--allow-others` | keep the new lock even when nix moved other nodes too (see `lock-moved-others`); they are listed in `moved[]` and a warning |
 | `--hold NAME,...` | `nixin pin NAME` for each (at the lock as it is before the move) first, then the update, then the pins' checks against the new lock: `holds[]`, `checks[]` (see `pin`) |
+| `--undo` | the update back, before it is committed: `git checkout HEAD -- flake.lock` in the workspace (index and working tree; staged or not, HEAD's lock wins). Every node that differs from `HEAD:flake.lock` goes back, not only the nixpkgs one. Nothing else changes: pins, other edits and the caches stay. `nothing-to-undo` when the lock is as committed; the message then says what applies instead: nothing (the lock is also the applied one), or, when the move is a commit already, `nixin pin NAME --rev <the applied revision>` or `git revert`. With `--dry-run` nothing runs. `--to`, `--input`, `--hold`, `--allow-others` are `usage` with it |
 
 Only the named input may move. After nix ran, both locks are compared node by node: the
 input's node and the nodes reachable only through it (its private sub-inputs, in the new
@@ -1507,16 +1524,21 @@ Result:
 | `moved[]` | other lock nodes that moved too: `{node, from, to}` (short revs); `[]` normally; only non-empty with `--allow-others` |
 | `holds[]`, `checks[]` | with `--hold`: the pins made (as `pins` lists them) and their checks against the new lock (`{id, level, text, data}`; a `block` adds a warning, the lock stays moved) |
 | `dry_run` | `--dry-run` was given |
+| `undo` | true for `--undo`: `command` is the git line, `to_ref` is `HEAD:flake.lock`, `from`/`to` the input's working and committed node, `restored[]` every node that goes back (`{node, from, to}`, short revs), `commands[]` = `nixin outdated …` after the undo |
 | `config` | the workspace path |
 | `commands[]` | after a change: `nixin plan`, `nixin apply` with `--config`/`--host`; `[]` when nothing changed; with `--dry-run`: `[command]` |
-| `timings` | seconds: `nix` (the update command), `total` |
+| `timings` | seconds: `nix` (the update command; `git` for `--undo`), `total` |
 
 Without `--json`: `nixpkgs (github:nixos/nixpkgs/nixos-unstable): 3ec6363 (2026-10-23) →
 0bb2eed (2026-11-01)`, `ran: …`, and `next:` (or "already at …; flake.lock unchanged").
+`--undo`: `nixpkgs: 0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (flake.lock back to
+HEAD's)`, `ran: …`, `moved back: nixpkgs_2 0bb2eed → 3ec6363`, `next:`.
 
 Errors: `usage` (a positional argument; `--to REV` for an input that is not on
-github/gitlab/sourcehut), `config-not-found`, `not-a-workspace`, `not-found` (no readable
-`flake.lock`, no nixpkgs input, or `--input` names no root input of the lock),
+github/gitlab/sourcehut; `--undo` with another flag), `config-not-found`, `not-a-workspace`,
+`not-found` (no readable `flake.lock`, no nixpkgs input, or `--input` names no root input of
+the lock; `--undo`: `flake.lock` is not tracked by git), `nothing-to-undo` (`--undo`: the
+lock is as committed), `git-failed` (`--undo`: the checkout failed),
 `lock-moved-others` (above), the `pin` errors with `--hold`, `network`
 (nix could not fetch the new commit for lack of network), `bad-channel` (GitHub does not
 know the ref: HTTP 404/422), `nix-failed` (nix failed otherwise; nix's message),
@@ -1742,7 +1764,10 @@ through `apply` (after `apply --dry-run` and a confirmation). The Packages page 
 Its Updates tab holds a row (`h`: `pin PNAME`, or `unpin` for a held row) and the kernel
 (`k`: `pin kernel`) through the writer's diff modal, and its Pins tab (`n`) shows `pins`
 (`c`: `pins --check`, `u`: `unpin` of the row); after an `update` with holds it runs `pins
---check` and says how many warnings and blocks there are.
+--check` and says how many warnings and blocks there are. While the moved lock is not
+committed, `status.lock_change` is a `lock` line in Pending's header and `z` (Pending, and
+the Updates tab, where `outdated` then compares the pending move) runs `update --undo`
+after `update --undo --dry-run` and a confirmation.
 The Options page shows `search --kind opt|hm --limit 50` and, for the selected option,
 `where NAME --kind option` (no `info`: the search row has the upstream fields); Set and
 Unset are `set`/`unset` (with `--home USER` for a Home Manager option) after their
@@ -1780,7 +1805,9 @@ in a dialog), and switches only through `apply` (after `apply --dry-run` and a
 confirmation). Its Packages and Options pages use the verbs the TUI's do, with the holds
 (an update row's hold / unhold button, "hold kernel" beside the kernel line, the update
 dialog's `hold` lines) and a Pins page (Ctrl+6: `pins`, Check = `pins --check`, Unpin
-through the diff dialog). Try (the
+through the diff dialog). "Undo lock move…" (Pending's header and the Updates tab, while
+`lock_change` is not committed) runs `update --undo` through the update dialog, after
+`update --undo --dry-run`. Try (the
 details pane) runs `try PKG --build-only` as the TUI does, then starts a graphical app
 detached, or opens a CLI program's `command` in the person's terminal (`$TERMINAL -e`,
 else the first of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal,
@@ -1889,6 +1916,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `ssh-failed` | apply | `apply --host H` for another host: `ssh` is missing, could not connect (exit 255), or the session ended otherwise; `committed`, `pushed` say how far it got |
 | `invalid-hosts-config` | apply | `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/`) does not parse, or a value is of the wrong type or not a usable path / ssh destination |
 | `lock-moved-others` | outdated (`update`) | nix moved lock nodes other than the requested input and its private sub-inputs; `flake.lock` was put back as it was (`moved[]`: `{node, from, to}`); `--allow-others` takes nix's result |
+| `nothing-to-undo` | outdated (`update --undo`) | `flake.lock` is as committed: nothing to take back. The message says whether the move is a commit already (then `nixin pin NAME --rev <the applied revision>` holds something at the old nixpkgs, or `git revert` the commit) or the lock is also the applied one |
 | `pin-unsupported` | pins | `pin`: an overlay cannot hold this: a nested attribute or a language package set member, a kernel from another flake input or an expression naming no `pkgs.linux…` attribute, a kernel attribute that is not the host's kernel, a nixpkgs input not locked as a github tree; nothing written |
 | `pin-blocked` | pins | not an error of the verb: `checks.eval.code` after a `pin` (and a warning) when a `block` check fired (`kernel-modules-dropped`, `pin-not-holding`); the write stays, `hold_checks[]` says what to do |
 | `gc-failed` | apply | `gc`: nix-env `--delete-generations`, the bootloader step or nix-collect-garbage failed, or a generation was still there after the delete; `step` says which, `deleted[]`/`done[]` how far it got |

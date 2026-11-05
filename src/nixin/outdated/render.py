@@ -105,6 +105,7 @@ _WHY = {
     "nixin plan": "build it, diff the closure",
     "nixin apply": "commit and switch (sudo)",
     "nixin outdated": "what the lock update itself would change",
+    "nixin update --undo": "flake.lock back to the committed one",
 }
 
 
@@ -127,6 +128,13 @@ def header(doc: dict[str, Any], host: str) -> str:
     """The first line: what was compared with what."""
     lock, target = doc["lock"], doc["target"]
     have = _when(lock.get("short_rev"), lock.get("date"))
+    if doc["mode"] == "lock" and target.get("from") == "pending":
+        change = doc.get("lock_change") or {}
+        old = change.get("from") or {}
+        return (
+            f"{host}: {lock['input']} {_when(old.get('short_rev'), old.get('date'))} {ARROW} "
+            f"{have} in flake.lock, not committed (nixin update --undo takes it back)"
+        )
     if doc["mode"] == "lock":
         days = target.get("days_newer")
         newer = f", {days:g} days newer" if days else ""
@@ -141,7 +149,9 @@ def header(doc: dict[str, Any], host: str) -> str:
 
 
 def _verb(doc: dict[str, Any]) -> str:
-    return "would change" if doc["mode"] == "lock" else f"differ on {doc['target']['channel']}"
+    if doc["mode"] != "lock":
+        return f"differ on {doc['target']['channel']}"
+    return "change with the lock move" if doc["target"].get("from") == "pending" else "would change"
 
 
 def scope_line(doc: dict[str, Any], s: dict[str, Any]) -> str:

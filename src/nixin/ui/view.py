@@ -704,8 +704,11 @@ def plan_fields(doc: Doc) -> list[Field]:
 # --- status.pending -------------------------------------------------------------------------
 
 
-def pending_fields(p: dict[str, Any] | None) -> list[Field]:
-    """`status.pending`: what an apply would bring in."""
+def pending_fields(
+    p: dict[str, Any] | None, lock_change: dict[str, Any] | None = None, undo_key: str = ""
+) -> list[Field]:
+    """`status.pending`: what an apply would bring in (and `status.lock_change`, the lock
+    move that is not committed or not applied)."""
     if not p:
         return [Field("pending", "not loaded", "dim")]
     if p.get("error"):
@@ -728,6 +731,9 @@ def pending_fields(p: dict[str, Any] | None) -> list[Field]:
         out.append(Field("changed", str(f), "accent"))
     for f in p.get("untracked") or []:
         out.append(Field("untracked", f"{f} (not part of a build)", "warn"))
+    lc = lock_change_field(lock_change, undo_key)
+    if lc is not None:
+        out.append(lc)
     rm = p.get("running_matches")
     if rm is True:
         out.append(Field("running", "the authoritative HEAD's build", "ok"))
@@ -736,6 +742,26 @@ def pending_fields(p: dict[str, Any] | None) -> list[Field]:
     else:
         out.append(Field("running", "unknown (not built yet, or another host)", "dim"))
     return out
+
+
+def lock_change_field(change: dict[str, Any] | None, undo_key: str = "") -> Field | None:
+    """`lock_change` (status, outdated) as one line: `nixpkgs 0bb2eed → 1d06008 in flake.lock,
+    not committed (undo: z)`, or the committed-but-not-applied form; None when the lock is
+    where everything else is."""
+    if not change:
+        return None
+    fr, to = change.get("from") or {}, change.get("to") or {}
+    text = f"{short(fr.get('rev'))} → {short(to.get('rev'))}"
+    if change.get("committed"):
+        return Field("lock", f"{text} committed, not applied yet (Plan, Apply)", "accent")
+    tail = f" (undo: {undo_key})" if undo_key else ""
+    running = " — the running system has the old one" if change.get("running") else ""
+    return Field("lock", f"{text} in flake.lock, not committed{running}{tail}", "warn")
+
+
+def can_undo(change: dict[str, Any] | None) -> bool:
+    """`update --undo` applies: the lock moved and the move is not committed."""
+    return bool(change) and not change.get("committed")
 
 
 def has_pending(p: dict[str, Any] | None) -> bool:
@@ -1336,6 +1362,8 @@ def update_args(doc: Doc | None) -> list[str] | None:
     if not doc or not doc.get("ok") or doc.get("up_to_date"):
         return None
     target = doc.get("target") or {}
+    if target.get("from") == "pending":  # the lock already has it: undo or apply, not update
+        return None
     if doc.get("mode") == "lock" and target.get("from") != "lock" and target.get("rev"):
         return ["--to", str(target["rev"])]
     return []
@@ -1379,6 +1407,24 @@ def update_confirm_fields(dry: Doc, outdated: Doc | None = None) -> list[Field]:
         Field("writes", f"flake.lock in {dry.get('config')}; nothing is built or switched", "dim"),
         Field("then", "Pending: Plan builds it, Apply… switches (root)", "dim"),
         Field("takes", "nix fetches the new nixpkgs: about a minute the first time", "dim"),
+    ]
+    return out
+
+
+def undo_confirm_fields(dry: Doc) -> list[Field]:
+    """`update --undo --dry-run` as the confirmation: what runs, which nodes move back."""
+    name = str(dry.get("input") or "input")
+    out = [
+        Field("runs", str(dry.get("command")), "accent"),
+        Field(name, f"{_side(dry.get('from'))} → {_side(dry.get('to'))} (as committed)", "add"),
+    ]
+    for r in dry.get("restored") or []:
+        if r.get("node") != dry.get("node"):
+            out.append(Field("also", f"{r.get('node')} {r.get('from')} → {r.get('to')}", "dim"))
+    out += [
+        Field("writes", f"flake.lock in {dry.get('config')}; nothing is built or switched", "dim"),
+        Field("keeps", "pins and every other change in the workspace", "dim"),
+        Field("then", "Updates compares the lock with the branch again", "dim"),
     ]
     return out
 
@@ -1492,9 +1538,12 @@ def check_counts(checks: list[dict] | None) -> str:
 
 
 def update_fields(doc: Doc) -> list[Field]:
-    """What `update` did."""
+    """What `update` (or `update --undo`) did."""
     name = str(doc.get("input") or "input")
-    if doc.get("changed"):
+    if doc.get("undo"):
+        back = ", ".join(f"{r['node']} {r['from']} → {r['to']}" for r in doc.get("restored") or [])
+        out = [Field(name, f"back to {_side(doc.get('to'))} as committed ({back})", "add")]
+    elif doc.get("changed"):
         out = [Field(name, f"{_side(doc.get('from'))} → {_side(doc.get('to'))}", "add")]
     else:
         out = [Field(name, f"already at {_side(doc.get('to'))}; flake.lock unchanged", "dim")]
@@ -1506,7 +1555,8 @@ def update_fields(doc: Doc) -> list[Field]:
 def update_summary(doc: Doc) -> str:
     """One line for the session log: `nixpkgs 3ec6363 → 0bb2eed (flake.lock)`."""
     fr, to = doc.get("from") or {}, doc.get("to") or {}
-    return f"{doc.get('input')} {short(fr.get('rev'))} → {short(to.get('rev'))} (flake.lock)"
+    tail = "flake.lock back to HEAD's" if doc.get("undo") else "flake.lock"
+    return f"{doc.get('input')} {short(fr.get('rev'))} → {short(to.get('rev'))} ({tail})"
 
 
 # --- options: the Options page ----------------------------------------------------------------

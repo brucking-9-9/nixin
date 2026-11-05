@@ -106,6 +106,14 @@ def no_local_index(tmp_path, monkeypatch):
     optindex._LOADED.clear()
 
 
+@pytest.fixture(autouse=True)
+def _no_authoritative_tree(tmp_path, monkeypatch):
+    """This machine's /etc/nixos stays out of every test (status's pending block and
+    lock_change read the authoritative tree): the path points at nothing. Tests with a
+    Machine set their own."""
+    monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(tmp_path / "no-authoritative"))
+
+
 @pytest.fixture
 def transport():
     s = FakeSession()

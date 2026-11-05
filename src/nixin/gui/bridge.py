@@ -1038,6 +1038,7 @@ class PendingVM(VM, _Tracking):
         "closureHead": "",
         "syncing": False,
         "synced": False,
+        "canUndo": False,  # status.lock_change: an update that is not committed
         **TRACKING_STATE,
     }
     lists: ClassVar = {
@@ -1061,6 +1062,7 @@ class PendingVM(VM, _Tracking):
     closureHead = state(str, "closureHead", changed)
     syncing = state(bool, "syncing", changed)
     synced = state(bool, "synced", changed)
+    canUndo = state(bool, "canUndo", changed)
     buildHead = state(str, "buildHead", changed)
     stepNote = state(str, "stepNote", changed)
     stopEnabled = state(bool, "stopEnabled", changed)
@@ -1098,9 +1100,14 @@ class PendingVM(VM, _Tracking):
             self.rows("pending").reset([])
             self.set(statusNote=f"status: {n.code}: {n.message}", statusNoteStyle="error")
             return
-        p = doc.get("pending")
-        self.rows("pending").reset(models.fields(view.pending_fields(p)))
-        self.set(statusNote="", hasPending=view.has_pending(p))
+        p, change = doc.get("pending"), doc.get("lock_change")
+        self.rows("pending").reset(models.fields(view.pending_fields(p, change)))
+        self.set(statusNote="", hasPending=view.has_pending(p), canUndo=view.can_undo(change))
+
+    @Slot()
+    def startUndo(self) -> None:
+        """`update --undo` through the Packages page's dialog."""
+        self.gui.packages.startUndo()
 
     def render_session(self) -> None:
         g = self.gui
@@ -1389,10 +1396,12 @@ class PackagesVM(VM):
         "notes": "",
         "canUpdate": False,
         "kernelHold": "",  # the kernel's hold toggle label ("" when the kernel does not move)
+        "canUndo": False,  # the lock moved and the move is not committed (update --undo)
         "upSelected": -1,
         "updateOpen": False,
         "updatePhase": "",  # checking | confirm | running
         "updateTitle": "",
+        "updateConfirmLabel": "Update",  # or Undo: the dialog serves `update --undo` too
     }
     lists: ClassVar = {
         "packages": models.PACKAGE,
@@ -1420,10 +1429,12 @@ class PackagesVM(VM):
     notes = state(str, "notes", changed)
     canUpdate = state(bool, "canUpdate", changed)
     kernelHold = state(str, "kernelHold", changed)
+    canUndo = state(bool, "canUndo", changed)
     upSelected = state(int, "upSelected", changed)
     updateOpen = state(bool, "updateOpen", changed)
     updatePhase = state(str, "updatePhase", changed)
     updateTitle = state(str, "updateTitle", changed)
+    updateConfirmLabel = state(str, "updateConfirmLabel", changed)
     packages = model("packages")
     updates = model("updates")
     updateFields = model("updateFields")
@@ -1576,6 +1587,7 @@ class PackagesVM(VM):
                 summary="",
                 notes="",
                 canUpdate=True,  # the lock can move without a comparison
+                canUndo=False,
             )
             return
         self.update_rows = view.update_rows(doc)
@@ -1591,6 +1603,7 @@ class PackagesVM(VM):
             notes=" · ".join(view.outdated_notes(doc)),
             canUpdate=view.update_args(doc) is not None,
             kernelHold=hold[0] if hold else "",
+            canUndo=view.can_undo(doc.get("lock_change")),
         )
 
     # --- holds: pin / unpin through the writer's diff dialog
@@ -1664,14 +1677,51 @@ class PackagesVM(VM):
         )
         if started:
             self.rows("updateFields").reset([])
-            self.set(updateOpen=True, updatePhase="checking", updateTitle="update nixpkgs")
+            self.set(
+                updateOpen=True,
+                updatePhase="checking",
+                updateTitle="update nixpkgs",
+                updateConfirmLabel="Update",
+            )
+
+    @Slot()
+    def startUndo(self) -> None:
+        """`update --undo --dry-run` → the dialog (confirm) → `update --undo`: flake.lock back
+        to the committed one; the Updates tab then compares the lock with the branch again."""
+        self._update_args = ["--undo"]
+        started = self.gui.fetch(
+            "update",
+            "--undo",
+            "--dry-run",
+            done=lambda d: self._dry(d, None),
+            busy="checking",
+            label="update --undo --dry-run",
+            hint="reads flake.lock and git: instant",
+        )
+        if started:
+            self.rows("updateFields").reset([])
+            self.set(
+                updateOpen=True,
+                updatePhase="checking",
+                updateTitle="undo the lock move",
+                updateConfirmLabel="Undo",
+            )
 
     def _dry(self, dry: Doc, outdated: Doc | None) -> None:
         if not self["updateOpen"]:
             return
         if not dry.get("ok"):
             self.set(updateOpen=False, updatePhase="")
-            self.gui.notice.show(dry, "update")
+            self.gui.notice.show(
+                dry, "update --undo" if "--undo" in self._update_args else "update"
+            )
+            return
+        if dry.get("undo"):
+            self.rows("updateFields").reset(models.fields(view.undo_confirm_fields(dry)))
+            self.set(
+                updatePhase="confirm",
+                updateTitle=f"undo the {dry.get('input')} lock move (flake.lock back to the committed one)",
+            )
             return
         lock = outdated if outdated is not None and outdated.get("mode") == "lock" else None
         self.rows("updateFields").reset(models.fields(view.update_confirm_fields(dry, lock)))
@@ -1682,13 +1732,18 @@ class PackagesVM(VM):
         if self["updatePhase"] != "confirm":
             return
         args = self._update_args
+        undo = "--undo" in args
         if self.gui.fetch(
             "update",
             *args,
             done=self._updated,
             busy="updating",
-            label="update: " + shell(["nix", "flake", "update", "nixpkgs", *args]),
-            hint="nix fetches the new nixpkgs: about a minute the first time",
+            label="update --undo: git checkout HEAD -- flake.lock"
+            if undo
+            else "update: " + shell(["nix", "flake", "update", "nixpkgs", *args]),
+            hint="instant"
+            if undo
+            else "nix fetches the new nixpkgs: about a minute the first time",
         ):
             self.set(updatePhase="running")
 
@@ -1707,6 +1762,14 @@ class PackagesVM(VM):
             return
         if not doc.get("changed"):
             g.notice.say(view.update_fields(doc)[0].value, "info")
+            return
+        if doc.get("undo"):
+            self.outdated_docs.clear()
+            g.pins.doc = None  # a pin at the old revision is stale again
+            g.wrote(view.update_summary(doc))
+            g.notice.say(f"undone: {view.update_summary(doc)}", "ok")
+            if g["page"] == "pending":
+                g.pending.refresh()
             return
         had_holds = any(d.get("holds") for d in self.outdated_docs.values())
         self.outdated_docs.clear()

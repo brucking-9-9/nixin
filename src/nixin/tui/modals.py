@@ -228,17 +228,34 @@ class UpdateModal(Modal):
         self.dry = dry
         self.outdated = outdated
 
+    @property
+    def undo(self) -> bool:
+        return bool(self.dry.get("undo"))
+
     def compose(self) -> ComposeResult:
+        title = (
+            f"undo the {self.dry.get('input')} lock move (flake.lock back to the committed one)"
+            if self.undo
+            else f"update {self.dry.get('input')} in flake.lock"
+        )
         with Vertical(classes="dialog"):
-            yield Label(f"update {self.dry.get('input')} in flake.lock", classes="dialog-title")
+            yield Label(title, classes="dialog-title")
             with VerticalScroll():
                 yield Fields(id="update-fields", label_width=8)
             with Horizontal(classes="buttons"):
-                yield Button("Update (u)", id="update", variant="primary", compact=True)
+                yield Button(
+                    "Undo (u)" if self.undo else "Update (u)",
+                    id="update",
+                    variant="primary",
+                    compact=True,
+                )
                 yield Button("Cancel (esc)", id="cancel", compact=True)
 
     def on_mount(self) -> None:
-        fields = view.update_confirm_fields(self.dry, self.outdated)
+        if self.undo:
+            fields = view.undo_confirm_fields(self.dry)
+        else:
+            fields = view.update_confirm_fields(self.dry, self.outdated)
         self.query_one("#update-fields", Fields).show(fields)
         self.query_one("#update", Button).focus()
 
@@ -278,6 +295,7 @@ KEYS = [
     ("m", "updates: lock ↔ --published"),
     ("u", "update the nixpkgs lock (confirm first)"),
     ("h / k", "updates: hold the row (pin) or release it (unpin) / hold the kernel"),
+    ("z", "updates, pending: undo the lock move (flake.lock back to the committed one)"),
     ("n", "pins: what is held back, at which nixpkgs"),
     ("c / u", "pins: check them against the lock / unpin the row"),
     ("r", "refresh (re-evaluate)"),

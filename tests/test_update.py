@@ -280,6 +280,101 @@ def test_lock_moves_allows_the_inputs_private_sub_inputs():
     assert lock_moves(a, after, "nixin") == []
 
 
+# --- --undo: flake.lock back to HEAD's ------------------------------------------------------------
+
+
+def git(path, *args: str) -> str:
+    p = subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True, check=True)
+    return p.stdout.strip()
+
+
+@pytest.fixture
+def gitrepo(repo):
+    """The repo fixture as a git checkout: flake.nix and flake.lock committed."""
+    if shutil.which("git") is None:
+        pytest.skip("needs git")
+    git(repo.path, "init", "-q", "-b", "main")
+    git(repo.path, "config", "user.name", "T")
+    git(repo.path, "config", "user.email", "t@example.org")
+    git(repo.path, "add", "-A")
+    git(repo.path, "commit", "-q", "-m", "lock")
+    return repo
+
+
+def test_undo_with_a_clean_lock_is_nothing_to_undo(gitrepo, capsys, tmp_path, monkeypatch):
+    rc, doc = run(capsys, gitrepo, "--undo")
+    assert rc == 1 and doc["error"]["code"] == "nothing-to-undo"
+    assert "as committed (nixpkgs 3ec6363); nothing to undo" in doc["error"]["message"]
+    # the move is a commit already: the message says to pin at the applied revision or revert
+    auth = tmp_path / "etc-nixos"
+    subprocess.run(["git", "clone", "-q", str(gitrepo.path), str(auth)], check=True)
+    monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(auth))
+    assert run(capsys, gitrepo)[0] == 0  # the fake nix moves the lock
+    git(gitrepo.path, "commit", "-qam", "bump")
+    rc, doc = run(capsys, gitrepo, "--undo")
+    assert rc == 1 and doc["error"]["code"] == "nothing-to-undo"
+    msg = doc["error"]["message"]
+    assert "nixpkgs 3ec6363 → 0bb2eed is already a commit" in msg
+    assert f"nixin pin NAME --rev {LOCK_REV}" in msg and "git revert" in msg
+    assert locked_rev(gitrepo) == TARGET_REV
+
+
+def test_undo_puts_the_lock_back_as_committed(gitrepo, capsys):
+    committed = (gitrepo.path / "flake.lock").read_text()
+    assert run(capsys, gitrepo)[0] == 0 and locked_rev(gitrepo) == TARGET_REV
+    moved = (gitrepo.path / "flake.lock").read_text()
+    git(gitrepo.path, "add", "flake.lock")  # staged or not, HEAD's wins
+    # dry run: says what moves back, runs nothing
+    rc, doc = run(capsys, gitrepo, "--undo", "--dry-run")
+    assert rc == 0 and doc["undo"] is True and doc["dry_run"] is True and doc["changed"] is None
+    assert doc["command"] == f"git -C {gitrepo.path} checkout HEAD -- flake.lock"
+    assert doc["commands"] == [doc["command"]] and doc["to_ref"] == "HEAD:flake.lock"
+    assert doc["from"]["rev"] == TARGET_REV and doc["to"]["rev"] == LOCK_REV
+    assert doc["restored"] == [{"node": "nixpkgs_2", "from": "0bb2eed", "to": "3ec6363"}]
+    assert (gitrepo.path / "flake.lock").read_text() == moved
+    # the undo itself
+    rc, doc = run(capsys, gitrepo, "--undo")
+    assert rc == 0 and doc["ok"] and doc["changed"] is True and doc["undo"] is True
+    assert doc["from"]["rev"] == TARGET_REV and doc["to"]["rev"] == LOCK_REV
+    assert doc["restored"] == [{"node": "nixpkgs_2", "from": "0bb2eed", "to": "3ec6363"}]
+    assert doc["commands"] == [f"nixin outdated --config {gitrepo.path} --host 19BK"]
+    assert "git" in doc["timings"]
+    assert (gitrepo.path / "flake.lock").read_text() == committed  # byte for byte
+    assert git(gitrepo.path, "status", "--porcelain") == ""
+    assert gitrepo.nix.calls == [["flake", "update", "nixpkgs", "--flake", str(gitrepo.path)]]
+    # every node that moved goes back, not only nixpkgs
+    gitrepo.nix.also = {"home-manager": OTHER_REV}
+    assert run(capsys, gitrepo, "--allow-others")[0] == 0
+    rc, doc = run(capsys, gitrepo, "--undo")
+    assert [r["node"] for r in doc["restored"]] == ["home-manager", "nixpkgs_2"]
+    assert (gitrepo.path / "flake.lock").read_text() == committed
+
+
+def test_undo_human_output_and_usage(gitrepo, capsys):
+    assert run(capsys, gitrepo)[0] == 0
+    rc, text = run(capsys, gitrepo, "--undo", "--dry-run", json_=False)
+    assert text.splitlines() == [
+        "nixpkgs: 0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (flake.lock back to HEAD's)",
+        f"would run: git -C {gitrepo.path} checkout HEAD -- flake.lock",
+        "moves back: nixpkgs_2 0bb2eed → 3ec6363",
+    ]
+    rc, text = run(capsys, gitrepo, "--undo", json_=False)
+    assert rc == 0 and text.splitlines()[:3] == [
+        "nixpkgs: 0bb2eed (2026-11-01) → 3ec6363 (2026-10-23) (flake.lock back to HEAD's)",
+        f"ran: git -C {gitrepo.path} checkout HEAD -- flake.lock",
+        "moved back: nixpkgs_2 0bb2eed → 3ec6363",
+    ]
+    for extra in (["--to", TARGET_REV], ["--input", "home-manager"], ["--hold", "kernel"]):
+        rc, doc = run(capsys, gitrepo, "--undo", *extra)
+        assert rc == 2 and doc["error"]["code"] == "usage"
+
+
+def test_undo_needs_a_tracked_lock(repo, capsys):
+    rc, doc = run(capsys, repo, "--undo")  # no git checkout at all
+    assert rc == 1 and doc["error"]["code"] == "not-found"
+    assert "not tracked by git" in doc["error"]["message"]
+
+
 # --- live: a throwaway clone of $NIXIN_CONFIG, never the config itself --------------------
 
 
