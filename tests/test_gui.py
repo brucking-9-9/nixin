@@ -1035,6 +1035,106 @@ def test_options_list_element_sets_the_list(ui):
     assert ["where", "programs.git.includes", "--kind", "option"] in u.fake.verbs()
 
 
+# --- the two-pane pages at the window's minimum width ------------------------------------------
+
+
+def rect(u: SimpleNamespace, name: str) -> tuple[float, float, float, float]:
+    """(left, top, right, bottom) of a visible item in scene coordinates."""
+    o = item(u, name)
+    assert o.property("visible"), f"{name} is not visible"
+    p = o.mapToScene(QPointF(0, 0))
+    return (p.x(), p.y(), p.x() + o.property("width"), p.y() + o.property("height"))
+
+
+def disjoint(a, b) -> bool:
+    return a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1]
+
+
+def inside(a, b, slack: float = 1.0) -> bool:
+    return (
+        a[0] >= b[0] - slack
+        and a[2] <= b[2] + slack
+        and a[1] >= b[1] - slack
+        and a[3] <= b[3] + slack
+    )
+
+
+PAGES = (  # page, routes, how to open it and select a row, the list, the drawer's back button
+    ("packagesPage", "pkList", "pkBack"),
+    ("searchPage", "results", "searchBack"),
+    ("optionsPage", "opResults", "opBack"),
+    ("browsePage", "browseApps", "browseBack"),
+)
+
+
+def _select_on(u: SimpleNamespace, page: str) -> None:
+    if page == "packagesPage":
+        open_packages(u)
+        u.gui.packages.select(0)
+    elif page == "searchPage":
+        u.gui.go("search")
+        settle(u)
+        open_details(u)
+    elif page == "optionsPage":
+        open_options(u)
+        keys(u, "openssh", Qt.Key.Key_Return)
+        pick_option(u, "services.openssh.enable")
+    else:
+        keys(u, Qt.Key.Key_B, mods=Qt.KeyboardModifier.ControlModifier)
+        u.gui.browse.select(0)
+    settle(u)
+
+
+@pytest.mark.parametrize("size", [(900, 720), (1014, 720), (1200, 800)], ids=str)
+@pytest.mark.parametrize("page, list_name, back", PAGES, ids=[p[0] for p in PAGES])
+def test_two_pane_pages_fit_the_window(ui, size, page, list_name, back):
+    """Every page with a list and a pane: side by side without overlap when the page is wide
+    enough, else the list across the whole width and the pane as a drawer (900 is the
+    window's minimum; 1014 is just above the breakpoint for the two-column pages)."""
+    routes = {
+        "packagesPage": PACKAGES,
+        "searchPage": COWSAY,
+        "optionsPage": OPTIONS,
+        "browsePage": browse_routes(),
+    }[page]
+    u = ui(routes, host="19BK" if page == "packagesPage" else "mbp13")
+    u.win.window.resize(*size)
+    settle(u)
+    _select_on(u, page)
+    pane = "optionPane" if page == "optionsPage" else "details"
+    page_rect, list_rect, pane_rect = rect(u, page), rect(u, list_name), rect(u, pane)
+    stacked = prop(u, page, "stacked")
+    assert inside(pane_rect, page_rect), (pane_rect, page_rect)
+    if not stacked:
+        assert not shown(u, back)
+        assert list_rect[2] <= pane_rect[0], (list_rect, pane_rect)
+        # the pane's controls stay inside it (no overflow past the window)
+        first = "opSet" if page == "optionsPage" else "addButton"
+        assert inside(rect(u, first), pane_rect)
+        if page == "packagesPage":
+            assert disjoint(rect(u, "pkRefresh"), pane_rect)
+            click(u, "pk-tab-updates")
+            assert disjoint(rect(u, "updateButton"), pane_rect)
+            assert disjoint(rect(u, "upList"), pane_rect)
+            assert inside(rect(u, "homeBox"), pane_rect) if shown(u, "homeBox") else True
+        return
+    # stacked: the list spans the page, the pane is a drawer over it with a way back
+    assert list_rect[2] >= page_rect[2] - 2 * 14 - 2, (list_rect, page_rect)
+    assert shown(u, back) and inside(pane_rect, page_rect)
+    assert pane_rect[2] - pane_rect[0] <= 600
+    click(u, back)
+    assert not shown(u, back) and not prop(u, pane, "visible")
+    if page == "packagesPage":
+        click(u, "pkRefresh")  # nothing covers it now
+        click(u, "pk-tab-updates")
+        assert shown(u, "updateButton") and prop(u, "updateButton", "enabled")
+        # the next selection opens the drawer again
+        click(u, "pk-tab-installed")
+        u.gui.packages.select(1)
+        settle(u)
+        assert shown(u, back) and prop(u, pane, "visible")
+
+
 def test_every_page_and_dialog_grabs(ui, tmp_path):
     u = ui()
     open_details(u)
@@ -1050,12 +1150,19 @@ def test_every_page_and_dialog_grabs(ui, tmp_path):
         "browse",
         "pins",
         "pin",
+        "packages-900",
     ):
         if step == "pins":
             u.fake.routes |= {"pins": ["pins_19BK_check"]}
             u.gui.go("pins")
         elif step == "pin":
             u.gui.pins.startPin()
+        elif step == "packages-900":
+            u.gui.pins.cancelPin()
+            u.win.window.resize(900, 720)
+            u.gui.go("packages")
+            settle(u)
+            u.gui.packages.select(0)
         elif step == "browse":
             u.gui.packages.cancelUpdate()
             u.fake.routes |= {k: [v] for k, v in browse_routes().items() if k.startswith("browse")}

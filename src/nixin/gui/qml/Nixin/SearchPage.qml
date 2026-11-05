@@ -13,6 +13,8 @@ Item {
     required property var backend
     readonly property var vm: backend.search
 
+    objectName: "searchPage"
+
     function focusQuery() {
         query.forceActiveFocus();
         query.selectAll();
@@ -34,6 +36,26 @@ Item {
         onTriggered: page.vm.search(query.text)
     }
 
+    function focusList() {
+        results.forceActiveFocus();
+    }
+
+    // the two layouts (see above): one pane, reparented between the slot and the drawer
+    readonly property bool stacked: width < Theme.stackBelow + 0
+    property bool drawerOpen: false
+    property int seenShows: -1
+
+    Connections {
+        target: page.backend.details
+        function onChanged() {
+            const d = page.backend.details;
+            if (d.present && d.owner === "search" && d.shows !== page.seenShows) {
+                page.seenShows = d.shows;
+                page.drawerOpen = true;
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: Theme.pad
@@ -41,8 +63,9 @@ Item {
 
         ColumnLayout {
             Layout.fillHeight: true
-            Layout.fillWidth: false
-            Layout.preferredWidth: Math.max(330, page.width * 0.46)
+            Layout.fillWidth: page.stacked
+            Layout.preferredWidth: page.stacked ? -1
+                : Math.max(330, Math.min(page.width * 0.46, page.width - 2 * Theme.pad - 29 - 400))
             spacing: Theme.gap
 
             RowLayout {
@@ -146,13 +169,36 @@ Item {
         Rectangle {
             Layout.fillHeight: true
             implicitWidth: 1
+            visible: !page.stacked
             color: Theme.line
         }
 
-        DetailsPane {
+        Item {
+            id: paneSlot
+            visible: !page.stacked
             Layout.fillWidth: true
             Layout.fillHeight: true
-            backend: page.backend
+            Layout.minimumWidth: 0
         }
+    }
+
+    PaneDrawer {
+        id: drawer
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.margins: Theme.pad
+        open: page.stacked && page.drawerOpen
+        backName: "searchBack"
+        onCloseRequested: {
+            page.drawerOpen = false;
+            page.focusList();
+        }
+    }
+
+    DetailsPane {
+        parent: page.stacked ? drawer.slot : paneSlot
+        anchors.fill: parent
+        backend: page.backend
     }
 }

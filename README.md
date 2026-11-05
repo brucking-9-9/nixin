@@ -301,8 +301,11 @@ running the `nix run` line; Shell in terminal, Copy command, and a program picke
 there are several. **Browse** (`Ctrl+B`) lists the categories (installed and
 search.nixos.org counts), a category's apps (● installed, ★ well-known, then the most
 popular; icons only for installed apps, nothing is fetched for the list) and the selected
-app in the details pane. The details pane shows a package's AppStream data when it has
-some: the icon, name, summary, categories as chips, and up to three screenshots, fetched
+app in the details pane. Each of these pages lays its list and its pane side by side; in a
+window narrower than about 1010 px (900 is the minimum; niri tiles nixin at 900x720) the
+list takes the whole width and the pane opens as a drawer over its right part when a row
+is selected, with a back button (Escape too). The details pane shows a package's AppStream
+data when it has some: the icon, name, summary, categories as chips, and up to three screenshots, fetched
 when the details open (search.nixos.org's small WebP copies when it has them), cached
 under `images/` in the nixin cache, at most 4 MiB each. Error documents appear as a notice
 over the page (`code` + message, the candidates to pick for an ambiguous write, commands

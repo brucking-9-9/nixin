@@ -29,6 +29,22 @@ Item {
         }
     }
 
+    // the two layouts (see above): one pane, reparented between the slot and the drawer
+    readonly property bool stacked: width < Theme.stackBelow + 160
+    property bool drawerOpen: false
+    property int seenShows: -1
+
+    Connections {
+        target: page.backend.details
+        function onChanged() {
+            const d = page.backend.details;
+            if (d.present && d.owner === "browse" && d.shows !== page.seenShows) {
+                page.seenShows = d.shows;
+                page.drawerOpen = true;
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: Theme.pad
@@ -119,8 +135,10 @@ Item {
 
         ColumnLayout {
             Layout.fillHeight: true
-            Layout.fillWidth: false
-            Layout.preferredWidth: Math.max(330, page.width * 0.36)
+            Layout.fillWidth: page.stacked
+            // the categories take 190; the pane keeps 320, the apps 300
+            Layout.preferredWidth: page.stacked ? -1
+                : Math.max(300, Math.min(page.width * 0.36, page.width - 2 * Theme.pad - 190 - 58 - 320))
             spacing: Theme.gap
 
             SectionHead {
@@ -182,15 +200,38 @@ Item {
         Rectangle {
             Layout.fillHeight: true
             implicitWidth: 1
+            visible: !page.stacked
             color: Theme.line
         }
 
-        DetailsPane {
+        Item {
+            id: paneSlot
+            visible: !page.stacked
             Layout.fillWidth: true
             Layout.fillHeight: true
-            backend: page.backend
-            owner: "browse"
-            hint: "Select an application to see its icon, screenshots and categories, what it is, and whether " + page.backend.host + " has it."
+            Layout.minimumWidth: 0
         }
+    }
+
+    PaneDrawer {
+        id: drawer
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.margins: Theme.pad
+        open: page.stacked && page.drawerOpen
+        backName: "browseBack"
+        onCloseRequested: {
+            page.drawerOpen = false;
+            page.focusList();
+        }
+    }
+
+    DetailsPane {
+        parent: page.stacked ? drawer.slot : paneSlot
+        anchors.fill: parent
+        backend: page.backend
+        owner: "browse"
+        hint: "Select an application to see its icon, screenshots and categories, what it is, and whether " + page.backend.host + " has it."
     }
 }

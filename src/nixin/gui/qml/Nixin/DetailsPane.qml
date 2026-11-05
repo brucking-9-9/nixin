@@ -69,7 +69,9 @@ Item {
             }
         }
 
-        RowLayout {
+        // a Flow, not a RowLayout: on a narrow pane the buttons wrap under each other
+        // instead of forcing the pane wider than its column
+        Flow {
             Layout.fillWidth: true
             spacing: Theme.gap
             Button {
@@ -111,10 +113,11 @@ Item {
                 enabled: pane.backend.busy === ""
                 onClicked: pane.d.unset()
             }
-            Item { Layout.fillWidth: true }
             Text {
                 visible: pane.d.canHome
                 text: "for"
+                height: Theme.controlH
+                verticalAlignment: Text.AlignVCenter
                 color: Theme.dim2
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize

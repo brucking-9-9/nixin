@@ -65,7 +65,7 @@ Item {
             }
         }
 
-        RowLayout {
+        Flow {
             Layout.fillWidth: true
             spacing: Theme.gap
             Button {
@@ -83,10 +83,11 @@ Item {
                 ToolTip.text: "a template: unset takes the full name"
                 onClicked: pane.o.unset()
             }
-            Item { Layout.fillWidth: true }
             Text {
                 visible: pane.o.badge === "hm"
                 text: "for"
+                height: Theme.controlH
+                verticalAlignment: Text.AlignVCenter
                 color: Theme.dim2
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize
@@ -112,6 +113,8 @@ Item {
                 objectName: "opNoUser"
                 visible: pane.o.badge === "hm" && pane.o.homeChoices.length === 0 && !pane.o.whereLoading
                 text: "no Home Manager user"
+                height: Theme.controlH
+                verticalAlignment: Text.AlignVCenter
                 color: Theme.dim
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize

@@ -16,6 +16,7 @@ PinRow 1.0 PinRow.qml
 OptionsPage 1.0 OptionsPage.qml
 OptionPane 1.0 OptionPane.qml
 DetailsPane 1.0 DetailsPane.qml
+PaneDrawer 1.0 PaneDrawer.qml
 PendingPage 1.0 PendingPage.qml
 StatusPage 1.0 StatusPage.qml
 DiffDialog 1.0 DiffDialog.qml

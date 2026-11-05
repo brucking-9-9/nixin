@@ -323,6 +323,7 @@ class DetailsVM(VM):
 
     changed = Signal()
     defaults: ClassVar = {
+        "shows": 0,  # bumped by every show(): a page opens its drawer on a new one
         "present": False,
         "owner": "",  # the page whose row this is: search | packages | browse (each pane its own)
         "kind": "",
@@ -365,6 +366,7 @@ class DetailsVM(VM):
         "where": models.FIELD,
         "shots": models.SHOT,
     }
+    shows = state(int, "shows", changed)
     present = state(bool, "present", changed)
     owner = state(str, "owner", changed)
     kind = state(str, "kind", changed)
@@ -419,6 +421,7 @@ class DetailsVM(VM):
             user = (g.hm_users() or [""])[0]
         self.set(
             present=True,
+            shows=self["shows"] + 1,
             owner=owner,
             kind=hit.kind,
             badge=view.KIND_BADGE.get(hit.kind, hit.kind),
@@ -1956,6 +1959,7 @@ class OptionsVM(VM):
         "message": "type to search NixOS options",
         "loading": False,
         "selected": -1,
+        "shows": 0,
         "present": False,
         "badge": "",
         "name": "",
@@ -1984,6 +1988,7 @@ class OptionsVM(VM):
     message = state(str, "message", changed)
     loading = state(bool, "loading", changed)
     selected = state(int, "selected", changed)
+    shows = state(int, "shows", changed)
     present = state(bool, "present", changed)
     badge = state(str, "badge", changed)
     name = state(str, "name", changed)
@@ -2085,6 +2090,7 @@ class OptionsVM(VM):
         self.set(
             selected=i,
             present=True,
+            shows=self["shows"] + 1,
             badge=view.KIND_BADGE.get(hit.kind, hit.kind),
             name=hit.name,
             template=template,

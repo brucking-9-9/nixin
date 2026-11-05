@@ -33,6 +33,8 @@ QtObject {
     readonly property int radius: 4
     readonly property int controlH: 30
     readonly property int navW: 172
+    readonly property int stackBelow: 840  // a page narrower than this stacks: list + drawer
+    readonly property int drawerW: 600     // the drawer's width at most
     readonly property int topH: 40
     readonly property int labelW: 96       // field labels
     readonly property int fadeMs: 140

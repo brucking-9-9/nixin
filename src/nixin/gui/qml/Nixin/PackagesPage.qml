@@ -9,6 +9,9 @@ import QtQuick.Layouts
 // update would change (the lock's next commit, or --published against search.nixos.org),
 // the kernel line (with its hold), the summary, and "Update nixpkgs lock" (update → Pending);
 // a row's hold pins it. The selected row opens on the right, for its user, with Remove.
+// Two layouts: side by side (the list at the left, the pane at the right) when the page is
+// at least Theme.stackBelow wide; below that the list takes the whole width and the pane is
+// a PaneDrawer over its right part, opened by a selection, closed with its back button.
 Item {
     id: page
 
@@ -19,6 +22,22 @@ Item {
 
     function focusList() {
         (page.vm.tab === "installed" ? installed : updates).forceActiveFocus();
+    }
+
+    // the two layouts (see above): one pane, reparented between the slot and the drawer
+    readonly property bool stacked: width < Theme.stackBelow + 0
+    property bool drawerOpen: false
+    property int seenShows: -1
+
+    Connections {
+        target: page.backend.details
+        function onChanged() {
+            const d = page.backend.details;
+            if (d.present && d.owner === "packages" && d.shows !== page.seenShows) {
+                page.seenShows = d.shows;
+                page.drawerOpen = true;
+            }
+        }
     }
 
     // a row selected from elsewhere (a script, a test) is the cursor, scrolled into view
@@ -39,8 +58,10 @@ Item {
 
         ColumnLayout {
             Layout.fillHeight: true
-            Layout.fillWidth: false
-            Layout.preferredWidth: Math.max(360, page.width * 0.5)
+            Layout.fillWidth: page.stacked
+            // half the page, but the pane keeps 400 and the list 360
+            Layout.preferredWidth: page.stacked ? -1
+                : Math.max(360, Math.min(page.width * 0.5, page.width - 2 * Theme.pad - 29 - 400))
             spacing: Theme.gap
 
             RowLayout {
@@ -174,6 +195,9 @@ Item {
                             id: mode
                             objectName: "upMode"
                             implicitWidth: 250
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 140
+                            Layout.maximumWidth: 250
                             model: ["lock", "published"]
                             currentIndex: Math.max(0, model.indexOf(page.vm.mode))
                             displayText: currentText === "lock" ? "vs the lock's next commit" : "vs search.nixos.org"
@@ -190,15 +214,6 @@ Item {
                             }
                         }
                         Item { Layout.fillWidth: true }
-                        DangerButton {
-                            objectName: "undoButton"
-                            text: "Undo lock move…"
-                            visible: page.vm.canUndo
-                            enabled: page.backend.busy === "" && !page.vm.updatesLoading
-                            ToolTip.visible: hovered
-                            ToolTip.text: "update --undo: flake.lock back to the committed one (asks first); pins and other changes stay"
-                            onClicked: page.vm.startUndo()
-                        }
                         Button {
                             objectName: "updateButton"
                             text: "Update nixpkgs lock…"
@@ -207,6 +222,30 @@ Item {
                             ToolTip.visible: hovered
                             ToolTip.text: "nix flake update nixpkgs in the workspace (asks first); then Pending: Plan, Apply"
                             onClicked: page.vm.startUpdate()
+                        }
+                    }
+
+                    // an update that is not committed yet: what the rows describe, and the way back
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: page.vm.canUndo
+                        spacing: Theme.gap
+                        Text {
+                            Layout.fillWidth: true
+                            text: "the lock moved, not committed: Pending's Plan and Apply take it"
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: Theme.dim2
+                            font.family: Theme.font
+                            font.pixelSize: Theme.small
+                        }
+                        DangerButton {
+                            objectName: "undoButton"
+                            text: "Undo lock move…"
+                            enabled: page.backend.busy === "" && !page.vm.updatesLoading
+                            ToolTip.visible: hovered
+                            ToolTip.text: "update --undo: flake.lock back to the committed one (asks first); pins and other changes stay"
+                            onClicked: page.vm.startUndo()
                         }
                     }
 
@@ -323,15 +362,38 @@ Item {
         Rectangle {
             Layout.fillHeight: true
             implicitWidth: 1
+            visible: !page.stacked
             color: Theme.line
         }
 
-        DetailsPane {
+        Item {
+            id: paneSlot
+            visible: !page.stacked
             Layout.fillWidth: true
             Layout.fillHeight: true
-            backend: page.backend
-            owner: "packages"
-            hint: "Select a package to see what it is, its versions, and where it is listed on " + page.backend.host + "; Remove takes it out."
+            Layout.minimumWidth: 0
         }
+    }
+
+    PaneDrawer {
+        id: drawer
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.margins: Theme.pad
+        open: page.stacked && page.drawerOpen
+        backName: "pkBack"
+        onCloseRequested: {
+            page.drawerOpen = false;
+            page.focusList();
+        }
+    }
+
+    DetailsPane {
+        parent: page.stacked ? drawer.slot : paneSlot
+        anchors.fill: parent
+        backend: page.backend
+        owner: "packages"
+        hint: "Select a package to see what it is, its versions, and where it is listed on " + page.backend.host + "; Remove takes it out."
     }
 }
