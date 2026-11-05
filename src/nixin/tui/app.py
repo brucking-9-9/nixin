@@ -33,7 +33,7 @@ from .widgets import LogView, Spinner
 
 Doc = dict[str, Any]
 
-WRITE_VERBS = ("add", "rm", "set", "unset")
+WRITE_VERBS = ("add", "rm", "set", "unset", "pin", "unpin")
 NARROW = 80  # cells: HORIZONTAL_BREAKPOINTS' -narrow
 # below NARROW the footer has no room for a name per page: the same keys, one group
 PAGE_KEYS = Binding.Group("go")
@@ -74,6 +74,7 @@ class NixinApp(App[str]):
         self.list_doc: Doc | None = None
         self.list_stale = True
         self.outdated_docs: dict[str, Doc] = {}  # mode (lock | published) → document
+        self.pins_doc: Doc | None = None  # the Pins tab's last ok `pins` document
         self.options_last: tuple[str, str, Doc] | None = None  # the Options page's query, kind, doc
         self.register_theme(THEME)
         self.theme = THEME.name
@@ -236,6 +237,9 @@ class NixinApp(App[str]):
             self.status_stale = True
             self.list_stale = True
             self.plan_doc = None
+            if verb in ("pin", "unpin"):
+                self.outdated_docs.clear()
+                self.pins_doc = None
             if view.writer_eval_failed(doc):
                 self.push_screen(DiffModal(doc, f"{verb}: written, but the eval check FAILED"))
             else:
@@ -285,6 +289,7 @@ class NixinApp(App[str]):
         if doc.get("ok") and doc.get("changed"):
             self.writes.append(view.update_summary(doc))
             self.outdated_docs.clear()
+            self.pins_doc = None  # stale pins are no longer stale
             self.list_stale = True
             self.status_stale = True
             self.plan_doc = None
@@ -375,7 +380,7 @@ class NixinApp(App[str]):
     def get_system_commands(self, screen: Screen) -> Iterable[SystemCommand]:
         yield SystemCommand("Search", "find packages and options", self.action_search)
         yield SystemCommand(
-            "Packages", "installed (list), updates (outdated)", self.action_packages
+            "Packages", "installed (list), updates (outdated), pins", self.action_packages
         )
         yield SystemCommand(
             "Options", "NixOS and Home Manager options: browse, set, unset", self.action_options

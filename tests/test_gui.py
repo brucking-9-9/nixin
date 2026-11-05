@@ -29,7 +29,7 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
-from tui_fake import BROWSE, COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load
+from tui_fake import BROWSE, COWSAY, HM_OPTIONS, HOLDS, OPTIONS, PACKAGES, FakeBackend, load
 
 from nixin.cli import main
 from nixin.gui import app as gui_app
@@ -628,6 +628,74 @@ def test_packages_updates_then_update_lock_to_pending(ui):
     assert sorted(verbs[-2:]) == [["list"], ["outdated"]]
 
 
+def test_packages_hold_kernel_and_row_then_pins_page(ui):
+    u = ui(HOLDS, host="19BK")
+    open_packages(u)
+    click(u, "pk-tab-updates")
+    vm = u.gui.packages
+    assert prop(u, "upList", "count") == 14
+    assert prop(u, "holdKernel", "text") == "hold kernel at 7.2.12"
+    click(u, "holdKernel")  # pin kernel --dry-run → the diff dialog → write
+    assert shown(u, "diffDialog") and u.gui.writer["phase"] == "preview"
+    assert u.gui.writer["title"] == "pin kernel"
+    click(u, "diffWrite")
+    assert not shown(u, "diffDialog")
+    assert u.gui.writes[0].startswith("pin kernel at 7.2.12 (")
+    settle(u)
+    assert prop(u, "upList", "count") == 15  # outdated again: two held rows
+    assert prop(u, "upKernel", "text") == "kernel 7.2.12 (held by pin kernel; 7.2.14 available)"
+    assert prop(u, "holdKernel", "text") == "unhold kernel (pin kernel)"
+    rows = vm.rows("updates").rows
+    ff = next(r for r in rows if r["name"] == "firefox")
+    assert ff["held"] == "firefox" and ff["note"] == "(held by pin firefox; stale)"
+    assert ff["style"] == "warn"
+    # the row's hold button: visible on a held row; `hold` on a plain row previews `pin`
+    assert shown(u, "hold-firefox")
+    fuse = next(i for i, r in enumerate(rows) if r["name"] == "fuse")
+    vm.hold(fuse)
+    settle(u)
+    assert shown(u, "diffDialog") and u.gui.writer["title"] == "pin fuse"
+    click(u, "diffCancel")
+    # the update dialog lists the holds
+    click(u, "updateButton")
+    assert shown(u, "updateDialog") and vm["updatePhase"] == "confirm"
+    holds = [r["value"] for r in vm.rows("updateFields").rows if r["label"] == "hold"]
+    assert holds[1].startswith("kernel: linux_7_2 stays at 7.2.12 (the target has 7.2.14)")
+    click(u, "updateCancel")
+    # the Pins page
+    keys(u, Qt.Key.Key_6, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "pins" and shown(u, "pinsPage")
+    pins = u.gui.pins
+    assert prop(u, "pinsList", "count") == 2
+    assert prop(u, "pinsSummary", "text") == "19BK: 2 pins, 1 stale (flake.lock: nixpkgs 3ec6363)"
+    kernel = next(r for r in pins.rows("pins").rows if r["name"] == "kernel")
+    assert kernel["stale"] and kernel["note"].startswith("(stale: flake.lock is at 3ec6363")
+    assert not shown(u, "pinsChecks")
+    click(u, "pinsCheck")
+    assert pins["checked"] and shown(u, "pinsChecks")
+    checks = pins.rows("checks").rows
+    assert checks[0]["label"] == "warn" and "glibc 2.42" in checks[0]["value"]
+    assert not prop(u, "pinsUnpin", "enabled")
+    click(u, "pin-firefox")  # select the first row
+    assert pins["selected"] == 0 and prop(u, "pinsUnpin", "enabled")
+    assert prop(u, "pinsDetail", "text").startswith("mode attr · firefox at 158.0")
+    pins.unpin(1)  # the kernel
+    settle(u)
+    assert shown(u, "diffDialog") and u.gui.writer["title"] == "unpin kernel"
+    click(u, "diffWrite")
+    settle(u)
+    assert u.gui.writes[1].startswith("unpin kernel (")
+    verbs = u.fake.verbs()
+    assert verbs[:4] == [["list"], ["outdated"], ["pin", "kernel", "--dry-run"], ["pin", "kernel"]]
+    assert sorted(verbs[4:6]) == [["list"], ["outdated"]]  # a write: both again
+    assert verbs[-4:] == [
+        ["pins", "--check"],
+        ["unpin", "kernel", "--dry-run"],
+        ["unpin", "kernel"],
+        ["pins"],
+    ]
+
+
 def test_packages_nothing_to_update_and_errors(ui):
     routes = {
         **PACKAGES,
@@ -835,8 +903,21 @@ def test_every_page_and_dialog_grabs(ui, tmp_path):
     u = ui()
     open_details(u)
     sizes = []
-    for step in ("details", "diff", "pending", "status", "packages", "updates", "update", "browse"):
-        if step == "browse":
+    for step in (
+        "details",
+        "diff",
+        "pending",
+        "status",
+        "packages",
+        "updates",
+        "update",
+        "browse",
+        "pins",
+    ):
+        if step == "pins":
+            u.fake.routes |= {"pins": ["pins_19BK_check"]}
+            u.gui.go("pins")
+        elif step == "browse":
             u.gui.packages.cancelUpdate()
             u.fake.routes |= {k: [v] for k, v in browse_routes().items() if k.startswith("browse")}
             u.gui.go("browse")

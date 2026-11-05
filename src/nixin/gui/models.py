@@ -32,7 +32,8 @@ SPAN = ("text", "style")
 HIT = ("kind", "badge", "name", "target", "detail", "description", "isOption")
 CLOSURE = ("sign", "name", "version", "size", "style")
 PACKAGE = ("name", "drv", "version", "tag", "where", "isHome")
-UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome")
+UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome", "held")
+PIN = ("name", "attrs", "version", "heldAt", "mode", "stale", "why", "note", "drop")
 LINE = ("text",)
 APP = ("name", "target", "version", "summary", "icon", "installed", "curated", "marks")
 CATEGORY = ("key", "label", "count", "installed")
@@ -178,6 +179,24 @@ def updates(xs: Iterable[view.UpdateRow]) -> list[Row]:
             "note": r.note,
             "style": r.style,
             "isHome": r.user is not None,
+            "held": r.held,
+        }
+        for r in xs
+    ]
+
+
+def pins(xs: Iterable[view.PinRow]) -> list[Row]:
+    return [
+        {
+            "name": r.name,
+            "attrs": r.attrs,
+            "version": r.version,
+            "heldAt": r.held_at,
+            "mode": r.mode,
+            "stale": r.stale,
+            "why": r.why,
+            "note": r.note,
+            "drop": r.drop,
         }
         for r in xs
     ]

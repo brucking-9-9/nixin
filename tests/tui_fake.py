@@ -50,7 +50,17 @@ PACKAGES = {
     "info": "info_ripgrep",
     "versions": "versions_ripgrep",
     "where": "where_ripgrep_19BK",
+    "pins": "pins_19BK",
+    "pins --check": "pins_19BK_check",
+    "pin kernel --dry-run": "pin_kernel_dry",
+    "pin kernel": "pin_kernel",
+    "pin --dry-run": "pin_firefox_dry",
+    "pin": "pin_firefox",
+    "unpin --dry-run": "unpin_kernel_dry",
+    "unpin": "unpin_kernel",
 }
+# the Packages screen once something is held: `outdated` answers with holds[] after a pin
+HOLDS = {**PACKAGES, "outdated": ["outdated_19BK", "outdated_19BK_holds"]}
 
 
 # the Options page: NixOS options on mbp13 (services.openssh.*, recorded against ~/nixos, the

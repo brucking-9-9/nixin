@@ -6,7 +6,10 @@ narrow it here, with `list --filter`/`--scope` semantics (view.filter_packages),
 need no second eval. Enter opens the Details screen for the row (info, versions, where,
 Remove), for the row's Home Manager user. Updates: `outdated` (lock mode, `m` for
 `--published`) on first view; `u` previews `update --dry-run`, confirms, runs `update`, and
-goes to Pending, where Plan builds it as for any other change.
+goes to Pending, where Plan builds it as for any other change. `h` on a row holds it (`pin
+PNAME`, through the writer's diff modal) or releases it (`unpin`); `k` holds the kernel.
+Pins: the host's pins (`pins`), `c` checks them against the lock (`pins --check`), `u`
+drops the one under the cursor.
 """
 
 from __future__ import annotations
@@ -22,12 +25,12 @@ from textual.widgets import Button, ContentSwitcher, DataTable, Input, Tab, Tabs
 from ..ui import view
 from .modals import NoticeModal, UpdateModal
 from .screens import Base, DetailsScreen
-from .widgets import Line, NoticeBox, Spinner, cell
+from .widgets import Fields, Line, NoticeBox, Spinner, cell
 
 if TYPE_CHECKING:
     from .app import NixinApp
 
-TABS = ("installed", "updates")
+TABS = ("installed", "updates", "pins")
 MODES = ("lock", "published")
 OUTDATED_HINT = {
     "lock": "two package-list evals: seconds; about a minute when nixpkgs has a new commit",
@@ -40,10 +43,15 @@ class PackagesScreen(Base):
         Binding("escape", "escape", "Back"),
         Binding("t", "tab('updates')", "Updates"),
         Binding("t", "tab('installed')", "Installed"),
+        Binding("n", "tab('pins')", "Pins", show=False),
         Binding("f", "focus_filter", "Filter", show=False),
         Binding("h", "next_scope", "For", show=False),
+        Binding("h", "hold", "Hold", show=False),
+        Binding("k", "hold_kernel", "Hold kernel", show=False),
         Binding("m", "mode", "Mode", show=False),
         Binding("u", "update", "Update lock", show=False),
+        Binding("u", "unpin", "Unpin", show=False),
+        Binding("c", "check_pins", "Check", show=False),
         Binding("r", "refresh", "Refresh", show=False),  # ? lists it; a phone has no room
     ]
 
@@ -54,6 +62,7 @@ class PackagesScreen(Base):
         self.rows: list[view.PackageRow] = []  # the whole list
         self.shown: list[view.PackageRow] = []  # what the filter and the scope leave
         self.updates: list[view.UpdateRow] = []
+        self.pins: list[view.PinRow] = []
         self.mode = "lock"
         self._planned: dict[str, int] = {}  # table id → the width its columns were planned for
 
@@ -87,6 +96,17 @@ class PackagesScreen(Base):
                         "Update nixpkgs lock (u)", id="up-update", variant="primary", compact=True
                     )
                     yield Button("mode: lock (m)", id="up-mode", compact=True)
+                    yield Button("hold kernel (k)", id="up-kernel-hold", compact=True)
+            with Vertical(id="pk-pins"):
+                yield Line("", id="pn-head")
+                yield Spinner(id="pn-spin")
+                yield NoticeBox(id="pn-notice")
+                yield DataTable(id="pn-table", cursor_type="row")
+                yield Line("", id="pn-detail")
+                yield Fields(id="pn-checks", label_width=6)
+                with Horizontal(id="pn-actions", classes="actions"):
+                    yield Button("Check (c)", id="pn-check", variant="primary", compact=True)
+                    yield Button("Unpin (u)", id="pn-unpin", compact=True)
         yield from self.compose_bottom()
 
     def on_mount(self) -> None:
@@ -100,6 +120,8 @@ class PackagesScreen(Base):
             self.show_list(app.list_doc)
         if self.tab == "updates":
             self.load_updates()
+        elif self.tab == "pins":
+            self.load_pins()
         self._focus_table()
 
     # --- tabs ---------------------------------------------------------------------------
@@ -111,6 +133,8 @@ class PackagesScreen(Base):
         self.query_one("#pk-switch", ContentSwitcher).current = f"pk-{tab}"
         if tab == "updates":
             self.load_updates()
+        elif tab == "pins":
+            self.load_pins()
         self._focus_table()
         self.refresh_bindings()
         self.call_after_refresh(self._replan)
@@ -119,15 +143,22 @@ class PackagesScreen(Base):
         self.query_one("#pk-tabs", Tabs).active = f"pk-tab-{tab}"
 
     def _focus_table(self) -> None:
-        self.query_one("#pk-table" if self.tab == "installed" else "#up-table").focus()
+        table = {"installed": "#pk-table", "updates": "#up-table", "pins": "#pn-table"}[self.tab]
+        self.query_one(table).focus()
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
-        if action == "tab":  # `t` names the other tab
+        if action == "tab":  # `t` names the other tab (installed ↔ updates), `n` the pins
+            if parameters[0] == "pins":
+                return self.tab != "pins"
+            if self.tab == "pins":
+                return parameters[0] == "installed"
             return parameters[0] != self.tab
         if action in ("focus_filter", "next_scope"):
             return self.tab == "installed"
-        if action == "update":
+        if action in ("update", "mode", "hold", "hold_kernel"):
             return self.tab == "updates"
+        if action in ("unpin", "check_pins"):
+            return self.tab == "pins"
         return True
 
     def action_escape(self) -> None:
@@ -226,7 +257,12 @@ class PackagesScreen(Base):
         return width
 
     def _replan(self) -> None:
-        for tid, render in (("pk-table", self.render_list), ("up-table", self.render_updates)):
+        tables = (
+            ("pk-table", self.render_list),
+            ("up-table", self.render_updates),
+            ("pn-table", self.render_pins),
+        )
+        for tid, render in tables:
             w = self.query_one(f"#{tid}", DataTable).size.width
             if w and w != self._planned.get(tid):
                 render()
@@ -312,6 +348,12 @@ class PackagesScreen(Base):
         notes = view.outdated_notes(doc)
         self.query_one("#up-notes", Line).show(" · ".join(notes), "dim")
         self.query_one("#up-update", Button).disabled = view.update_args(doc) is None
+        hold = view.kernel_hold(doc)
+        kbutton = self.query_one("#up-kernel-hold", Button)
+        kbutton.set_class(hold is None, "hidden")  # a class: the narrow rule still applies
+        if hold is not None:
+            kbutton.label = f"{hold[0]} (k)"
+            kbutton.refresh(layout=True)
         self.render_updates()
 
     def render_updates(self) -> None:
@@ -337,7 +379,7 @@ class PackagesScreen(Base):
     @on(DataTable.RowSelected, "#up-table")
     def _update_selected(self, event: DataTable.RowSelected) -> None:
         r = self._current(self.query_one("#up-table", DataTable), self.updates)
-        if r is None:
+        if r is None or r.pname == "kernel":
             return
         row = view.PackageRow(r.scope, r.user, r.pname, r.pname, r.old, "", r.pname)
         self.app.push_screen(DetailsScreen(view.package_hit(row), user=r.user))
@@ -345,8 +387,129 @@ class PackagesScreen(Base):
     def action_refresh(self) -> None:
         if self.tab == "installed":
             self.load_list(refresh=True)
-        else:
+        elif self.tab == "updates":
             self.load_updates(refresh=True)
+        else:
+            self.load_pins(refresh=True)
+
+    # --- holds: pin / unpin through the writer flow ----------------------------------------
+
+    def _hold(self, args: list[str]) -> None:
+        """`pin X` / `unpin X` previewed in the diff modal, written, then the Updates and
+        Pins documents evaluated again (a hold changes what the lock update brings)."""
+        self.nixin.write(args[0], args[1:], after=self._held)
+
+    def _held(self) -> None:
+        app = self.nixin
+        app.outdated_docs.clear()
+        app.pins_doc = None
+        if self.tab == "updates":
+            self.load_updates()
+        elif self.tab == "pins":
+            self.load_pins()
+
+    def action_hold(self) -> None:
+        r = self._current(self.query_one("#up-table", DataTable), self.updates)
+        if r is None:
+            self.notify("no row to hold", severity="warning")
+            return
+        if r.pname == "kernel":
+            self.action_hold_kernel()
+            return
+        self._hold(r.hold_args)
+
+    def action_hold_kernel(self) -> None:
+        doc = self.nixin.outdated_docs.get(self.mode)
+        hold = view.kernel_hold(doc) if doc else None
+        if hold is None:
+            self.notify("the kernel does not change with this update", severity="warning")
+            return
+        self._hold(hold[1])
+
+    # --- pins ------------------------------------------------------------------------------
+
+    def load_pins(self, refresh: bool = False, check: bool = False) -> None:
+        app = self.nixin
+        doc = app.pins_doc
+        if doc is not None and not refresh and not check:
+            self.show_pins(doc)
+            return
+        self.query_one("#pn-notice", NoticeBox).show(None)
+        self.nixin.fetch(
+            "pins",
+            *(["--check"] if check else []),
+            done=self._pins,
+            group="pins",
+            exclusive=True,
+            spinner=self.query_one("#pn-spin", Spinner),
+            label="pins --check: evaluating" if check else "pins",
+            hint="one eval of the host: seconds" if check else "reads installer/state.json",
+        )
+
+    def _pins(self, doc: dict) -> None:
+        if doc.get("ok"):
+            self.nixin.pins_doc = doc
+        self.show_pins(doc)
+
+    def show_pins(self, doc: dict) -> None:
+        notice = view.notice(doc)
+        self.query_one("#pn-notice", NoticeBox).show(notice)
+        head = self.query_one("#pn-head", Line)
+        checks = self.query_one("#pn-checks", Fields)
+        if notice is not None:
+            self.pins = []
+            head.show("")
+            checks.show([])
+            self.render_pins()
+            return
+        self.pins = view.pin_rows(doc)
+        head.show(f"{self.nixin.backend.host}: {view.pins_summary(doc)}", "head")
+        checks.show(view.check_fields(doc.get("checks")))
+        checks.display = bool(doc.get("checks"))
+        self.query_one("#pn-unpin", Button).disabled = not self.pins
+        self.query_one("#pn-check", Button).disabled = not self.pins
+        self.render_pins()
+
+    def render_pins(self) -> None:
+        table = self.query_one("#pn-table", DataTable)
+        table.clear(columns=True)
+        width = self._width(table)
+        cols = view.pin_columns(width)
+        for c in cols:
+            table.add_column(c.label, width=c.width, key=c.key)
+        for i, r in enumerate(self.pins):
+            table.add_row(
+                *(cell(self.app, s.text, s.style) for s in view.pin_cells(r, cols)), key=str(i)
+            )
+        table.display = bool(self.pins)
+        self._pin_detail()
+
+    @on(DataTable.RowHighlighted, "#pn-table")
+    def _pin_highlighted(self, event: DataTable.RowHighlighted) -> None:
+        self._pin_detail()
+
+    def _pin_detail(self) -> None:
+        line = self.query_one("#pn-detail", Line)
+        r = self._current(self.query_one("#pn-table", DataTable), self.pins)
+        if r is not None:
+            line.show(view.pin_detail(r), "dim")
+        elif self.nixin.pins_doc is not None and not self.pins:
+            line.show("no pins · h on an Updates row or k holds something back", "dim")
+        else:
+            line.show("")
+
+    def action_check_pins(self) -> None:
+        if not self.pins:
+            self.notify("no pins to check", severity="warning")
+            return
+        self.load_pins(check=True)
+
+    def action_unpin(self) -> None:
+        r = self._current(self.query_one("#pn-table", DataTable), self.pins)
+        if r is None:
+            self.notify("no pin under the cursor", severity="warning")
+            return
+        self._hold(["unpin", r.name])
 
     # --- update -------------------------------------------------------------------------
 
@@ -384,17 +547,31 @@ class PackagesScreen(Base):
         if not doc.get("ok"):
             self.app.push_screen(NoticeModal(doc, "update"))
             return
+        had_holds = any(d.get("holds") for d in self.nixin.outdated_docs.values())
         self.nixin.updated(doc)
         summary = view.update_summary(doc)
         if not doc.get("changed"):
             self.notify(view.update_fields(doc)[0].value, title="update")
             return
         self.notify(f"{summary} · b: plan, a: apply", title="updated")
+        if had_holds:  # the lock moved: now the holds' checks mean something
+            self.nixin.fetch("pins", "--check", done=self._checked_after_update, group="pins")
         self.nixin.action_pending()
+
+    def _checked_after_update(self, doc: dict) -> None:
+        if not doc.get("ok"):
+            return
+        self.nixin.pins_doc = doc
+        counts = view.check_counts(doc.get("checks"))
+        if counts:
+            self.notify(f"holds: {counts} · n: Pins", title="pins --check", severity="warning")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         {
             "pk-scope": self.action_next_scope,
             "up-update": self.action_update,
             "up-mode": self.action_mode,
+            "up-kernel-hold": self.action_hold_kernel,
+            "pn-check": self.action_check_pins,
+            "pn-unpin": self.action_unpin,
         }[event.button.id or ""]()

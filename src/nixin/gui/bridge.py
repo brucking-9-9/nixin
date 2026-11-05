@@ -1388,6 +1388,7 @@ class PackagesVM(VM):
         "summary": "",
         "notes": "",
         "canUpdate": False,
+        "kernelHold": "",  # the kernel's hold toggle label ("" when the kernel does not move)
         "upSelected": -1,
         "updateOpen": False,
         "updatePhase": "",  # checking | confirm | running
@@ -1418,6 +1419,7 @@ class PackagesVM(VM):
     summary = state(str, "summary", changed)
     notes = state(str, "notes", changed)
     canUpdate = state(bool, "canUpdate", changed)
+    kernelHold = state(str, "kernelHold", changed)
     upSelected = state(int, "upSelected", changed)
     updateOpen = state(bool, "updateOpen", changed)
     updatePhase = state(str, "updatePhase", changed)
@@ -1579,6 +1581,7 @@ class PackagesVM(VM):
         self.update_rows = view.update_rows(doc)
         self.rows("updates").reset(models.updates(self.update_rows))
         k = view.kernel_line(doc)
+        hold = view.kernel_hold(doc)
         self.set(
             updatesNote="",
             head=view.outdated_head(doc, self.gui.backend.host),
@@ -1587,7 +1590,32 @@ class PackagesVM(VM):
             summary=view.outdated_summary(doc),
             notes=" · ".join(view.outdated_notes(doc)),
             canUpdate=view.update_args(doc) is not None,
+            kernelHold=hold[0] if hold else "",
         )
+
+    # --- holds: pin / unpin through the writer's diff dialog
+
+    def _hold(self, args: list[str]) -> None:
+        self.gui.writer.start(args[0], args[1:], after=self.gui.pins.stale)
+
+    @Slot(int)
+    def hold(self, i: int) -> None:
+        """`h` on an update row: pin it (`pin PNAME`), or unpin the pin holding it."""
+        if 0 <= i < len(self.update_rows):
+            r = self.update_rows[i]
+            if r.pname == "kernel":
+                self.holdKernel()
+            else:
+                self._hold(r.hold_args)
+
+    @Slot()
+    def holdKernel(self) -> None:
+        doc = self.outdated_docs.get(self["mode"])
+        hold = view.kernel_hold(doc) if doc else None
+        if hold is None:
+            self.gui.notice.say("the kernel does not change with this update", "info")
+            return
+        self._hold(hold[1])
 
     @Slot(str)
     def setMode(self, mode: str) -> None:
@@ -1599,6 +1627,9 @@ class PackagesVM(VM):
     def selectUpdate(self, i: int) -> None:
         if 0 <= i < len(self.update_rows):
             r = self.update_rows[i]
+            if r.pname == "kernel":
+                self.set(upSelected=i)
+                return
             row = view.PackageRow(r.scope, r.user, r.pname, r.pname, r.old, "", r.pname)
             self.set(upSelected=i, selected=-1)
             self.gui.search.set(selected=-1)
@@ -1677,10 +1708,125 @@ class PackagesVM(VM):
         if not doc.get("changed"):
             g.notice.say(view.update_fields(doc)[0].value, "info")
             return
+        had_holds = any(d.get("holds") for d in self.outdated_docs.values())
         self.outdated_docs.clear()
         g.wrote(view.update_summary(doc))
         g.notice.say(f"updated: {view.update_summary(doc)} · Pending: plan, apply", "ok")
         g.go("pending")
+        if had_holds:  # the lock moved: now the holds' checks mean something
+            g.pins.check(after_update=True)
+
+
+class PinsVM(VM):
+    """The Pins page: the host's pins (`pins`: name, what it holds, at which nixpkgs, stale
+    or not), Check (`pins --check`: one eval, the compatibility checks against the lock as it
+    is now) and Unpin (through the writer's diff dialog)."""
+
+    changed = Signal()
+    defaults: ClassVar = {
+        "loading": False,
+        "checking": False,
+        "note": "",
+        "noteStyle": "",
+        "summary": "",
+        "checked": False,
+        "selected": -1,
+        "detail": "",
+    }
+    lists: ClassVar = {"pins": models.PIN, "checks": models.FIELD}
+    loading = state(bool, "loading", changed)
+    checking = state(bool, "checking", changed)
+    note = state(str, "note", changed)
+    noteStyle = state(str, "noteStyle", changed)
+    summary = state(str, "summary", changed)
+    checked = state(bool, "checked", changed)
+    selected = state(int, "selected", changed)
+    detail = state(str, "detail", changed)
+    pins = model("pins")
+    checks = model("checks")
+
+    def __init__(self, gui: Gui) -> None:
+        super().__init__(gui)
+        self.doc: Doc | None = None
+        self.pin_rows: list[view.PinRow] = []
+
+    def visit(self) -> None:
+        if self.doc is None:
+            self.load()
+        else:
+            self._show(self.doc)
+
+    def stale(self) -> None:
+        """A pin, unpin or update since: the next visit reads again; if the page is open, now."""
+        self.doc = None
+        self.gui.packages.outdated_docs.clear()  # a hold changes what the update brings
+        QTimer.singleShot(0, lambda: self.gui["page"] == "pins" and self.visit())
+
+    @Slot()
+    def load(self) -> None:
+        self.set(loading=True, note="")
+        self.gui.fetch(
+            "pins",
+            done=self._loaded,
+            group="pins",
+            exclusive=True,
+            label="pins",
+            hint="reads installer/state.json: instant",
+        )
+
+    @Slot()
+    def check(self, after_update: bool = False) -> None:
+        self.set(loading=True, checking=True, note="")
+        self.gui.fetch(
+            "pins",
+            "--check",
+            done=lambda d: self._loaded(d, after_update),
+            group="pins",
+            exclusive=True,
+            label="pins --check: evaluating",
+            hint="one eval of the host: seconds",
+        )
+
+    def _loaded(self, doc: Doc, after_update: bool = False) -> None:
+        self.set(loading=False, checking=False)
+        if doc.get("ok"):
+            self.doc = doc
+        self._show(doc)
+        counts = view.check_counts(doc.get("checks")) if doc.get("ok") else ""
+        if after_update and counts:
+            self.gui.notice.say(f"holds after the update: {counts} · Pins (Ctrl+6)", "warn")
+
+    def _show(self, doc: Doc) -> None:
+        n = view.notice(doc)
+        if n is not None:
+            self.pin_rows = []
+            self.rows("pins").reset([])
+            self.rows("checks").reset([])
+            self.set(note=f"pins: {n.code}: {n.message}", noteStyle="error", summary="")
+            return
+        self.pin_rows = view.pin_rows(doc)
+        self.rows("pins").reset(models.pins(self.pin_rows))
+        self.rows("checks").reset(models.fields(view.check_fields(doc.get("checks"))))
+        self.set(
+            note=""
+            if self.pin_rows
+            else "no pins · hold a row on Packages › Updates (or the kernel)",
+            noteStyle="dim",
+            summary=f"{self.gui.backend.host}: {view.pins_summary(doc)}",
+            checked=bool(doc.get("checked")),
+            selected=-1,
+            detail="",
+        )
+
+    @Slot(int)
+    def select(self, i: int) -> None:
+        if 0 <= i < len(self.pin_rows):
+            self.set(selected=i, detail=view.pin_detail(self.pin_rows[i]))
+
+    @Slot(int)
+    def unpin(self, i: int) -> None:
+        if 0 <= i < len(self.pin_rows):
+            self.gui.writer.start("unpin", [self.pin_rows[i].name], after=self.stale)
 
 
 # --- options --------------------------------------------------------------------------------
@@ -2221,6 +2367,7 @@ class Gui(VM):
             "apply": ApplyVM(self),
             "status": StatusVM(self),
             "browse": BrowseVM(self),
+            "pins": PinsVM(self),
         }
         from .trying import TryVM  # it subclasses VM, from this module
 
@@ -2240,6 +2387,7 @@ class Gui(VM):
     status = area("status")
     trying = area("trying")
     browse = area("browse")
+    pins = area("pins")
 
     # --- running verbs
 
@@ -2414,11 +2562,13 @@ class Gui(VM):
 
     @Slot(str)
     def go(self, page: str) -> None:
-        if page not in ("search", "packages", "options", "pending", "status", "browse"):
+        if page not in ("search", "packages", "options", "pending", "status", "browse", "pins"):
             return
         self.set(page=page)
         if page == "browse":
             self.browse.visit()
+        elif page == "pins":
+            self.pins.visit()
         elif page == "packages":
             self.packages.visit()
         elif page == "pending":

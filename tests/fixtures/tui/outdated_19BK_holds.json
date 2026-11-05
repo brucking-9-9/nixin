@@ -1,0 +1,241 @@
+{
+ "added": [],
+ "cache": {
+  "dir": "/home/master/.cache/nixin/truth",
+  "enabled": true,
+  "hits": [],
+  "misses": [
+   "outdated-lock",
+   "outdated-target"
+  ]
+ },
+ "changed": [
+  {
+   "direction": "up",
+   "from": "7.2",
+   "pname": "strace",
+   "scope": "system",
+   "to": "7.3",
+   "user": null
+  },
+  {
+   "direction": "up",
+   "from": "1.104.2",
+   "pname": "tailscale",
+   "scope": "system",
+   "to": "1.104.4",
+   "user": null
+  },
+  {
+   "direction": "up",
+   "from": "0.5.18",
+   "pname": "wireplumber",
+   "scope": "system",
+   "to": "0.5.19",
+   "user": null
+  },
+  {
+   "direction": "up",
+   "from": "1.4.7",
+   "pname": "btop",
+   "scope": "home",
+   "to": "1.4.8",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "2.1.308",
+   "pname": "claude-code",
+   "scope": "home",
+   "to": "2.1.316",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "3.8.0",
+   "pname": "git-lfs",
+   "scope": "home",
+   "to": "3.8.1",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "2.13.0",
+   "pname": "harper",
+   "scope": "home",
+   "to": "3.0.0",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "1.9.0",
+   "pname": "swayidle",
+   "scope": "home",
+   "to": "1.9.1",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "2.1.3",
+   "pname": "syncthing",
+   "scope": "home",
+   "to": "2.1.7",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "156.0.8078.47",
+   "pname": "ungoogled-chromium",
+   "scope": "home",
+   "to": "156.0.8078.79",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "0.14.3",
+   "pname": "xdg-terminal-exec",
+   "scope": "home",
+   "to": "0.14.4",
+   "user": "brucking"
+  },
+  {
+   "direction": "up",
+   "from": "2026.08.19",
+   "pname": "yt-dlp",
+   "scope": "home",
+   "to": "2026.10.21",
+   "user": "brucking"
+  }
+ ],
+ "commands": [
+  "nix flake update nixpkgs --flake /home/master/nixos",
+  "nixin plan --config /home/master/nixos --host 19BK",
+  "nixin apply --config /home/master/nixos --host 19BK"
+ ],
+ "config": {
+  "dirty": true,
+  "fingerprint": "0009fd29952762696ad96408bd7da45bf05bdb613253b9f0733678b9c2ae6d03",
+  "head": "e089d2740673139303c35910113e7349b1f4830d",
+  "last_modified": 1793614250,
+  "path": "/home/master/nixos",
+  "source": "/nix/store/x1mmgp3jqq9kmq667qp9lqz16yj2pgzz-source",
+  "source_hash": "x1mmgp3jqq9kmq667qp9lqz16yj2pgzz"
+ },
+ "count": 12,
+ "holds": [
+  {
+   "attrs": [
+    "firefox"
+   ],
+   "available": {
+    "firefox": "159.0"
+   },
+   "behind": true,
+   "date": "2026-10-23",
+   "drop": "nixin unpin firefox",
+   "mode": "attr",
+   "name": "firefox",
+   "pname": "firefox",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "stale": true,
+   "stale_why": "flake.lock is at 3ec6363, the revision it pins",
+   "version": "158.0.1",
+   "why": null
+  },
+  {
+   "attrs": [
+    "linux_7_2",
+    "linuxPackages_7_2"
+   ],
+   "available": {
+    "linuxPackages_7_2": null,
+    "linux_7_2": "7.2.14"
+   },
+   "behind": true,
+   "date": "2026-10-23",
+   "drop": "nixin unpin kernel",
+   "mode": "kernel",
+   "name": "kernel",
+   "pname": "linux",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "stale": true,
+   "stale_why": "flake.lock is at 3ec6363, the revision it pins",
+   "version": "7.2.12",
+   "why": "T2 kernel build takes 2-3 h"
+  }
+ ],
+ "kernel": {
+  "changed": false,
+  "from": "7.2.12",
+  "held": {
+   "available": "7.2.14",
+   "pin": "kernel"
+  },
+  "to": "7.2.12"
+ },
+ "lock": {
+  "date": "2026-10-23",
+  "flakeref": "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "input": "nixpkgs",
+  "last_modified": 1792773339,
+  "node": "nixpkgs_2",
+  "original": "github:nixos/nixpkgs/nixos-unstable",
+  "release": "26.11",
+  "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "short_rev": "3ec6363"
+ },
+ "mode": "lock",
+ "notes": [],
+ "ok": true,
+ "removed": [
+  {
+   "pname": "fuse",
+   "scope": "system",
+   "user": null,
+   "version": "2.9.9"
+  }
+ ],
+ "scopes": [
+  {
+   "added": 0,
+   "changed": 3,
+   "removed": 1,
+   "scope": "system",
+   "total": 135,
+   "user": null
+  },
+  {
+   "added": 0,
+   "changed": 9,
+   "removed": 0,
+   "scope": "home",
+   "total": 190,
+   "user": "brucking"
+  }
+ ],
+ "target": {
+  "date": "2026-11-01",
+  "days_newer": 8.9,
+  "flakeref": "github:nixos/nixpkgs/nixos-unstable",
+  "from": "lock",
+  "input": "nixpkgs",
+  "last_modified": 1793540411,
+  "locked": "github:nixos/nixpkgs/0bb2eedc20e4739f29e8045034f2828ad7054f8f?narHash=sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE%3D",
+  "release": "26.11",
+  "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+  "short_rev": "0bb2eed"
+ },
+ "timings": {
+  "holds": 1.9,
+  "lock": 2.68,
+  "resolve": 0.05,
+  "target": 2.99,
+  "total": 5.82
+ },
+ "total": 325,
+ "up_to_date": false
+}

@@ -3,7 +3,7 @@
 Written 2026-11-05 on 19BK in `~/Projects/nixin-wt-pins`; `~/nixos` was only read, probes ran on throwaway
 clones and `nix eval` (no lock written, no build, no sudo). **Status**: steps 1-3 of §7 are implemented on
 this branch (`docs/HANDOFF-pins.md`); §4 (security) is **deferred** by the user (no `reasons[]`, no
-`--security` in any document yet); §5 (TUI tab, GUI page, hold toggles) waits for the plan-progress merge.
+`--security` in any document yet); §5 (TUI tab, GUI page, hold toggles) is implemented after the plan-progress merge.
 
 ## Probes (facts the design rests on)
 
@@ -154,7 +154,7 @@ instead of listing them as changes; `plan`/`apply` carry `pins[]` and the stale 
   6 running system older than 30 days (generation link mtime); 7 a pin blocking a fix. One line each, highest
   first, e.g. `security  2 CVEs (CVSS 9.8, 7.5) in the running system are gone with the pending lock; kernel 7.2.15 is out`.
 
-## 5. UX — step 5, after the plan-progress merge
+## 5. UX — step 5, implemented after the plan-progress merge
 
 - CLI: `nixin pin NAME [--attr A] [--rev R] [--whole-set] [--why TEXT] [--force]`, `nixin unpin NAME|--all`,
   `nixin pins [--sizes] [--check]`, `nixin update [--hold N,…] [--allow-others]`, `nixin outdated [--security]`.

@@ -1,0 +1,109 @@
+{
+ "checked": true,
+ "checks": [
+  {
+   "data": {
+    "attr": "firefox",
+    "inputs": [
+     "libglvnd",
+     "gtk3"
+    ],
+    "pin": "firefox"
+   },
+   "id": "gl-skew",
+   "level": "warn",
+   "text": "firefox held at 158.0 brings its own glibc 2.42; the system's Mesa/Wayland drivers are built against glibc 2.44. The program is self-contained but can fail to find a GL/EGL driver at run time (seen with dorion 2026-10-11). Prefer nixin update --to 1d06008 for everything, or expect to wrap it with the pinned Mesa"
+  },
+  {
+   "data": {
+    "revisions": [
+     "1d060086d60cb76a40cf37109f979d88a5bd6396",
+     "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+    ]
+   },
+   "id": "eval-cost",
+   "level": "info",
+   "text": "a second nixpkgs tree (2 pinned revisions) adds about 1-2 s and 300 MiB to every evaluation; after a garbage collection nix re-downloads it (~60 s)"
+  },
+  {
+   "data": {
+    "pin": "kernel"
+   },
+   "id": "kernel-toolchain",
+   "level": "info",
+   "text": "out-of-tree modules are built with the new nixpkgs' toolchain against the held kernel; vermagic is by version, so they load. A compiler-version complaint means: nixin pin kernel --whole-set"
+  },
+  {
+   "data": {
+    "pin": "kernel"
+   },
+   "id": "pin-stale",
+   "level": "info",
+   "text": "pin \"kernel\" holds nothing yet: flake.lock is still at 3ec6363, the revision it pins; it takes effect once the lock moves (nixin update)"
+  }
+ ],
+ "config": "/home/master/nixos",
+ "count": 2,
+ "host": "19BK",
+ "lock": {
+  "date": "2026-10-23",
+  "input": "nixpkgs",
+  "node": "nixpkgs_2",
+  "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+  "short_rev": "3ec6363"
+ },
+ "ok": true,
+ "pins": [
+  {
+   "attrs": [
+    "firefox"
+   ],
+   "date": "2026-11-03",
+   "drop": "nixin unpin firefox",
+   "mode": "attr",
+   "name": "firefox",
+   "now": {
+    "firefox": "158.0"
+   },
+   "pname": "firefox",
+   "rev": "1d060086d60cb76a40cf37109f979d88a5bd6396",
+   "short_rev": "1d06008",
+   "since": "2026-11-05",
+   "size": {
+    "firefox": 412345678
+   },
+   "stale": false,
+   "stale_why": null,
+   "version": "158.0",
+   "why": "159 breaks the kiosk profile"
+  },
+  {
+   "attrs": [
+    "linux_7_2",
+    "linuxPackages_7_2"
+   ],
+   "date": "2026-10-23",
+   "drop": "nixin unpin kernel",
+   "mode": "kernel",
+   "name": "kernel",
+   "now": {
+    "linuxPackages_7_2": null,
+    "linux_7_2": "7.2.12"
+   },
+   "pname": "linux",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "size": {
+    "linuxPackages_7_2": null,
+    "linux_7_2": null
+   },
+   "stale": true,
+   "stale_why": "flake.lock is at 3ec6363, the revision it pins",
+   "version": "7.2.12",
+   "why": "T2 kernel build takes 2-3 h"
+  }
+ ],
+ "stale": 1,
+ "verb": "pins"
+}

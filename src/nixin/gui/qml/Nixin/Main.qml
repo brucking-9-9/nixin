@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // The window: the top bar, the navigation on the left (Search, Browse, Pending, Status,
-// Packages, Options),
+// Packages, Options, Pins),
 // the page, the non-modal notice over the bottom of the page, and the dialogs (diff, set,
 // apply, update).
 // `backend` is the Python root object (nixin/gui/bridge.py: Gui); everything shown comes
@@ -73,7 +73,7 @@ ApplicationWindow {
             id: pages
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: ["search", "pending", "status", "packages", "options", "browse"].indexOf(win.backend.page)
+            currentIndex: ["search", "pending", "status", "packages", "options", "browse", "pins"].indexOf(win.backend.page)
             // the keys follow the page: the query on Search, the page itself elsewhere (a
             // hidden text field keeping the focus would take "/" as a letter)
             onCurrentIndexChanged: {
@@ -85,6 +85,8 @@ ApplicationWindow {
                     optionsPage.focusQuery();
                 else if (currentIndex === 5)
                     browsePage.focusList();
+                else if (currentIndex === 6)
+                    pinsPage.focusList();
                 else if (currentIndex > 0)
                     children[currentIndex].forceActiveFocus();
             }
@@ -109,6 +111,10 @@ ApplicationWindow {
             }
             BrowsePage {
                 id: browsePage
+                backend: win.backend
+            }
+            PinsPage {
+                id: pinsPage
                 backend: win.backend
             }
         }
@@ -176,6 +182,10 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+B"
         onActivated: win.showPage("browse")
+    }
+    Shortcut {
+        sequence: "Ctrl+6"
+        onActivated: win.showPage("pins")
     }
     Shortcut {
         sequence: "Ctrl+Q"

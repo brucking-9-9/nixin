@@ -1,9 +1,11 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls
 
 // One `outdated` row: the package, `from → to` (pink for a removed one, cyan for an added
-// one, purple when the new version sorts older); under them for whom and the note.
+// one, purple when the new version sorts older or a pin holds it); under them for whom and
+// the note; hold / unhold on the right (pin / unpin through the diff dialog).
 Rectangle {
     id: row
 
@@ -15,10 +17,12 @@ Rectangle {
     required property string note
     required property string style
     required property bool isHome
+    required property string held
     property bool selected: false
     property bool current: false
 
     signal clicked()
+    signal holdClicked()
 
     implicitHeight: 46
     radius: Theme.radius
@@ -33,6 +37,30 @@ Rectangle {
         radius: 1
         color: Theme.cyan
         visible: row.selected
+    }
+
+    // hold (pin) / unhold (unpin) the row: shown while the pointer or the cursor is on it,
+    // always for a held row
+    Button {
+        id: holdButton
+        objectName: "hold-" + row.name
+        anchors.right: parent.right
+        anchors.rightMargin: 8
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
+        height: 20
+        padding: 2
+        leftPadding: 8
+        rightPadding: 8
+        flat: true
+        visible: row.held !== "" || row.selected || row.current || mouse.containsMouse
+        text: row.held !== "" ? "unhold" : "hold"
+        font.family: Theme.font
+        font.pixelSize: Theme.small
+        ToolTip.visible: hovered
+        ToolTip.text: row.held !== "" ? "unpin " + row.held + ": let the lock update bring it along"
+                                      : "pin " + row.name + ": keep it at " + row.before + " while the rest moves on"
+        onClicked: row.holdClicked()
     }
 
     Text {
@@ -91,7 +119,7 @@ Rectangle {
     Text {
         anchors.left: tagText.right
         anchors.leftMargin: 10
-        anchors.right: parent.right
+        anchors.right: holdButton.visible ? holdButton.left : parent.right
         anchors.rightMargin: 10
         y: 25
         text: row.note

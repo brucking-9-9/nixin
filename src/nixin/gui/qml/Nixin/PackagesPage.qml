@@ -7,8 +7,8 @@ import QtQuick.Layouts
 // Installed: what `list` says the host has (system and each Home Manager user), narrowed by
 // the filter and the scope without another eval. Updates: what `outdated` says a nixpkgs
 // update would change (the lock's next commit, or --published against search.nixos.org),
-// the kernel line, the summary, and "Update nixpkgs lock" (update → Pending). The selected
-// row opens on the right, for its user, with Remove.
+// the kernel line (with its hold), the summary, and "Update nixpkgs lock" (update → Pending);
+// a row's hold pins it. The selected row opens on the right, for its user, with Remove.
 Item {
     id: page
 
@@ -237,6 +237,7 @@ Item {
                                 updates.forceActiveFocus();
                                 page.vm.selectUpdate(index);
                             }
+                            onHoldClicked: page.vm.hold(index)
                         }
 
                         Text {
@@ -256,16 +257,30 @@ Item {
                         }
                     }
 
-                    Text {
-                        objectName: "upKernel"
+                    RowLayout {
                         Layout.fillWidth: true
-                        visible: text !== ""
-                        text: page.vm.kernel
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        color: Theme.style(page.vm.kernelStyle)
-                        font.family: Theme.font
-                        font.pixelSize: Theme.fontSize
+                        visible: page.vm.kernel !== ""
+                        spacing: Theme.gap
+                        Text {
+                            objectName: "upKernel"
+                            Layout.fillWidth: true
+                            text: page.vm.kernel
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            color: Theme.style(page.vm.kernelStyle)
+                            font.family: Theme.font
+                            font.pixelSize: Theme.fontSize
+                        }
+                        Button {
+                            objectName: "holdKernel"
+                            visible: page.vm.kernelHold !== ""
+                            text: page.vm.kernelHold
+                            flat: true
+                            enabled: page.backend.busy === ""
+                            ToolTip.visible: hovered
+                            ToolTip.text: "pin kernel: keep the kernel while the rest of nixpkgs moves on (no kernel rebuild); unpin to let it go"
+                            onClicked: page.vm.holdKernel()
+                        }
                     }
                     Text {
                         objectName: "upSummary"

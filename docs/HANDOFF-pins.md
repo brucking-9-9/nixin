@@ -1,7 +1,7 @@
 # HANDOFF: pins (branch `pins`, 2026-11-05, 19BK)
 
 Design: `docs/DESIGN-pins.md` (probes, decisions, the deferred security section). Branch cut from `main` @
-61fde16 in `~/Projects/nixin-wt-pins`; nothing pushed or merged. `~/nixos` was never written: live checks
+61fde16 in `~/Projects/nixin-wt-pins`; steps 1-3 merged to main as dffe51d, step 5 on the branch after it. `~/nixos` was never written: live checks
 ran on `git clone` copies under /tmp.
 
 ## Done (steps 1-3 of the design)
@@ -52,14 +52,33 @@ output is in the store). Human renderings live in `pins/render.py` and `outdated
   (`tests/fixtures/pins/19BK.nix`, regenerate with `NIXIN_WRITE_FIXTURES=1`); the eval expressions parsed by
   the real `nix-instantiate` (the fakes never parse Nix; this caught two syntax errors).
 
-## Left (steps 4-5)
+## Step 5: the UIs (after the plan-progress merge, dffe51d)
+
+- `ui/view.py`: `UpdateRow.held` + `hold_args`, held rows from `holds[]` in `update_rows`, `kernel_hold`,
+  `hold` lines in `update_confirm_fields`, `PinRow`/`pin_rows`/`pin_columns`/`pin_cells`/`pin_detail`,
+  `check_fields`/`check_counts`, `writer_summary` for pin/unpin. `ui/backend.py`: `CONFIG_VERBS` + pin, unpin, pins.
+- TUI (`tui/packages.py`): the Updates tab holds a row (`h`) or the kernel (`k`, also a button on a
+  desktop) through the writer's diff modal (`app.write`: `WRITE_VERBS` + pin/unpin), then evaluates
+  `outdated` again; the update confirm lists the holds; after an `update` with holds, `pins --check` and
+  a notification with the warn/block counts. A Pins tab (`n`): the table, the detail line, the checks
+  (`c`: `pins --check`), `u`: unpin the row. `app.pins_doc` is kept like the outdated documents.
+- GUI: `PinsVM` (area `pins`, page `pins`, Ctrl+6, NavRail entry; `PinsPage.qml`, `PinRow.qml`);
+  `PackagesVM.hold(i)`/`holdKernel()` (`UpdateRow`'s hold / unhold button, the "hold kernel" button,
+  `kernelHold` state); the update dialog shows the `hold` fields; `models.PIN`, `UPDATE` + `held`.
+- `nixin-state status` also writes `summary.json`'s `pins {count, stale, at}` (one `pins` call, no eval).
+- Tests: fixtures `pins_19BK`, `pins_19BK_check`, `pins_empty`, `pin_kernel{,_dry}`, `pin_firefox{,_dry}`,
+  `unpin_kernel{,_dry}`, `outdated_19BK_holds` (hand-made in the CONTRACT shape); `tui_fake.HOLDS` (the
+  second `outdated` answers with holds); view-model tests; one TUI flow at both sizes and one GUI flow
+  (hold kernel → diff → write → held rows → hold a row → update dialog's holds → Pins → check → unpin);
+  the GUI grabs test takes the Pins page too; the state test checks the `pins` part.
+
+## Left
 
 - §4 security (vulnix, kernel.org, `reasons[]`): deferred by the user.
-- §5 UI: TUI Pins tab + hold toggles in the Updates tab, GUI `PinsPage.qml` + holds in `UpdateDialog`,
-  `ui/backend.py` `CONFIG_VERBS` (+ pin/unpin/pins), `nixin-state` `pins {count, stale}`; after the
-  plan-progress merge. The documents are UI-ready: `hold_checks[]`/`checks[]` `{id, level, text, data}`,
-  `pins[]`, `holds[]`.
-- HM-scope pins for hosts without `useGlobalPkgs` (none here); `pin --rev` for non-github inputs.
+- The hold of a row pins by pname (`pin PNAME`): right for top-level attributes named like their pname;
+  a nested one answers `pin-unsupported` in the modal/notice (the CLI's `pin NAME --attr ATTR` covers it).
+- HM-scope pins for hosts without `useGlobalPkgs` (none here); `pin --rev` for non-github inputs;
+  TUI/GUI screenshots for the docs (`scripts/tui-screenshots.py`) not redrawn.
 
 ## How to test
 

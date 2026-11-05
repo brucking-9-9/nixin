@@ -1,0 +1,107 @@
+{
+ "actions": [
+  {
+   "action": "pinned",
+   "file": "installer/19BK.nix",
+   "name": "firefox",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+  }
+ ],
+ "changes": [
+  {
+   "diff": "--- a/installer/19BK.nix\n+++ b/installer/19BK.nix\n@@ -28,6 +28,8 @@\n       in\n       {\n         # pin \"kernel\" (2026-11-05): linux_7_2 held at 7.2.12 — T2 kernel build takes 2-3 h. `nixin unpin kernel`\n+        # pin \"firefox\" (2026-11-05): firefox held at 158.0.1. `nixin unpin firefox`\n+        firefox = pinned.firefox;\n         linux_7_2 = pinned.linux_7_2;\n         linuxPackages_7_2 = final.linuxPackagesFor final.linux_7_2;\n       }\n",
+   "file": "installer/19BK.nix",
+   "kind": "modified"
+  },
+  {
+   "diff": "--- a/installer/state.json\n+++ b/installer/state.json\n@@ -5,6 +5,20 @@\n       \"packages\": [],\n       \"pins\": {\n+        \"firefox\": {\n+          \"attrs\": [\n+            \"firefox\"\n+          ],\n+          \"mode\": \"attr\",\n+          \"rev\": \"3ec636362e1816bc2f0888fa0fa2c69f1bc9e504\",\n+          \"version\": \"158.0.1\"\n+        },\n         \"kernel\": {\n",
+   "file": "installer/state.json",
+   "kind": "modified"
+  }
+ ],
+ "checks": {
+  "eval": {
+   "checks": [
+    {
+     "data": {
+      "revisions": [
+       "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+      ]
+     },
+     "id": "eval-cost",
+     "level": "info",
+     "text": "a second nixpkgs tree (1 pinned revision) adds about 1-2 s and 300 MiB to every evaluation; after a garbage collection nix re-downloads it (~60 s)"
+    },
+    {
+     "data": {
+      "pin": "firefox"
+     },
+     "id": "pin-stale",
+     "level": "info",
+     "text": "pin \"firefox\" holds nothing yet: flake.lock is still at 3ec6363, the revision it pins; it takes effect once the lock moves (nixin update)"
+    }
+   ],
+   "kernel": "7.2.12",
+   "note": "firefox 158.0.1",
+   "ok": true
+  },
+  "parse": [
+   {
+    "error": null,
+    "file": "installer/19BK.nix",
+    "ok": true
+   }
+  ],
+  "type": null
+ },
+ "config": "/home/master/nixos",
+ "dry_run": false,
+ "hold_checks": [
+  {
+   "data": {
+    "revisions": [
+     "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+    ]
+   },
+   "id": "eval-cost",
+   "level": "info",
+   "text": "a second nixpkgs tree (1 pinned revision) adds about 1-2 s and 300 MiB to every evaluation; after a garbage collection nix re-downloads it (~60 s)"
+  },
+  {
+   "data": {
+    "pin": "firefox"
+   },
+   "id": "pin-stale",
+   "level": "info",
+   "text": "pin \"firefox\" holds nothing yet: flake.lock is still at 3ec6363, the revision it pins; it takes effect once the lock moves (nixin update)"
+  }
+ ],
+ "host": "19BK",
+ "imports_added": [],
+ "imports_removed": [],
+ "ok": true,
+ "pin": "firefox",
+ "pins": [
+  {
+   "attrs": [
+    "firefox"
+   ],
+   "date": "2026-10-23",
+   "drop": "nixin unpin firefox",
+   "mode": "attr",
+   "name": "firefox",
+   "pname": "firefox",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "stale": true,
+   "stale_why": "flake.lock is at 3ec6363, the revision it pins",
+   "version": "158.0.1",
+   "why": null
+  }
+ ],
+ "scope": "nixos",
+ "user": null,
+ "verb": "pin",
+ "warnings": []
+}

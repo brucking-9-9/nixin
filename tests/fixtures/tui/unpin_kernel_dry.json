@@ -1,0 +1,68 @@
+{
+ "actions": [
+  {
+   "action": "unpinned",
+   "file": "installer/19BK.nix",
+   "name": "kernel",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+  }
+ ],
+ "changes": [
+  {
+   "diff": "--- a/configuration.nix\n+++ /dev/null",
+   "file": "configuration.nix",
+   "kind": "modified"
+  },
+  {
+   "diff": "--- a/X\n+++ /dev/null",
+   "file": "installer/19BK.nix",
+   "kind": "deleted"
+  },
+  {
+   "diff": "--- a/X\n+++ /dev/null",
+   "file": "installer/state.json",
+   "kind": "deleted"
+  }
+ ],
+ "checks": {
+  "eval": null,
+  "parse": [],
+  "type": null
+ },
+ "config": "/home/master/nixos",
+ "dry_run": true,
+ "host": "19BK",
+ "imports_added": [],
+ "imports_removed": [
+  {
+   "file": "configuration.nix",
+   "line": 3,
+   "restored": false
+  }
+ ],
+ "ok": true,
+ "scope": "nixos",
+ "unpinned": [
+  {
+   "attrs": [
+    "linux_7_2",
+    "linuxPackages_7_2"
+   ],
+   "date": "2026-10-23",
+   "drop": "nixin unpin kernel",
+   "mode": "kernel",
+   "name": "kernel",
+   "pname": "linux",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "stale": true,
+   "stale_why": "flake.lock is at 3ec6363, the revision it pins",
+   "version": "7.2.12",
+   "why": "T2 kernel build takes 2-3 h"
+  }
+ ],
+ "user": null,
+ "verb": "unpin",
+ "warnings": []
+}

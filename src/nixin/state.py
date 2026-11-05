@@ -28,6 +28,8 @@ summary.json is what the UIs read; every run rewrites it under a lock:
   pending    {count, commits, dirty, untracked, apply, workspace, at}: count =
              commits + changed files (nixin's own history file aside); apply =
              the running system is not the authoritative HEAD's build
+  pins       {count, stale, at}: the workspace's pins (nixin pins); stale = pins at
+             the lock's own revision (they hold nothing yet)
   errors     {lock|published|status: {code, message, at}}: the last failure, dropped
              on the next success. A failed nixin run keeps the last good document and
              still exits 0 (a network blip at boot should not leave a failed unit for
@@ -332,6 +334,14 @@ def cmd_status(argv: list[str]) -> int:
         s["pending"] = part
         s["errors"].pop("status", None)
         log(f"status on {ws}: {part['count']} pending ({time.time() - t0:.1f} s)")
+    pins = nixin("pins", "--config", ws)  # reads installer/state.json: milliseconds
+    with Summary(sd) as s:
+        if pins.get("ok"):
+            s["pins"] = {"count": pins.get("count", 0), "stale": pins.get("stale", 0), "at": at}
+            s["errors"].pop("pins", None)
+        else:
+            e = pins.get("error") or {}
+            s["errors"]["pins"] = {"code": e.get("code"), "message": e.get("message"), "at": at}
     return 0
 
 

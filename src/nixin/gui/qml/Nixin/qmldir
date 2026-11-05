@@ -11,6 +11,8 @@ AppRow 1.0 AppRow.qml
 AppIcon 1.0 AppIcon.qml
 PackageRow 1.0 PackageRow.qml
 UpdateRow 1.0 UpdateRow.qml
+PinsPage 1.0 PinsPage.qml
+PinRow 1.0 PinRow.qml
 OptionsPage 1.0 OptionsPage.qml
 OptionPane 1.0 OptionPane.qml
 DetailsPane 1.0 DetailsPane.qml

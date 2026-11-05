@@ -512,10 +512,17 @@ def writer_eval_failed(doc: Doc) -> bool:
 
 def writer_summary(doc: Doc) -> str:
     """One line for the session log: `+cowsay (installer/mbp13.nix)`."""
-    sign = {"add": "+", "rm": "-", "set": "", "unset": "-"}.get(str(doc.get("verb")), "")
+    verb = str(doc.get("verb"))
+    sign = {"add": "+", "rm": "-", "set": "", "unset": "-", "pin": "pin ", "unpin": "unpin "}
+    sign = sign.get(verb, "")
     names = doc.get("packages") or [doc.get("option")]
-    if doc.get("verb") == "set":
+    if verb == "set":
         names = [f"{doc.get('option')} = {clip(doc.get('value'), 30)}"]
+    elif verb == "pin":
+        p = (doc.get("pins") or [{}])[0]
+        names = [f"{doc.get('pin')} at {p.get('version') or '?'}"]
+    elif verb == "unpin":
+        names = [u.get("name") for u in doc.get("unpinned") or []] or ["nothing"]
     files = sorted({c.get("file") for c in doc.get("changes") or []})
     who = f" [home {doc['user']}]" if doc.get("user") else ""
     return f"{sign}{', '.join(str(n) for n in names)}{who} ({', '.join(files) or 'no change'})"
@@ -1182,12 +1189,20 @@ class UpdateRow:
     new: str  # to / published; "removed" for a removed one
     scope: str
     user: str | None
-    note: str  # (older), (same order), as kdePackages.x, (added), (removed)
+    note: str  # (older), (same order), as kdePackages.x, (added), (removed), (held by pin x)
     style: str  # accent (newer), warn (older or same order), add, del
+    held: str = ""  # the pin holding this row (a `holds[]` row), else ""
 
     @property
     def tag(self) -> str:
         return self.user or "system"
+
+    @property
+    def hold_args(self) -> list[str]:
+        """What `h` runs for the row: `unpin NAME` for a held one, `pin PNAME` otherwise
+        (the pname as the attribute: right for firefox, ripgrep, …; a nested one answers
+        pin-unsupported)."""
+        return ["unpin", self.held] if self.held else ["pin", self.pname]
 
 
 _DIR = {"down": ("(older)", "warn"), "same": ("(same order)", "warn")}
@@ -1214,8 +1229,31 @@ def update_rows(doc: Doc) -> list[UpdateRow]:
     for r in doc.get("added") or []:
         v = str(r.get("version") or "")
         rows.append(UpdateRow(str(r["pname"]), "added", v, r["scope"], r.get("user"), "", "add"))
+    for h in doc.get("holds") or []:  # held: both evals saw the pin, so not in changed[]
+        attr = (h.get("attrs") or ["?"])[0]
+        name = "kernel" if h.get("mode") != "attr" else str(h.get("pname") or attr)
+        avail = (h.get("available") or {}).get(attr)
+        new = str(avail) if h.get("behind") and avail else str(h.get("version") or "")
+        note = f"(held by pin {h['name']}" + ("; stale)" if h.get("stale") else ")")
+        rows.append(
+            UpdateRow(
+                name, str(h.get("version") or ""), new, "system", None, note, "warn", h["name"]
+            )
+        )
     rows.sort(key=lambda r: (order.get((r.scope, r.user), 99), r.pname.lower()))
     return rows
+
+
+def kernel_hold(doc: Doc) -> tuple[str, list[str]] | None:
+    """(label, args) of the kernel's hold toggle for an `outdated` document: `pin kernel`
+    while the kernel changes, `unpin NAME` while a pin holds it; None when neither."""
+    k = doc.get("kernel") or {}
+    held = k.get("held") or {}
+    if held.get("pin"):
+        return f"unhold kernel (pin {held['pin']})", ["unpin", str(held["pin"])]
+    if k.get("changed") and doc.get("mode") == "lock":
+        return f"hold kernel at {k.get('from')}", ["pin", "kernel"]
+    return None
 
 
 def update_columns(width: int, tagged: bool) -> list[Column]:
@@ -1328,12 +1366,129 @@ def update_confirm_fields(dry: Doc, outdated: Doc | None = None) -> list[Field]:
         )
     else:
         out.append(Field("to", f"{dry.get('to_ref')}, as it resolves now", "add"))
+    for h in (outdated or {}).get("holds") or []:
+        attr = (h.get("attrs") or ["?"])[0]
+        avail = (h.get("available") or {}).get(attr)
+        text = f"{h['name']}: {attr} stays at {h.get('version') or '?'}"
+        if h.get("behind") and avail:
+            text += f" (the target has {avail})"
+        if h.get("stale"):
+            text += " — holds nothing yet, it takes effect with this update"
+        out.append(Field("hold", text, "warn"))
     out += [
         Field("writes", f"flake.lock in {dry.get('config')}; nothing is built or switched", "dim"),
         Field("then", "Pending: Plan builds it, Apply… switches (root)", "dim"),
         Field("takes", "nix fetches the new nixpkgs: about a minute the first time", "dim"),
     ]
     return out
+
+
+# --- pins: `pins` --------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PinRow:
+    """One pin: what it holds, where, whether it still does."""
+
+    name: str
+    attrs: str  # "linux_7_2, linuxPackages_7_2"
+    version: str  # held at
+    held_at: str  # "0bb2eed (2026-11-01)"
+    mode: str
+    stale: bool
+    why: str
+    note: str  # "(stale: flake.lock is at 0bb2eed, …)" or ""
+    drop: str  # nixin unpin NAME
+
+    @property
+    def style(self) -> str:
+        return "warn" if self.stale else "accent"
+
+
+CHECK_STYLE = {"block": "error", "warn": "warn", "info": "dim"}
+
+
+def pin_rows(doc: Doc) -> list[PinRow]:
+    out = []
+    for p in doc.get("pins") or []:
+        held = f"{p.get('short_rev') or '?'}" + (f" ({p['date']})" if p.get("date") else "")
+        note = f"(stale: {p.get('stale_why')})" if p.get("stale") else ""
+        out.append(
+            PinRow(
+                str(p.get("name")),
+                ", ".join(p.get("attrs") or []),
+                str(p.get("version") or "?"),
+                held,
+                str(p.get("mode") or "attr"),
+                bool(p.get("stale")),
+                str(p.get("why") or ""),
+                note,
+                str(p.get("drop") or f"nixin unpin {p.get('name')}"),
+            )
+        )
+    return out
+
+
+def pin_columns(width: int) -> list[Column]:
+    """pin · attrs · held at · nixpkgs; a narrow table drops the attrs and the commit."""
+    if width < NARROW:  # 12 + 10 + two gaps of 2
+        return [
+            Column("name", "pin", 12),
+            Column("version", "held at", 10),
+            Column("note", "", max(8, width - 26)),
+        ]
+    return [  # 12 + 22 + 10 + 20 + four gaps of 2 = 72
+        Column("name", "pin", 12),
+        Column("attrs", "attrs", 22),
+        Column("version", "held at", 10),
+        Column("held_at", "nixpkgs", 20),
+        Column("note", "", max(6, width - 72)),
+    ]
+
+
+def pin_cells(r: PinRow, columns: list[Column]) -> list[Span]:
+    out = []
+    for c in columns:
+        v = getattr(r, c.key)
+        if c.key == "note":
+            v = "  ".join(x for x in (r.note, r.why) if x)
+        style = r.style if c.key == "name" else "warn" if c.key == "note" and r.stale else "dim"
+        out.append(Span(clip(str(v), c.width), style if c.key != "version" else ""))
+    return out
+
+
+def pins_summary(doc: Doc) -> str:
+    from ..pins import render as pins_render
+
+    return pins_render.summary(doc)
+
+
+def pin_detail(r: PinRow) -> str:
+    """The line under the table for the highlighted pin."""
+    what = f"mode {r.mode} · {r.attrs} at {r.version} from nixpkgs {r.held_at} · {r.drop}"
+    return f"{what} · {r.why}" if r.why else what
+
+
+def check_fields(checks: list[dict] | None) -> list[Field]:
+    """`checks[]` / `hold_checks[]` as fields: the level is the label."""
+    return [
+        Field(str(c.get("level")), str(c.get("text")), CHECK_STYLE.get(str(c.get("level")), ""))
+        for c in checks or []
+    ]
+
+
+def check_counts(checks: list[dict] | None) -> str:
+    """`1 block, 2 warnings` for a notification; "" when nothing above info."""
+    n = {"block": 0, "warn": 0}
+    for c in checks or []:
+        if c.get("level") in n:
+            n[c["level"]] += 1
+    parts = []
+    if n["block"]:
+        parts.append(f"{n['block']} block{'s' if n['block'] != 1 else ''}")
+    if n["warn"]:
+        parts.append(f"{n['warn']} warning{'s' if n['warn'] != 1 else ''}")
+    return ", ".join(parts)
 
 
 def update_fields(doc: Doc) -> list[Field]:

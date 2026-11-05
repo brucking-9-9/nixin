@@ -36,6 +36,7 @@ STREAMING = frozenset({"plan", "apply", "try"})
 CONFIG_VERBS = frozenset(
     {"status", "where", "list", "add", "rm", "set", "unset", "plan", "apply", "sync"}
     | {"outdated", "update", "try", "info"}  # info: the lock its AppStream lookup evaluates
+    | {"pin", "unpin", "pins"}
 )
 
 

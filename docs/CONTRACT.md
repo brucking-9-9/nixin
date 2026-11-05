@@ -1739,6 +1739,10 @@ through `apply` (after `apply --dry-run` and a confirmation). The Packages page 
 `list` (one call, every scope; its filter and for-whom toggle narrow the loaded rows with
 `--filter`/`--scope` semantics, so they cost nothing) and `outdated` (lock mode, or
 `--published`); both documents are kept until a write or an `update` makes them stale.
+Its Updates tab holds a row (`h`: `pin PNAME`, or `unpin` for a held row) and the kernel
+(`k`: `pin kernel`) through the writer's diff modal, and its Pins tab (`n`) shows `pins`
+(`c`: `pins --check`, `u`: `unpin` of the row); after an `update` with holds it runs `pins
+--check` and says how many warnings and blocks there are.
 The Options page shows `search --kind opt|hm --limit 50` and, for the selected option,
 `where NAME --kind option` (no `info`: the search row has the upstream fields); Set and
 Unset are `set`/`unset` (with `--home USER` for a Home Manager option) after their
@@ -1773,7 +1777,10 @@ the same verb handlers in-process, on a thread pool, and renders their documents
 the same view-model (`nixin.ui.view`). It writes only through `add`/`rm`/`set`/`unset`
 (after showing their `--dry-run` diff in a dialog) and `update` (after `update --dry-run`
 in a dialog), and switches only through `apply` (after `apply --dry-run` and a
-confirmation). Its Packages and Options pages use the verbs the TUI's do. Try (the
+confirmation). Its Packages and Options pages use the verbs the TUI's do, with the holds
+(an update row's hold / unhold button, "hold kernel" beside the kernel line, the update
+dialog's `hold` lines) and a Pins page (Ctrl+6: `pins`, Check = `pins --check`, Unpin
+through the diff dialog). Try (the
 details pane) runs `try PKG --build-only` as the TUI does, then starts a graphical app
 detached, or opens a CLI program's `command` in the person's terminal (`$TERMINAL -e`,
 else the first of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal,
@@ -1823,7 +1830,7 @@ anything (a `nixin-state outdated --help` used to run the job, notification incl
 |---|---|---|
 | `outdated-lock.json`, `outdated-published.json` | `outdated` | the `outdated` and `outdated --published` documents for the authoritative tree (`$NIXIN_AUTHORITATIVE`, else `/etc/nixos`) |
 | `status.json` | `status` | the `status` document for the workspace (`$NIXIN_CONFIG`, else `~/nixos` when it is a git checkout, else the authoritative tree); skipped while neither tree's HEAD, the workspace's files nor `/run/current-system` changed and the last run is under an hour old |
-| `summary.json` | both, under an `flock` (`.summary.lock`) | `outdated` = `{count, source (lock\|published), total, kernel {from, to} \| null, days_newer, at}` (lock mode when it worked); `lock`, `published` (the same per document); `pending` = `{count, commits, dirty, untracked, apply, workspace, at}` (`count` = commits + changed files, `installer/history.jsonl` aside; `apply`: the running system is not the authoritative HEAD's build); `errors` = `{lock\|published\|status: {code, message, at}}` (the last failure, dropped on the next success); `notified` = `{count, at}`; `at`, `host` |
+| `summary.json` | both, under an `flock` (`.summary.lock`) | `outdated` = `{count, source (lock\|published), total, kernel {from, to} \| null, days_newer, at}` (lock mode when it worked); `lock`, `published` (the same per document); `pending` = `{count, commits, dirty, untracked, apply, workspace, at}` (`count` = commits + changed files, `installer/history.jsonl` aside; `apply`: the running system is not the authoritative HEAD's build); `pins` = `{count, stale, at}` (the workspace's `pins`, written with `status`; `stale`: pins at the lock's own revision); `errors` = `{lock\|published\|status\|pins: {code, message, at}}` (the last failure, dropped on the next success); `notified` = `{count, at}`; `at`, `host` |
 
 `count` is packages whose version goes up. A failed verb keeps the last good numbers and
 still exits 0. `outdated` sends `notify-send -a nixin` when that count changed since the

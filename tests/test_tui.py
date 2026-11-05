@@ -10,14 +10,14 @@ import json
 
 import pytest
 from textual.widgets import Button, DataTable, TextArea
-from tui_fake import COWSAY, HM_OPTIONS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
+from tui_fake import COWSAY, HM_OPTIONS, HOLDS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
 
 from nixin.cli import main
+from nixin.tui import options, screens
 from nixin.tui.app import NixinApp
 from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, SetOptionModal, UpdateModal
 from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
-from nixin.tui import options, screens
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
 from nixin.tui.widgets import BuildTracker, Fields, Line, LogView, NoticeBox, Spans
 from nixin.ui import backend, view
@@ -268,6 +268,66 @@ def test_update_rows_lock_mode():
     assert view.outdated_summary({**doc, "up_to_date": True}) == (
         "the lock already has 0bb2eed: nothing would change"
     )
+
+
+def test_update_rows_with_holds_and_the_kernel_hold():
+    doc = load("outdated_19BK_holds")
+    rows = view.update_rows(doc)
+    held = [r for r in rows if r.held]
+    assert [(r.pname, r.old, r.new, r.held, r.note) for r in held] == [
+        ("firefox", "158.0.1", "159.0", "firefox", "(held by pin firefox; stale)"),
+        ("kernel", "7.2.12", "7.2.14", "kernel", "(held by pin kernel; stale)"),
+    ]
+    assert all(r.style == "warn" for r in held)
+    assert held[0].hold_args == ["unpin", "firefox"]
+    plain = next(r for r in rows if not r.held)
+    assert plain.hold_args == ["pin", plain.pname]
+    assert view.kernel_line(doc) == view.Span(
+        "kernel 7.2.12 (held by pin kernel; 7.2.14 available)", "dim"
+    )
+    assert view.kernel_hold(doc) == ("unhold kernel (pin kernel)", ["unpin", "kernel"])
+    assert view.kernel_hold(load("outdated_19BK")) == ("hold kernel at 7.2.12", ["pin", "kernel"])
+    assert view.kernel_hold(load("outdated_19BK_published")) is None
+    fields = [f for f in view.update_confirm_fields(load("update_dry"), doc) if f.label == "hold"]
+    tail = " — holds nothing yet, it takes effect with this update"
+    assert [f.value for f in fields] == [
+        "firefox: firefox stays at 158.0.1 (the target has 159.0)" + tail,
+        "kernel: linux_7_2 stays at 7.2.12 (the target has 7.2.14)" + tail,
+    ]
+
+
+def test_pin_rows_columns_and_checks():
+    doc = load("pins_19BK_check")
+    rows = view.pin_rows(doc)
+    assert [(r.name, r.version, r.held_at, r.stale) for r in rows] == [
+        ("firefox", "158.0", "1d06008 (2026-11-03)", False),
+        ("kernel", "7.2.12", "3ec6363 (2026-10-23)", True),
+    ]
+    assert rows[1].note == "(stale: flake.lock is at 3ec6363, the revision it pins)"
+    assert rows[1].style == "warn" and rows[0].style == "accent"
+    for width in (46, 84, 116):
+        cols = view.pin_columns(width)
+        assert sum(c.width for c in cols) + 2 * (len(cols) - 1) <= width
+        for r in rows:
+            assert len(view.pin_cells(r, cols)) == len(cols)
+    assert view.pins_summary(doc) == "2 pins, 1 stale (flake.lock: nixpkgs 3ec6363)"
+    assert view.pin_detail(rows[0]).startswith("mode attr · firefox at 158.0 from nixpkgs 1d06008")
+    fields = view.check_fields(doc["checks"])
+    assert [(f.label, f.style) for f in fields] == [
+        ("warn", "warn"),
+        ("info", "dim"),
+        ("info", "dim"),
+        ("info", "dim"),
+    ]
+    assert view.check_counts(doc["checks"]) == "1 warning"
+    assert view.check_counts([{"level": "block"}, {"level": "block"}, {"level": "warn"}]) == (
+        "2 blocks, 1 warning"
+    )
+    assert view.check_counts([{"level": "info"}]) == ""
+    assert view.writer_summary(load("pin_kernel")) == (
+        "pin kernel at 7.2.12 (configuration.nix, installer/19BK.nix, installer/state.json)"
+    )
+    assert view.writer_summary(load("unpin_kernel")).startswith("unpin kernel (")
 
 
 def test_update_rows_published():
@@ -959,6 +1019,100 @@ def test_packages_updates_then_update_lock_to_pending(size):
     assert sorted(verbs[-2:]) == [["list"], ["outdated"]]  # both again, in two workers
     assert app.writes == ["nixpkgs 3ec6363 → 0bb2eed (flake.lock)"]
     assert app.return_value is None or "nothing changed" not in app.return_value
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_packages_hold_kernel_hold_row_pins_tab_check_unpin(size):
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot)
+        await pilot.press("t")
+        await settle(app, pilot)
+        table = screen.query_one("#up-table", DataTable)
+        assert table.row_count == 14
+        if size == DESKTOP:
+            assert "hold kernel at 7.2.12 (k)" in screen_text(app)
+        await pilot.press("k")  # hold the kernel: pin kernel --dry-run → the diff modal
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, DiffModal) and modal.heading == "pin kernel — preview"
+        spans = modal.query_one("#diff", Spans).spans
+        assert view.Span("+        linux_7_2 = pinned.linux_7_2;", "add") in spans
+        await pilot.press("w")  # written: outdated again, now with holds
+        await settle(app, pilot)
+        assert app.screen is screen
+        assert table.row_count == 15  # 12 changed + fuse + firefox held + kernel held
+        assert screen.query_one("#up-kernel", Line).value == (
+            "kernel 7.2.12 (held by pin kernel; 7.2.14 available)"
+        )
+        text = screen_text(app)
+        assert "held by pin kernel" in text
+        if size == DESKTOP:
+            assert "unhold kernel (pin kernel) (k)" in text
+        fits(app)
+        # `h` on a row that is not held: pin PNAME (firefox is held in the fixture; take fuse)
+        table.move_cursor(row=next(i for i, r in enumerate(screen.updates) if r.pname == "fuse"))
+        await pilot.press("h")
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal) and app.screen.heading == "pin fuse — preview"
+        await pilot.press("escape")  # not this time
+        await settle(app, pilot)
+        await pilot.press("u")  # the update confirm lists the holds
+        await settle(app, pilot)
+        assert isinstance(app.screen, UpdateModal)
+        text = app.screen.query_one("#update-fields", Fields).text
+        assert "kernel: linux_7_2 stays at 7.2.12 (the target has 7.2.14)" in text
+        await pilot.press("escape")
+        await settle(app, pilot)
+        # the Pins tab
+        await pilot.press("n")
+        await settle(app, pilot)
+        assert screen.tab == "pins"
+        ptable = screen.query_one("#pn-table", DataTable)
+        assert ptable.row_count == 2 and ptable.has_focus
+        assert screen.query_one("#pn-head", Line).value == (
+            "19BK: 2 pins, 1 stale (flake.lock: nixpkgs 3ec6363)"
+        )
+        text = screen_text(app)
+        assert "Check (c)" in text and "Unpin (u)" in text
+        if size == DESKTOP:  # a phone shows the first row only (25 lines)
+            assert "kernel" in text and "(stale: flake.lock is at 3ec6363" in text
+        fits(app)
+        await pilot.press("c")  # pins --check
+        await settle(app, pilot)
+        checks = screen.query_one("#pn-checks", Fields).text
+        assert "warn" in checks and "firefox held at 158.0 brings its own glibc 2.42" in checks
+        fits(app)
+        ptable.move_cursor(row=1)  # kernel
+        await pilot.press("u")  # unpin kernel → the diff modal → write
+        await settle(app, pilot)
+        assert isinstance(app.screen, DiffModal) and app.screen.heading == "unpin kernel — preview"
+        await pilot.press("w")
+        await settle(app, pilot)
+        assert app.screen is screen and screen.tab == "pins"
+        await pilot.press("t")  # from pins, t goes to installed
+        await settle(app, pilot)
+        assert screen.tab == "installed"
+
+    app, fake = drive(script, HOLDS, size=size, host="19BK")
+    verbs = fake.verbs()
+    assert verbs[:5] == [
+        ["list"],
+        ["outdated"],
+        ["pin", "kernel", "--dry-run"],
+        ["pin", "kernel"],
+        ["outdated"],
+    ]
+    assert ["pin", "fuse", "--dry-run"] in verbs
+    assert ["update", "--dry-run"] in verbs and ["update"] not in verbs
+    assert verbs[-4:] == [
+        ["pins", "--check"],
+        ["unpin", "kernel", "--dry-run"],
+        ["unpin", "kernel"],
+        ["pins"],
+    ]
+    assert ["pins"] in verbs[:-1]
+    assert app.writes[0].startswith("pin kernel at 7.2.12 (")
+    assert app.writes[1].startswith("unpin kernel (")
 
 
 def test_packages_nothing_to_update_and_errors():

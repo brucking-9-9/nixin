@@ -79,7 +79,7 @@ NoticeBox.-action {
     margin: 0 1;
 }
 
-#pk-switch, #pk-installed, #pk-updates {
+#pk-switch, #pk-installed, #pk-updates, #pk-pins {
     width: 100%;
     height: 1fr;
 }
@@ -101,20 +101,20 @@ NoticeBox.-action {
     margin-left: 1;
 }
 
-#pk-table, #up-table {
+#pk-table, #up-table, #pn-table {
     height: 1fr;
     margin: 0 1;
     background: $background;
     scrollbar-size-vertical: 1;
 }
 
-#pk-detail, #up-summary {
+#pk-detail, #up-summary, #pn-detail {
     height: auto;
     max-height: 3;
     padding: 0 1;
     border-top: hkey $panel;
 }
-#pk-footer, #up-head, #up-kernel, #up-notes {
+#pk-footer, #up-head, #up-kernel, #up-notes, #pn-head {
     height: auto;
     max-height: 3;
     padding: 0 1;
@@ -213,6 +213,18 @@ Screen.-narrow .pane {
 #actions Button {
     margin-right: 1;
     min-width: 6;
+}
+#pn-actions {
+    height: auto;
+    padding: 0 1;
+}
+#pn-actions Button {
+    margin-right: 1;
+    min-width: 6;
+}
+/* a phone has no room for a third button; `k` does the same */
+Screen.-narrow #up-kernel-hold, #up-kernel-hold.hidden {
+    display: none;
 }
 /* Details on a phone: Add, Try, Remove and the home toggle do not fit one row of 50 */
 DetailsScreen.-narrow #actions {

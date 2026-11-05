@@ -139,16 +139,22 @@ def test_status_pending_part_and_skip(sd, fake, monkeypatch):
             },
         }
     }
+    fake.docs["pins"] = {"ok": True, "count": 2, "stale": 1, "pins": []}
     monkeypatch.setattr(state, "trees_key", lambda ws, auth: "k1")
     assert state.main(["status"]) == 0
     p = summary(sd)["pending"]
     assert p["count"] == 2 and p["commits"] == 1 and p["dirty"] == 1 and p["untracked"] == 1
     assert p["apply"] is True
+    pins = summary(sd)["pins"]
+    assert (pins["count"], pins["stale"]) == (2, 1) and pins["at"] == p["at"]
+    assert (
+        fake.calls[-1][:3] == ("pins", "--config", "/home/a/nixos") or fake.calls[-1][0] == "pins"
+    )
     n = len(fake.calls)
     state.main(["status"])  # nothing changed, younger than an hour: skipped
     assert len(fake.calls) == n
     state.main(["status", "--force"])
-    assert len(fake.calls) == n + 1
+    assert len(fake.calls) == n + 2  # status, then pins
 
 
 def test_in_quiet_wraps_midnight():
