@@ -75,6 +75,9 @@ class NixinApp(App[str]):
         self.list_stale = True
         self.outdated_docs: dict[str, Doc] = {}  # mode (lock | published) → document
         self.pins_doc: Doc | None = None  # the Pins tab's last ok `pins` document
+        # where plan and apply build (Pending's `w`): a mode of view.build_choices, for the session
+        self.build_choices = view.build_choices(backend.config)
+        self.build_where = self.build_choices[0][0]
         self.options_last: tuple[str, str, Doc] | None = None  # the Options page's query, kind, doc
         self.register_theme(THEME)
         self.theme = THEME.name
@@ -349,7 +352,30 @@ class NixinApp(App[str]):
             if message is not None:
                 self.push_screen(ApplyScreen(message))
 
-        self.fetch("apply", "--dry-run", done=dry, busy="checking", label="apply --dry-run")
+        self.fetch(
+            "apply",
+            "--dry-run",
+            *self.build_args(),
+            done=dry,
+            busy="checking",
+            label="apply --dry-run",
+        )
+
+    # --- where the build runs -------------------------------------------------------------
+
+    @property
+    def build_where_label(self) -> str:
+        return dict(self.build_choices)[self.build_where]
+
+    def build_args(self) -> list[str]:
+        """The plan/apply flags of the selected build location (none for local)."""
+        return view.build_flags(self.build_where)
+
+    def next_build_where(self) -> str:
+        """Cycle the location: local → the remote's big jobs → everything → split."""
+        modes = [m for m, _ in self.build_choices]
+        self.build_where = modes[(modes.index(self.build_where) + 1) % len(modes)]
+        return self.build_where_label
 
     def applied_doc(self, doc: Doc) -> None:
         if doc.get("ok"):

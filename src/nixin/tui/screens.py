@@ -532,6 +532,7 @@ class PendingScreen(BuildScreen):
         Binding("escape", "back", "Back"),
         Binding("b", "plan", "Plan", show=False),
         Binding("a", "apply", "Apply", show=False),
+        Binding("w", "where", "Build where", show=False),
         Binding("y", "sync", "Sync", show=False),
         Binding("x", "stop", "Stop", show=False),
         Binding("z", "undo", "Undo lock move", show=False),
@@ -559,6 +560,7 @@ class PendingScreen(BuildScreen):
             yield Button("Plan (b)", id="plan-btn", variant="primary", compact=True)
             yield Button("Stop (x)", id="stop-btn", variant="warning", compact=True)
             yield Button("Apply… (a)", id="apply-btn", variant="error", compact=True)
+            yield Button("Build: local (w)", id="where-btn", compact=True)
             yield Button("Sync (y)", id="sync-btn", compact=True)
             yield Button("Undo lock move (z)", id="undo-btn", variant="warning", compact=True)
         yield from self.compose_bottom()
@@ -572,7 +574,25 @@ class PendingScreen(BuildScreen):
     def on_screen_resume(self) -> None:  # also on the first push
         self.render_session()
         self.render_plan()
+        self.render_where()
         self.action_refresh(force=False)
+
+    def render_where(self) -> None:
+        """The build-location button's label and, on a phone (no button), the plan title."""
+        label = self.nixin.build_where_label
+        self.query_one("#where-btn", Button).label = f"Build: {label} (w)"
+        local = self.nixin.build_where == self.nixin.build_choices[0][0]
+        self.query_one("#plan-title", Title).update("plan" if local else f"plan · build: {label}")
+
+    def action_where(self) -> None:
+        """Cycle where plan and apply build (local, the remote's big jobs, everything,
+        split); remembered for the session."""
+        if self.nixin.busy in ("planning", "applying"):
+            self.notify(f"wait: {self.nixin.busy} is still running", severity="warning")
+            return
+        label = self.nixin.next_build_where()
+        self.render_where()
+        self.notify(f"plan and apply build: {label}")
 
     def render_session(self) -> None:
         writes = [view.Field("wrote", w, "accent") for w in self.nixin.writes]
@@ -616,6 +636,7 @@ class PendingScreen(BuildScreen):
         token = Cancel(watched=True)
         started = self.nixin.fetch(
             "plan",
+            *self.nixin.build_args(),
             done=self.show_plan,
             stream=True,
             log=log,
@@ -699,6 +720,7 @@ class PendingScreen(BuildScreen):
             "plan-btn": self.action_plan,
             "stop-btn": self.action_stop,
             "apply-btn": self.action_apply,
+            "where-btn": self.action_where,
             "sync-btn": self.action_sync,
             "undo-btn": self.action_undo,
         }[event.button.id or ""]()
@@ -755,7 +777,7 @@ class ApplyScreen(BuildScreen):
         self.run_apply()
 
     def run_apply(self) -> None:
-        args = ["-m", self.message] if self.message else []
+        args = (["-m", self.message] if self.message else []) + self.nixin.build_args()
         self.query_one("#log", LogView).reset()
         token = Cancel(watched=True)
         started = self.nixin.fetch(

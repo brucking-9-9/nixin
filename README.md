@@ -40,6 +40,7 @@ status where list           truth       what this config gives a host (evaluates
 explain                     explain     one option or package: the config's side and upstream's docs together
 add rm set unset            writer      edit a user-owned workspace clone of the config
 plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch
+                                        (--remote [--all|--split]: build on the remote builder)
                                         (another host: push to the hub, pull and switch there over ssh); hub sync
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
@@ -109,6 +110,16 @@ which touch the network, run nix or write files, and the cache locations.
   in place on a terminal; the documents end with a `build` summary. Ctrl-C stops the
   build cleanly (`cancelled`; an apply keeps its commit and continues next time); once
   apply pulls and switches it cannot be stopped any more, and says so.
+  `plan --remote` and `apply --remote` build with a remote nix builder (the switch is
+  unchanged): the `--builders` spec comes from a command (`$NIXIN_BUILDERS_CMD`, else
+  `builders_cmd` in `installer/state.json`, else `mbp13-builders`, the hub config's
+  helper), run only when something has to be built. Without a flag only big-parallel
+  derivations (kernels) go there; `--all` sends everything not substituted
+  (`--max-jobs 0`); `--split` lets the remote take any job while this machine builds too;
+  `--builders SPEC` passes a literal spec. A builder that is asleep or offline means a
+  local build with a warning, like `rbuild`; a user the nix daemon does not trust gets
+  `builders-untrusted` (nix would ignore `--builders`) with the fix. The documents say
+  where it built (`build.remote`), the tracker names the builder per derivation.
   `plan` and `apply` also compare the new system's kernel, initrd, modules, kernel
   params, bootspec and specialisations with the running one: `reboot_needed` and a
   "needs a reboot" line; and they add up the new kernel/initrd files the bootloader will
@@ -219,7 +230,9 @@ typing debounced, the CLI's `source channel@rev` footer) → Details (info, vers
 previewed as the writer's `--dry-run` diff before anything is written, with a Home
 Manager user toggle → Pending (`status.pending`, `plan` with the build tracker — built/total,
 fetched, the derivations building, the log tail, the ETA — and nix's output streamed, then
-the closure diff; `x` / Stop stops the build) → Apply (confirm with `apply --dry-run`'s
+the closure diff; `x` / Stop stops the build; `w` cycles where plan and apply build:
+local, the remote's big jobs, everything, split — kept for the session, and the tracker
+says "building on mbp13 · big jobs") → Apply (confirm with `apply --dry-run`'s
 commands and sudo readiness, a commit message, the tracker and the switch log streamed,
 the new generation; Stop works until the pull starts; without a sudo ticket the exact
 root commands to copy). Status shows the lock, HEAD, the running system,
@@ -274,7 +287,10 @@ Remove / Set… / Unset for the system or a Home Manager user. Every write opens
 writer's `--dry-run` diff in a dialog first (the user can be changed there), then Write.
 **Pending** shows `status.pending`, this session's writes and applies, and Plan (the build
 tracker while nix runs: built/total, fetched, the derivations building, the log tail, the
-ETA, with a Stop button next to Plan; nix's output streamed; then the closure diff);
+ETA, with a Stop button next to Plan; nix's output streamed; then the closure diff). A
+combo next to Plan picks where plan and apply build (local, the remote's big jobs,
+everything, split: `--remote [--all|--split]`), kept for the session; the tracker's
+header says "building on mbp13 · big jobs" (or that it fell back to local).
 Apply… opens the apply dialog (`apply --dry-run`: what is committed, what root runs, sudo
 readiness; a commit message; the tracker and the switch log streamed, Stop until the pull
 starts; the new generation; without a sudo ticket the exact root commands, with Copy and

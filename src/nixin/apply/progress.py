@@ -169,9 +169,18 @@ class Tracker:
         durations: Durations | None = None,
         clock: Callable[[], float] = time.monotonic,
         local_host: str | None = None,
+        remote: dict[str, Any] | None = None,
     ) -> None:
         self.clock = clock
         self.t0 = clock()
+        # builders.resolve's block (where the build was asked to run), or None: local.
+        # Its spec's hosts map to its name, so rows say "on mbp13", not the tailnet IP.
+        self.remote = remote
+        self.aliases: dict[str, str] = {}
+        if remote and remote.get("builders") and remote.get("name"):
+            from .builders import spec_hosts  # (builders imports host_of from here)
+
+            self.aliases = {h: remote["name"] for h in spec_hosts(remote["builders"])}
         self.end: float | None = None
         self.state = "running"  # running | done | failed | cancelled
         self.local = local_host or _hostname()
@@ -307,11 +316,12 @@ class Tracker:
             path, machine = str(fields[0]), str(fields[1]) if len(fields) > 1 else ""
             r = self._row(path)
             self.acts[ev.get("id")] = path
+            host = host_of(machine, self.local)
             if r["status"] == "building" and r["machine"] and not machine:
                 return None  # the remote daemon's own build activity, nested in ours
             r.update(
                 status="building",
-                host=host_of(machine, self.local),
+                host=self.aliases.get(host, host),
                 machine=machine,
                 started=self.clock(),
                 ended=None,
@@ -463,6 +473,7 @@ class Tracker:
             "eta_s": eta,
             "eta_known": [known, open_n] if eta is not None else None,
             "errors": self.errors,
+            "remote": dict(self.remote) if self.remote else None,
         }
 
     def summary(self) -> dict[str, Any]:
@@ -480,6 +491,7 @@ class Tracker:
                 "done": snap["downloads"]["done"],
                 "bytes_done": snap["downloads"]["bytes_done"],
             },
+            "remote": snap["remote"],
         }
 
 

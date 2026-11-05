@@ -52,7 +52,7 @@ from typing import Any
 
 from ..cache import default_root
 from ..configrepo import DEFAULT_CONFIG, ConfigRepo, NixinError, local_hostname
-from . import build, commitmsg, privilege, proc, render, safety, system
+from . import build, builders, commitmsg, privilege, proc, render, safety, system
 from .git import Git, Status
 from .system import HISTORY
 
@@ -100,6 +100,8 @@ def register(sub: argparse._SubParsersAction) -> None:
             help=f"root-owned clone the system switches from (default: ${ENV_AUTHORITATIVE} "
             f"or {DEFAULT_CONFIG})",
         )
+    for verb in ("plan", "apply"):  # the build step's remote builder (builders.py)
+        builders.add_arguments(sub.choices[verb])
     ap = sub.choices["apply"]
     ap.add_argument("-m", "--message", help="commit message (default: generated)")
     ap.add_argument("--dry-run", action="store_true", help="print the commands, run none of them")
@@ -148,6 +150,7 @@ class Ctx:
     cache: build.PlanCache = field(default_factory=build.PlanCache)
     warnings: list[str] = field(default_factory=list)
     cancel: proc.Cancel = field(default_factory=proc.Cancel)
+    remote: dict[str, Any] | None = None  # builders.requested: None for a local build
 
     @property
     def human(self) -> bool:
@@ -168,9 +171,12 @@ def authoritative_path(explicit: str | None = None) -> Path:
     return Path(os.path.abspath(Path(raw).expanduser()))
 
 
-def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
+def _context(ns: argparse.Namespace, *, check_host: bool = True, build_flags: bool = False) -> Ctx:
+    """`build_flags` (plan, apply): read --remote/--all/--split/--builders too (`usage` for
+    --all/--split alone, before the config is opened; `builders-untrusted` after)."""
     from ..writer.workspace import Workspace  # here: `status` imports this package
 
+    mode = builders.mode_of(ns) if build_flags else builders.LOCAL
     ws = Workspace.open(ns.config, nix=build.nix)  # config-not-found / not-a-workspace
     git = Git(ws.root)
     if not git.is_repo():
@@ -192,6 +198,15 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
             raise NixinError(
                 "unknown-host", f"{host!r} is not in nixosConfigurations ({', '.join(hosts)})"
             )
+    remote = None
+    if mode != builders.LOCAL:
+        if host != local_hostname():
+            raise NixinError(
+                "usage",
+                f"--remote/--builders build on this machine; {host} is not it, and "
+                "`apply --host H` builds on H itself",
+            )
+        remote = builders.requested(ns, ws.root)  # builders-untrusted
     return Ctx(
         ns,
         ws.root,
@@ -203,6 +218,7 @@ def _context(ns: argparse.Namespace, *, check_host: bool = True) -> Ctx:
         host,
         host == local_hostname(),
         cancel=token,
+        remote=remote,
     )
 
 
@@ -302,7 +318,14 @@ def _target(
         return {"out": None, "drv": None, "cached": False, "cache_key": None}
     ctx.cancel.check()
     try:
-        b = build.build(ctx.repo, ctx.host, stream=ctx.human, cancel=ctx.cancel)
+        b = build.build(
+            ctx.repo,
+            ctx.host,
+            stream=ctx.human,
+            cancel=ctx.cancel,
+            remote=ctx.remote,
+            warnings=ctx.warnings,
+        )
     except NixinError as e:
         summary = getattr(e, "build", None)
         if summary is None and not progress:
@@ -331,7 +354,7 @@ def _plan(ns: argparse.Namespace) -> dict[str, Any]:
 def _plan_run(ns: argparse.Namespace, token: proc.Cancel) -> dict[str, Any]:
     t0 = time.monotonic()
     token.step = "prepare"
-    ctx = _context(ns)
+    ctx = _context(ns, build_flags=True)
     st = ctx.git.status()
     head = ctx.git.head()
     auth = _auth_doc(ctx)
@@ -453,7 +476,7 @@ def _apply(ns: argparse.Namespace) -> dict[str, Any]:
 def _apply_run(ns: argparse.Namespace, token: proc.Cancel) -> dict[str, Any]:
     t0 = time.monotonic()
     token.step = "prepare"
-    ctx = _context(ns)
+    ctx = _context(ns, build_flags=True)
     mode = "boot" if ns.no_switch else "switch"
     if not ctx.local:  # push to the hub, then pull and switch there over ssh
         from . import remote
@@ -694,7 +717,11 @@ def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps,
         )
     if target["out"] is None:
         commands.append(
-            {"step": "build", "privileged": False, "argv": build.build_command(ctx.repo, ctx.host)}
+            {
+                "step": "build",
+                "privileged": False,
+                "argv": build.build_command(ctx.repo, ctx.host, ctx.remote),
+            }
         )
     for s in steps:
         commands.append(
@@ -724,6 +751,7 @@ def _dry_run(ctx, st, head, rel, before, to_commit, add_history, message, steps,
         "privilege": {
             k: {"backend": bk[k].name, "ready": v is None, "why": v} for k, v in ready.items()
         },
+        "remote": ctx.remote,
         "diff": build.diff(before["store_path"], target["out"]) if target["out"] else None,
         "boot": boot,
         "reboot_needed": boot["reboot_needed"] if boot else None,

@@ -1834,3 +1834,94 @@ def test_apply_stop_is_refused_once_root_works():
 
     app, _ = drive(script)
     assert app.applied == []
+
+
+# --- the build location (plan/apply --remote) --------------------------------------------------
+
+
+def test_build_where_cycles_and_flags_plan_and_apply():
+    async def script(app, pilot, fake):
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        screen = app.screen
+        assert isinstance(screen, PendingScreen)
+        btn = screen.query_one("#where-btn", Button)
+        assert str(btn.label) == "Build: local (w)" and app.build_where == "local"
+        await pilot.press("w")
+        assert app.build_where == "big" and str(btn.label) == "Build: mbp13: big jobs (w)"
+        assert "plan · build: mbp13: big jobs" in screen_text(app)
+        await pilot.press("b")
+        await settle(app, pilot, 0.1)
+        assert fake.verbs()[-1] == ["plan", "--remote"]
+        await pilot.press("w", "w")
+        assert app.build_where == "split" and "split (mbp13 + local)" in str(btn.label)
+        await pilot.press("a")
+        await settle(app, pilot)
+        assert isinstance(app.screen, ApplyModal)
+        assert fake.verbs()[-1] == ["apply", "--dry-run", "--remote", "--split"]
+        await pilot.press("enter")
+        await settle(app, pilot)
+        assert isinstance(app.screen, ApplyScreen)
+        assert fake.verbs()[-1] == ["apply", "--remote", "--split"]
+        await pilot.press("escape")
+        await settle(app, pilot)
+        await pilot.press("w")  # wraps around to local
+        assert app.build_where == "local" and "plan · build" not in screen_text(app)
+        await pilot.press("b")
+        await settle(app, pilot, 0.1)
+        assert fake.verbs()[-1] == ["plan"]
+
+    drive(script)
+
+
+def test_build_where_on_a_phone_is_the_key_and_the_title():
+    async def script(app, pilot, fake):
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        screen = app.screen
+        assert not screen.query_one("#where-btn", Button).display
+        await pilot.press("w", "w")
+        await settle(app, pilot)
+        assert app.build_where == "all" and "plan · build: mbp13: everything" in screen_text(app)
+        w, _ = app.size
+        for widget in screen.query("*"):  # the actions row still fits the 50 columns
+            if widget.display and widget.region.width:
+                assert widget.region.right <= w, widget
+        await pilot.press("b")
+        await settle(app, pilot, 0.1)
+        assert fake.verbs()[-1] == ["plan", "--remote", "--all"]
+
+    drive(script, size=PHONE)
+
+
+def test_build_tracker_says_where_it_builds():
+    async def script(app, pilot, fake):
+        fake.build_delay = 5.0
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        screen = app.screen
+        await pilot.press("w", "w")  # mbp13: everything
+        assert app.build_where == "all"
+        await pilot.press("b")
+        await pilot.pause(0.7)
+        tracker = screen.query_one("#build", BuildTracker)
+        assert tracker.text.splitlines()[1] == "building on mbp13 · everything"
+        assert "building on mbp13 · everything" in screen_text(app)
+        await pilot.press("w")  # busy: the location cannot change under a running build
+        assert app.build_where == "all"
+        await pilot.press("x")
+        await settle(app, pilot, 0.2)
+        assert fake.verbs()[-1] == ["plan", "--remote", "--all"]
+
+    drive(script)
+
+
+def test_build_where_view_helpers():
+    snap = {**load("plan_building"), "remote": None}
+    assert view.build_where(snap) == "" and view.build_where(None) == ""
+    snap["remote"] = {"mode": "big", "name": "mbp13", "builders": "x", "fell_back": False}
+    assert view.build_where(snap) == "building on mbp13 · big jobs"
+    b = {**load("plan_cancelled")["error"]["build"], "remote": snap["remote"]}
+    assert view.build_summary(b).endswith("(stopped); building on mbp13 · big jobs")
+    assert view.build_flags("local") == [] and view.build_flags("split") == ["--remote", "--split"]
+    assert view.build_choices(None)[0] == ("local", "local")

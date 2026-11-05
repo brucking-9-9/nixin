@@ -230,6 +230,10 @@ Screen.-narrow #up-kernel-hold, #up-kernel-hold.hidden {
 Screen.-narrow #up-undo, #up-undo.hidden, Screen.-narrow #undo-btn, #undo-btn.hidden {
     display: none;
 }
+/* where plan and apply build: on a phone the `w` key, the plan title says which */
+Screen.-narrow #where-btn {
+    display: none;
+}
 /* Details on a phone: Add, Try, Remove and the home toggle do not fit one row of 50 */
 DetailsScreen.-narrow #actions {
     layout: grid;

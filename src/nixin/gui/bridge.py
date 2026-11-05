@@ -972,15 +972,21 @@ STEP_NOTE = {
     "switch": "switching (cannot be stopped)",
     "verify": "verifying (cannot be stopped)",
 }
-TRACKING_STATE = {"buildHead": "", "stepNote": "", "stopEnabled": False, "stopLabel": "Stop"}
+TRACKING_STATE = {
+    "buildHead": "",
+    "buildPlace": "",  # where the build runs: "building on mbp13 · big jobs" (empty: local)
+    "stepNote": "",
+    "stopEnabled": False,
+    "stopLabel": "Stop",
+}
 TRACKING_LISTS = {"build": models.FIELD, "tail": models.LINE}
 
 
 class _Tracking:
     """Mixed into a VM that runs a build: `track(token)` polls the token's snapshot every
-    TRACK_MS into `buildHead`, `stepNote`, `stopEnabled`, `stopLabel` and the `build` and
-    `tail` models; `untrack()` clears them. The VM declares TRACKING_STATE and
-    TRACKING_LISTS and a `stop` slot."""
+    TRACK_MS into `buildHead`, `buildPlace`, `stepNote`, `stopEnabled`, `stopLabel` and
+    the `build` and `tail` models; `untrack()` clears them. The VM declares
+    TRACKING_STATE and TRACKING_LISTS and a `stop` slot."""
 
     _token: Cancel | None = None
     _timer: QTimer | None = None
@@ -1013,6 +1019,7 @@ class _Tracking:
         note = STEP_NOTE.get(token.step, "")
         self.set(
             buildHead=view.build_head(snap),
+            buildPlace=view.build_where(snap),
             stepNote=note if (snap is None or token.step != "build") else "",
             stopEnabled=token.stoppable,
             stopLabel="Stopping…" if token.requested else "Stop",
@@ -1067,6 +1074,7 @@ class PendingVM(VM, _Tracking):
     synced = state(bool, "synced", changed)
     canUndo = state(bool, "canUndo", changed)
     buildHead = state(str, "buildHead", changed)
+    buildPlace = state(str, "buildPlace", changed)
     stepNote = state(str, "stepNote", changed)
     stopEnabled = state(bool, "stopEnabled", changed)
     stopLabel = state(str, "stopLabel", changed)
@@ -1127,6 +1135,7 @@ class PendingVM(VM, _Tracking):
         token = Cancel(watched=True)
         started = self.gui.fetch(
             "plan",
+            *self.gui.build_args(),
             done=self._planned,
             stream=True,
             log=log,
@@ -1242,6 +1251,7 @@ class ApplyVM(VM, _Tracking):
     noticeSeverity = state(str, "noticeSeverity", changed)
     commands = state(str, "commands", changed)
     buildHead = state(str, "buildHead", changed)
+    buildPlace = state(str, "buildPlace", changed)
     stepNote = state(str, "stepNote", changed)
     stopEnabled = state(bool, "stopEnabled", changed)
     stopLabel = state(str, "stopLabel", changed)
@@ -1258,6 +1268,7 @@ class ApplyVM(VM, _Tracking):
         started = self.gui.fetch(
             "apply",
             "--dry-run",
+            *self.gui.build_args(),
             done=self._dry,
             busy="checking",
             label="apply --dry-run",
@@ -1301,6 +1312,7 @@ class ApplyVM(VM, _Tracking):
         started = self.gui.fetch(
             "apply",
             *(["-m", msg] if msg else []),
+            *self.gui.build_args(),
             done=self._done,
             stream=True,
             log=log,
@@ -2436,8 +2448,14 @@ class Gui(VM):
         "activityHint": "",
         "activitySeconds": 0,
         "page": "search",
+        "buildWhere": "local",  # the build-location selector (view.build_choices modes)
+        "buildWhereIndex": 0,
+        "buildWhereLabel": "local",
     }
     host = state(str, "host", changed)
+    buildWhere = state(str, "buildWhere", changed)
+    buildWhereIndex = state(int, "buildWhereIndex", changed)
+    buildWhereLabel = state(str, "buildWhereLabel", changed)
     configLabel = state(str, "configLabel", changed)
     channel = state(str, "channel", changed)
     busy = state(str, "busy", changed)
@@ -2488,6 +2506,23 @@ class Gui(VM):
         self.image_fetcher: Callable[[str], Any] = _fetch_image  # tests swap it
         chan = channel if channel in view.CHANNELS else view.CHANNELS[0]
         self.set(host=backend.host, configLabel=backend.config_label, channel=chan)
+        self.build_choices = view.build_choices(backend.config)
+
+    # --- where plan and apply build (remembered for the session)
+
+    @Slot(result="QVariantList")
+    def buildChoices(self) -> list[str]:
+        return [label for _mode, label in self.build_choices]
+
+    @Slot(int)
+    def setBuildWhere(self, index: int) -> None:
+        if 0 <= index < len(self.build_choices):
+            mode, label = self.build_choices[index]
+            self.set(buildWhere=mode, buildWhereIndex=index, buildWhereLabel=label)
+
+    def build_args(self) -> list[str]:
+        """The plan/apply flags of the selected location (none for local)."""
+        return view.build_flags(self["buildWhere"])
 
     notice = area("notice")
     search = area("search")

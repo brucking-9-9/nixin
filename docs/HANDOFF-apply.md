@@ -1,5 +1,93 @@
 # HANDOFF: apply layer (branch `apply`; then `core-history-safety`, `hosts-remote-diff`,
-`gc-generations-speed`, `plan-progress`)
+`gc-generations-speed`, `plan-progress`, `remote-plan`)
+
+## `remote-plan`: build on the remote builder (2026-11-05)
+
+Written on 19BK in a worktree (`~/Projects/nixin-wt-remote`, branch `remote-plan` cut from
+`main` @ 22a2152). Nothing pushed or merged; no sudo; the live check ran against a
+throwaway clone of `~/nixos` (plan only, see below).
+
+### State
+
+Done: CLI, documents, tracker, TUI, GUI, tests, docs. Nothing half-done.
+
+- **`apply/builders.py`**: the user's `rbuild` (hub config `home/modules/tools/remote-build.nix`)
+  as verb flags. `plan`/`apply --remote [--all|--split]` and `--builders SPEC`.
+  `mode_of(ns)` (usage for `--all`/`--split` alone, before the config is opened),
+  `requested(ns, workspace)` in `_context` (the trust check: `nix store info --json`
+  `"trusted"`, `builders-untrusted` before anything is built or committed; unknown counts
+  as trusted and nix says what it ignored), `resolve()` in `build.build` right before the
+  `nix build` (the command runs only when a build is really needed, so a cached plan never
+  pings mbp13; a failure is `fell_back` + a warning, never an error), `nix_args()` →
+  `--builders SPEC --builders-use-substitutes [--max-jobs 0]`, inserted before
+  `--log-format internal-json -v`. The command: `$NIXIN_BUILDERS_CMD`, else a top-level
+  `builders_cmd` string in `installer/state.json` (the writer round-trips unknown top-level
+  keys; the env var wins per machine since state.json is shared by both hosts), else
+  `mbp13-builders`; shell-split, the mode flag appended, 30 s timeout. The remote's `name`
+  = the command's basename minus `-builders` (or a literal spec's hosts): the UIs' labels
+  and the tracker's header ("building on mbp13 · big jobs"), and the tracker maps the
+  spec's hosts (the tailnet IP) to it in `drvs[].host`.
+- **Documents**: `build.remote` `{mode, name, builders, command, fell_back}` (null for a
+  local build; also in `error.build`); `apply --dry-run` has `remote` (unresolved) and the
+  build command with the flags (`--builders "$(mbp13-builders --all)"`; it contacts
+  nothing). Human mode: one stderr line at build start (`nixin: building on mbp13 · big
+  jobs`), a `builders` row under `build`, the fallback as a warning. `--remote` with
+  `--host H` (another host) is `usage`: H builds its own system.
+- **TUI**: `w` on Pending (and a `Build: … (w)` button) cycles local → big → everything →
+  split, kept on the app for the session (`App.build_where`, `build_args()`); plan, the
+  apply dry run and the apply get the flags; the tracker widget's second line says where.
+  Refused while a plan/apply runs.
+- **GUI**: a ComboBox next to Plan (`buildWhere`; the root's `buildWhere`/`buildWhereIndex`/
+  `buildWhereLabel`, `buildChoices()`, `setBuildWhere(i)`, `build_args()`); `_Tracking`
+  gains `buildPlace` from the snapshot's `remote`, shown as a line in `BuildTracker.qml`
+  (Pending and the apply dialog).
+- **Tests**: `test_apply` (+8: the fake Machine answers `nix store info --json` and a fake
+  `$NIXIN_BUILDERS_CMD` with a spec or "not reachable"; reachable/all/split/unreachable/
+  untrusted/literal spec/usage/dry run/state.json + env precedence/not on PATH),
+  `test_progress` (+2: the snapshot's `remote`, the host alias, the phrases),
+  `test_tui` (+4, one on a phone: the button is hidden, `w` and the plan title), `test_gui` (+2), the fake backend patches the snapshot's `remote` from
+  the call's flags. `builders-untrusted` in the CONTRACT error table and `ERROR_CODES`.
+
+### Live check (19BK, 2026-11-05)
+
+See the end of this section: `plan --remote` against a throwaway clone of `~/nixos` with
+`XDG_CACHE_HOME` pointed at a scratch dir (plan's cache is content-keyed: at the applied
+commit a warm cache never reaches the builders command). mbp13 was awake; nix had every
+path, so the "build" returned at once with the spec in `build.remote`.
+
+### Judgement calls
+
+1. The builders command runs at build time, not in prepare: a cached plan with `--remote`
+   says nothing about the remote (`build` is null) rather than "fell back" for a build that
+   never happened. The trust check does run in prepare (cheap, and the flag is wrong
+   either way).
+2. `--all`/`--split` without `--remote` is `usage` rather than implying it: `--all` reads as
+   "everything" in too many other senses.
+3. A fallback is a warning, as in `rbuild`; `--json` stays stderr-clean.
+4. The selector lives on the root (App/Gui), not on the Pending screen: plan, the apply dry
+   run and the apply itself start from three places.
+5. The remote's name comes from the command's name, not the spec (the spec has the
+   tailnet IP). A custom command named `foo-builders` labels as `foo`.
+
+### Gaps / next
+
+- Kiosk recording: `rbuild` goes through `nix-plan` (the companion's build kiosk on mbp13,
+  `$XDG_RUNTIME_DIR/nix-plan/<pid>.json`); nixin's build does not. A follow-up: write the
+  tracker's snapshot where `companion-feed` reads it, or let `nix-plan` wrap nixin's nix.
+- `apply --remote` was not run live (it switches); the build step is the same code as
+  `plan --remote`, covered offline.
+- The selector is per session; a `NIXIN_BUILD_WHERE` default or a settings page could
+  remember it.
+
+### How to test
+
+```
+nix develop -c python -m pytest -q tests/test_apply.py tests/test_progress.py tests/test_tui.py tests/test_gui.py
+nix build .#default
+git clone -q ~/nixos /tmp/nixin-remote-live/nixos
+XDG_CACHE_HOME=/tmp/nixin-remote-live/cache nix develop -c env PYTHONPATH=src \
+  python -m nixin.cli --json --config /tmp/nixin-remote-live/nixos plan --remote | jq .build.remote
+```
 
 ## `plan-progress`: the build tracker and stopping a build (2026-11-04)
 

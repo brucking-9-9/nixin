@@ -60,7 +60,9 @@ conflict decision, the live smoke table.
 - [apply](docs/HANDOFF-apply.md) — `plan`, `apply`, `sync`, `status.pending` (branch
   `apply`; mbp13 switched for real, gens 110–112). `history`, `rollback [GEN]` and the boot
   block in `plan`/`apply` (branch `core-history-safety`; round trip gen 121 → 120 in
-  2.9 s). On integrate-night: `apply --host H` for another host over one `ssh -t` session,
+  2.9 s). `plan`/`apply --remote [--all|--split]` build with the remote builder, the UIs'
+  build-location selector (branch `remote-plan`, 2026-11-05, 19BK: the first section of
+  HANDOFF-apply). On integrate-night: `apply --host H` for another host over one `ssh -t` session,
   `~/.config/nixin/hosts.toml`, `needs-tty` (branch `hosts-remote-diff`; offline-tested with
   a fake ssh, live only as dry runs: 19BK is not reachable from mbp13); `generations` and
   `gc [--keep N] [--older-than DAYS] [--dry-run]`, `outdated`'s evals side by side, lazy

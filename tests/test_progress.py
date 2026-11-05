@@ -400,3 +400,46 @@ def test_interrupts_is_a_no_op_off_the_main_thread():
     th.start()
     th.join()
     assert seen["handler"] is before
+
+
+# --- the remote builder in the snapshot -------------------------------------------------------
+
+
+def test_remote_block_in_the_snapshot_and_the_summary_and_the_host_alias():
+    remote = {
+        "mode": "big",
+        "name": "mbp13",
+        "builders": "ssh-ng://nixremote@100.97.50.80 x86_64-linux - 2 1 big-parallel ; "
+        "ssh-ng://master@mbp13 x86_64-linux",
+        "command": "mbp13-builders",
+        "fell_back": False,
+    }
+    t = progress.Tracker(local_host="19BK", remote=remote)
+    feed(t, events())
+    snap = t.snapshot()
+    assert snap["remote"] == remote and t.summary()["remote"] == remote
+    # the fixture's remote build (ssh-ng://master@mbp13) is named after the remote block
+    hosts = {d["name"]: d["host"] for d in snap["drvs"]}
+    assert hosts["unit-dbus.service"] == "mbp13" and hosts["system-path"] == "19BK"
+    t = progress.Tracker(local_host="19BK")
+    feed(t, events())
+    assert t.snapshot()["remote"] is None and t.summary()["remote"] is None
+
+
+def test_where_phrases():
+    from nixin.apply import builders
+
+    base = {"name": "mbp13", "builders": "x", "command": "c", "fell_back": False}
+    assert builders.where(None) == ""
+    assert builders.where({**base, "mode": "big"}) == "building on mbp13 · big jobs"
+    assert builders.where({**base, "mode": "all"}) == "building on mbp13 · everything"
+    assert builders.where({**base, "mode": "split"}) == (
+        "building on both (mbp13 takes any job) · split"
+    )
+    assert builders.where({**base, "mode": "big", "builders": None, "fell_back": True}) == (
+        "mbp13 unreachable · building locally"
+    )
+    assert builders.spec_hosts("ssh://a@[fe80::1]:22 x ; @/etc/nix/machines ; ssh-ng://b") == [
+        "fe80::1",
+        "b",
+    ]

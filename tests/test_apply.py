@@ -48,6 +48,11 @@ EVENTS = (FIXTURES / "apply" / "build-events.jsonl").read_text().splitlines(keep
 # a build that succeeds: the events up to the first derivation's end (the tail fails)
 EVENTS_OK = EVENTS[: next(i for i, ln in enumerate(EVENTS) if '"stop","id":20' in ln) + 2]
 STATE = {"version": 1, "nixos": {HOST: {"packages": ["cowsay"], "options": {}}}, "home": {}}
+BUILDERS_CMD = "fake-mbp13-builders"  # $NIXIN_BUILDERS_CMD in the fixture; the Machine answers it
+SPEC = (
+    "ssh-ng://nixremote@100.97.50.80 x86_64-linux /etc/nix/mbp13-builder 2 1 "
+    "big-parallel,kvm {mandatory} aG9zdGtleQ=="
+)
 
 
 def git(path: Path, *args: str) -> str:
@@ -64,6 +69,8 @@ class Machine:
         self.store = tmp / "store"
         self.store.mkdir()
         self.calls: list[list[str]] = []
+        self.trusted = True  # `nix store info --json`'s "trusted"
+        self.builder_up = True  # the fake builders command answers (else: unreachable, rc 1)
         self.sudo_ok = True
         self.rebuild_rc = 0
         self.rebuild_salt = ""  # root's build lands elsewhere (verify-failed)
@@ -186,6 +193,9 @@ class Machine:
     def nix(self, argv: list[str], kw: dict | None = None) -> proc.Proc:
         kw = kw or {}
         args = [a for a in argv[1:] if a not in ("--option", "warn-dirty", "false")]
+        if args[:3] == ["store", "info", "--json"]:
+            doc = {"trusted": self.trusted, "url": "daemon", "version": "2.34.9"}
+            return proc.Proc(argv, 0, json.dumps(doc), "")
         if args[:2] == ["flake", "metadata"]:
             repo = Path(args[-1])
             meta = {"path": f"/nix/store/{self.source_hash(repo)}-source", "lastModified": 0}
@@ -201,6 +211,7 @@ class Machine:
             return proc.Proc(argv, 0, out.replace("-nixos-system", "-nixos-sys") + ".drv", "")
         if args[:1] == ["build"]:
             assert args[-4:-1] == ["--log-format", "internal-json", "-v"], args
+            self.build_args = args[:-4]
             drv = args[-1].removesuffix("^out")
             sink, self.cancel = kw.get("on_stderr"), kw.get("cancel")
             lines = EVENTS if self.fail_build else EVENTS_OK
@@ -286,6 +297,14 @@ class Machine:
             return self(argv[2:], **kw)
         if argv[0] == "nix":
             return self.nix(argv, kw)
+        if argv[0] == BUILDERS_CMD:  # the fake mbp13-builders: a spec, or "not reachable"
+            assert argv[1:] in ([], ["--all"], ["--split"]), argv
+            if not self.builder_up:
+                return proc.Proc(
+                    argv, 1, "", "mbp13 (100.97.50.80) is not reachable -- building locally\n"
+                )
+            mandatory = "-" if argv[1:] else "big-parallel"
+            return proc.Proc(argv, 0, SPEC.format(mandatory=mandatory) + "\n", "")
         if argv[0] == "nixos-rebuild":
             return self.rebuild(argv)
         if argv[0] == "nix-env":
@@ -328,6 +347,7 @@ def m(tmp_path, monkeypatch, cache_dir):
     monkeypatch.setattr(ap, "local_hostname", lambda: HOST)
     monkeypatch.setattr(privilege, "helper_installed", lambda: False)  # no nixos-switch
     monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(machine.auth))
+    monkeypatch.setenv("NIXIN_BUILDERS_CMD", BUILDERS_CMD)
     monkeypatch.delenv("NIXIN_CONFIG", raising=False)
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)  # no signing hooks etc. from ~
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -1595,3 +1615,177 @@ def test_cli_cancel_token_lives_in_the_namespace(m, capsys):
     ns = _ns(m)
     ap.plan(ns)
     assert isinstance(ns.cancel, proc.Cancel) and ns.cancel is not tok
+
+
+# --- the remote builder (plan/apply --remote) ----------------------------------------------
+
+
+def test_plan_remote_builds_with_the_builders_spec(m, capsys):
+    m.add_cowsay()
+    d = run(capsys, m, "plan", "--remote")
+    assert d["ok"] and not d["cached"]
+    r = d["build"]["remote"]
+    assert r["mode"] == "big" and r["name"] == "fake-mbp13" and not r["fell_back"]
+    assert r["builders"] == SPEC.format(mandatory="big-parallel") and r["command"] == BUILDERS_CMD
+    assert m.build_args[-3:] == ["--builders", r["builders"], "--builders-use-substitutes"]
+    assert "--max-jobs" not in m.build_args
+    assert [c for c in m.calls if c[0] == BUILDERS_CMD] == [[BUILDERS_CMD]]
+    assert d["warnings"] == []
+    # the tracker names the builder after the remote, not its tailnet address
+    # (the fixture's one remote build runs on ssh-ng://master@mbp13: another host)
+    assert all(row.get("host") != "100.97.50.80" for row in d["build"].get("drvs", []))
+    # a cached plan contacts nothing: no second command run
+    d = run(capsys, m, "plan", "--remote", "--all")
+    assert d["cached"] and d["build"] is None
+    assert [c for c in m.calls if c[0] == BUILDERS_CMD] == [[BUILDERS_CMD]]
+
+
+def test_plan_remote_all_and_split(m, capsys):
+    m.add_cowsay()
+    d = run(capsys, m, "plan", "--remote", "--all")
+    r = d["build"]["remote"]
+    assert r["mode"] == "all" and r["command"] == f"{BUILDERS_CMD} --all"
+    assert r["builders"] == SPEC.format(mandatory="-")
+    assert m.build_args[-5:] == [
+        "--builders",
+        r["builders"],
+        "--builders-use-substitutes",
+        "--max-jobs",
+        "0",
+    ]
+    m.rm_cowsay()
+    d = run(capsys, m, "plan", "--remote", "--split")
+    r = d["build"]["remote"]
+    assert r["mode"] == "split" and r["command"] == f"{BUILDERS_CMD} --split"
+    assert m.build_args[-3:] == ["--builders", r["builders"], "--builders-use-substitutes"]
+    assert "--max-jobs" not in m.build_args
+
+
+def test_plan_remote_falls_back_to_a_local_build(m, capsys):
+    m.builder_up = False
+    m.add_cowsay()
+    d = run(capsys, m, "plan", "--remote", "--all")  # run() asserts stderr is empty
+    assert d["ok"] and not d["cached"]
+    r = d["build"]["remote"]
+    assert r == {
+        "mode": "all",
+        "name": "fake-mbp13",
+        "builders": None,
+        "command": f"{BUILDERS_CMD} --all",
+        "fell_back": True,
+    }
+    assert "--builders" not in m.build_args and "--max-jobs" not in m.build_args
+    why = "mbp13 (100.97.50.80) is not reachable -- building locally"
+    assert d["warnings"] == [f"fake-mbp13 is not available ({why}): built locally instead"]
+    m.rm_cowsay()
+    text = run(capsys, m, "plan", "--remote", json_=False)
+    assert "builders  fake-mbp13 unreachable · building locally" in text
+    assert "warning   fake-mbp13 is not available" in text
+
+
+def test_plan_remote_human_output_and_stderr_line(m, capsys):
+    m.add_cowsay()
+    assert main(["--host", HOST, "plan", "--config", str(m.ws), "--remote"]) == 0
+    out, err = capsys.readouterr()
+    assert "nixin: building on fake-mbp13 · big jobs\n" in err
+    assert "builders  building on fake-mbp13 · big jobs (ssh-ng://nixremote@100.97.50.80" in out
+
+
+def test_plan_remote_refuses_an_untrusted_user(m, capsys):
+    m.trusted = False
+    m.add_cowsay()
+    d = run(capsys, m, "plan", "--remote")
+    assert d["error"]["code"] == "builders-untrusted"
+    assert "nix.settings.trusted-users" in d["error"]["message"]
+    assert not any(c[:2] == ["nix", "build"] for c in m.calls)
+    assert not any(c[0] == BUILDERS_CMD for c in m.calls)
+    d = run(capsys, m, "apply", "--remote", "--split")
+    assert d["error"]["code"] == "builders-untrusted"
+    assert git(m.ws, "status", "--porcelain") != ""  # nothing committed
+    # without the flags the untrusted user builds locally as before
+    d = run(capsys, m, "plan")
+    assert d["ok"] and d["build"]["remote"] is None
+
+
+def test_builders_literal_spec_and_usage(m, capsys):
+    m.add_cowsay()
+    spec = "ssh://me@box x86_64-linux - 4 1 big-parallel ; ssh://other aarch64-linux"
+    d = run(capsys, m, "plan", "--builders", spec, "--all")
+    r = d["build"]["remote"]
+    assert r["mode"] == "all" and r["builders"] == spec and r["command"] is None
+    assert r["name"] == "box, other" and not r["fell_back"]
+    assert m.build_args[-5:] == [
+        "--builders",
+        spec,
+        "--builders-use-substitutes",
+        "--max-jobs",
+        "0",
+    ]
+    assert not any(c[0] == BUILDERS_CMD for c in m.calls)
+    for flag in ("--all", "--split"):
+        d = run(capsys, m, "plan", flag)
+        assert d["error"]["code"] == "usage" and "--remote" in d["error"]["message"]
+    d = run(capsys, m, "plan", "--remote", host="other")
+    assert d["error"]["code"] == "usage" and "builds on H itself" in d["error"]["message"]
+
+
+def test_apply_remote_builds_remotely_and_the_dry_run_shows_the_flags(m, capsys):
+    m.add_cowsay()
+    d = run(capsys, m, "apply", "--dry-run")  # no flags: no remote block
+    assert d["remote"] is None and not any("--builders" in c["argv"] for c in d["commands"])
+    d = run(capsys, m, "apply", "--dry-run", "--remote", "--all")
+    assert d["ok"] and d["remote"]["mode"] == "all" and d["remote"]["builders"] is None
+    build = next(c for c in d["commands"] if c["step"] == "build")
+    assert "--builders" in build["argv"] and "--max-jobs" in build["argv"]
+    assert f"$({BUILDERS_CMD} --all)" in build["command"]
+    assert not any(c[0] == BUILDERS_CMD for c in m.calls)  # a dry run contacts nothing
+    d = run(capsys, m, "apply", "-m", "cowsay", "--remote", "--all")
+    assert d["ok"] and d["committed"] and d["switched"]
+    assert d["build"]["remote"]["mode"] == "all" and d["build"]["remote"]["builders"]
+    assert m.build_args[-2:] == ["--max-jobs", "0"]
+    assert [c for c in m.calls if c[0] == BUILDERS_CMD] == [[BUILDERS_CMD, "--all"]]
+
+
+def test_builders_command_from_state_json_and_the_env_wins(m, capsys, monkeypatch):
+    from nixin.apply import builders
+
+    m.add_cowsay()
+    state = json.loads((m.ws / "installer" / "state.json").read_text())
+    state["builders_cmd"] = "ssh hub nix-builders"
+    (m.ws / "installer" / "state.json").write_text(json.dumps(state))
+    assert builders.command(m.ws) == BUILDERS_CMD  # the env var wins
+    assert builders.remote_name(m.ws) == "fake-mbp13"
+    monkeypatch.delenv("NIXIN_BUILDERS_CMD")
+    assert builders.command(m.ws) == "ssh hub nix-builders"
+    assert builders.remote_name(m.ws) == "ssh"
+    assert builders.command(m.ws / "nowhere") == "mbp13-builders"
+    assert builders.remote_name(None) == "mbp13"
+    assert [m for m, _ in builders.choices(None)] == ["local", "big", "all", "split"]
+    assert [lbl for _, lbl in builders.choices(None)] == [
+        "local",
+        "mbp13: big jobs",
+        "mbp13: everything",
+        "split (mbp13 + local)",
+    ]
+    assert builders.flags("local") == [] and builders.flags("big") == ["--remote"]
+    assert builders.flags("all") == ["--remote", "--all"]
+    # a command that is not on PATH: a local build with a warning naming it
+    monkeypatch.setenv("NIXIN_BUILDERS_CMD", "no-such-builders")
+    monkeypatch.setattr(proc, "RUN", _passthrough(m))
+    d = run(capsys, m, "plan", "--remote")
+    assert d["ok"] and d["build"]["remote"]["fell_back"]
+    assert d["warnings"] == [
+        "no-such is not available (no-such-builders is not on PATH): built locally instead"
+    ]
+
+
+def _passthrough(m: Machine):
+    """The Machine, but an unknown executable runs for real (so PATH lookup decides)."""
+
+    def run_(argv, **kw):
+        if argv[0] == "no-such-builders":
+            m.calls.append(list(argv))
+            return proc.run_process(argv, **kw)
+        return m(argv, **kw)
+
+    return run_

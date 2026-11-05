@@ -62,6 +62,7 @@ Dialog {
             Layout.fillWidth: true
             visible: dlg.phase === "running" && dlg.apply.buildHead !== ""
             head: dlg.apply.buildHead
+            where: dlg.apply.buildPlace
             rows: dlg.apply.build
             tail: dlg.apply.tail
         }

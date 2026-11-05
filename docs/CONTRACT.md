@@ -796,7 +796,7 @@ never-committed ones). It never commits. The writer keeps no cache. Evals time o
 ### `plan`
 
 ```
-nixin plan [--config DIR] [--authoritative DIR]
+nixin plan [--remote [--all|--split] | --builders SPEC] [--config DIR] [--authoritative DIR]
 ```
 
 Builds the workspace host's `config.system.build.toplevel` without root and diffs its
@@ -833,6 +833,32 @@ dirty edits included) and by commit (see [Caches](#caches)), so `apply` right af
 tree is instant. A tree whose only change is `installer/history.jsonl` is answered as
 its HEAD commit (no module reads that file).
 
+#### The remote builder
+
+`--remote` builds with a remote nix builder (the user's `rbuild`, as a verb flag; the
+switch step is unchanged, and `plan`'s cache still applies). The `--builders` spec comes
+from a command, run only when a build is really needed (a cached plan contacts nothing):
+`$NIXIN_BUILDERS_CMD`, else `builders_cmd` (a string, top level) in
+`installer/state.json`, else `mbp13-builders`; it is shell-split, gets the mode as its
+argument and prints the spec on stdout. The mode: none (`big`): only `big-parallel`
+derivations (kernels) go to the remote, the rest builds or substitutes here; `--all`:
+plus `--max-jobs 0`, everything not substituted builds there; `--split`: any derivation
+may go there (its slots fill first), this machine builds too. `--builders SPEC` passes a
+literal spec instead of running the command (`--all`/`--split` still set the mode;
+`--all` without `--remote`/`--builders` is `usage`). `--builders-use-substitutes` is
+always on. The command failing (the builder asleep or offline: exit 1; not on PATH; no
+answer in 30 s) means a plain local build with a line in `warnings[]` (and on stderr in
+human mode), never an error. nix honours `--builders` only for a trusted user: the verb
+checks `nix store info --json` first and answers `builders-untrusted` with the fix
+(`nix.settings.trusted-users`) before anything is built or committed. The flags apply to
+a build on this machine only: with `--host H` for another host they are `usage` (H
+builds its own system). (`sync --remote NAME` is unrelated: a git remote.)
+
+The remote's `name` is the command's basename without a `-builders` suffix (`mbp13`),
+or a literal spec's hosts; the tracker names a builder after it where the spec's host
+is an address (`drvs[].host`), and the UIs' selector and the tracker's header say
+"building on mbp13 · big jobs".
+
 Result:
 
 | field | meaning |
@@ -841,7 +867,8 @@ Result:
 | `cached` | `out` came from plan's cache (nothing evaluated or built); `cache_key` says which entry (`source <hash>` or `commit <sha>`) |
 | `up_to_date` | `out` is `/run/current-system` |
 | `duration_s`, `timings` | total seconds; `eval_s`, `build_s` when it built |
-| `build` | the tracker's summary when it built, null when `cached`: `state` (`done`, `failed`, `cancelled`), `cancelled`, `duration_s`, `total` (derivations in the plan), `counts` (`queued`, `building`, `done`, `failed`, `skipped`), `failed[]` (names), `downloads` (`done` paths, `bytes_done`). The same object is in `error.build` of `build-failed` and `cancelled` |
+| `build` | the tracker's summary when it built, null when `cached`: `state` (`done`, `failed`, `cancelled`), `cancelled`, `duration_s`, `total` (derivations in the plan), `counts` (`queued`, `building`, `done`, `failed`, `skipped`), `failed[]` (names), `downloads` (`done` paths, `bytes_done`), `remote` (below). The same object is in `error.build` of `build-failed` and `cancelled` |
+| `build.remote` | null for a local build; with `--remote`/`--builders`: `mode` (`big`, `all`, `split`), `name` (`mbp13`), `builders` (the spec nix got; null after a fallback), `command` (what printed it, with its mode flag; null for a literal spec), `fell_back` (the command failed: built locally, see `warnings[]`) |
 | `workspace` | `path`, `branch`, `head`, `dirty[]` (tracked files that differ from HEAD), `untracked[]` (not part of the build) |
 | `authoritative` | `path`, `exists`, `head`, `branch`, `dirty[]`, `relation`: `same`, `ahead` (the workspace has commits to apply), `behind` (the authoritative tree has commits the workspace lacks), `diverged`, `unknown` (its HEAD is not a commit the workspace has) |
 | `running` | `store_path` (`/run/current-system`), `generation` (the newest system profile generation pointing at it, or null), `profile_generation`, `profile` |
@@ -887,10 +914,11 @@ report it); `unknown` when /boot cannot be read. With `limit` null, on /boot now
 running system's files and nothing counts as freed. A user cannot list /boot; the
 model assumes the last bootloader install ran after the newest generation was made.
 
-Errors: `usage` (any positional argument), `config-not-found`, `not-a-workspace` (also: not
-a git checkout, detached HEAD), `unknown-host`, `eval-failed`, `eval-timeout` (900 s),
-`build-failed` (the failing builder's block with nix's log tail), `not-a-flake`,
-`nix-missing`, `git-failed`, `internal`.
+Errors: `usage` (any positional argument; `--all`/`--split` without `--remote`;
+`--remote` for another host), `config-not-found`, `not-a-workspace` (also: not a git
+checkout, detached HEAD), `unknown-host`, `builders-untrusted`, `eval-failed`,
+`eval-timeout` (900 s), `build-failed` (the failing builder's block with nix's log
+tail), `not-a-flake`, `nix-missing`, `git-failed`, `internal`.
 
 Costs: runs nix (evaluation, then a build: from nothing for a no-op to hours for a new
 kernel) and git (read only). Writes nix's store and plan's cache, nothing in the trees.
@@ -898,7 +926,8 @@ kernel) and git (read only). Writes nix's store and plan's cache, nothing in the
 ### `apply`
 
 ```
-nixin apply [-m MESSAGE] [--dry-run] [--no-switch] [--config DIR] [--authoritative DIR]
+nixin apply [-m MESSAGE] [--dry-run] [--no-switch] [--remote [--all|--split] | --builders SPEC]
+            [--config DIR] [--authoritative DIR]
 ```
 
 The one privileged step. In order:
@@ -912,7 +941,9 @@ The one privileged step. In order:
 2. **Refuse** with `nothing-to-apply` when there is nothing to commit, the authoritative
    tree already has the workspace HEAD, and `/run/current-system` already is its build.
    (Running a different system, e.g. after a failed switch, re-switches.)
-3. **Build**: plan's out path (cache), else the same build as `plan`.
+3. **Build**: plan's out path (cache), else the same build as `plan` (`--remote`,
+   `--all`, `--split`, `--builders` as there: [the remote builder](#the-remote-builder);
+   the document's `build.remote`; the untrusted check runs before the commit).
    **Boot check** ([the boot block](#the-boot-block)): `boot-space` when the new
    kernels/initrds do not fit on /boot. When plan's cache already knows the out path
    this runs before the commit (nothing has happened); otherwise after the build, before
@@ -942,7 +973,10 @@ hand finishes the job; so does `sudo -v` and apply again (the commit and the bui
 done and cached by then).
 
 `--dry-run` runs none of the steps. It reads the trees and the caches, probes `sudo -n
-true`, and prints the commands in order.
+true`, and prints the commands in order. With `--remote`/`--builders` the `build`
+command carries the builders flags (`--builders "$(mbp13-builders --all)"` when the
+spec is still to be fetched: the command is not run) and the document has `remote`
+(the block of `build.remote` before the spec is known); null without the flags.
 
 Result:
 
@@ -1927,6 +1961,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `boot-space` | apply | `apply`/`rollback`: the new system's kernels and initrds do not fit on /boot (`boot_space` has the numbers); nothing ran as root |
 | `unknown-generation` | apply | `rollback GEN`: no such system generation, or none before the running one |
 | `workspace-dirty` | apply | `rollback`: the workspace has uncommitted changes (`files[]`) or unapplied commits (`commits[]`) its revert would sweep in or drop |
+| `builders-untrusted` | apply | `plan`/`apply` with `--remote` or `--builders`: `nix store info --json` says the daemon does not trust this user, so it would ignore `--builders`; the message says to add the user to `nix.settings.trusted-users` (or build without `--remote`). Nothing was built or committed |
 | `needs-tty` | apply | `apply --host H` for another host, not `--dry-run`, under `--json`, from a UI (a worker thread) or without a terminal: the sudo on H may ask for a password on this terminal |
 | `push-failed` | apply | `apply --host H` for another host: no remote to push the workspace branch to, or the push failed (`rejected: true`: the hub has commits the workspace lacks) |
 | `ssh-failed` | apply | `apply --host H` for another host: `ssh` is missing, could not connect (exit 255), or the session ended otherwise; `committed`, `pushed` say how far it got |

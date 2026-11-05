@@ -9,7 +9,9 @@ stderr the way plan/apply tee nix's output in human mode.
 A call with a `cancel` token (plan, apply from the UIs) shows a build in progress the way
 the real verbs do: `LIVE` names the snapshot the token answers while the call runs
 (`plan_building`) and the document a stopped run answers (`plan_cancelled`); the call
-waits `build_delay` seconds for the token (0: it returns at once, as before).
+waits `build_delay` seconds for the token (0: it returns at once, as before). The
+snapshot's `remote` block follows the call's build flags (`--remote [--all|--split]`),
+as the real tracker's does; without them it is a local build (`remote` null).
 """
 
 from __future__ import annotations
@@ -91,6 +93,23 @@ def load(name: str) -> dict[str, Any]:
     return json.loads((FIXTURES / f"{name}.json").read_text())
 
 
+SPEC = "ssh-ng://nixremote@100.97.50.80 x86_64-linux /etc/nix/mbp13-builder 2 1 big-parallel"
+
+
+def remote_block(args: tuple[str, ...]) -> dict[str, Any] | None:
+    """The tracker's `remote` for a call's flags, as builders.resolve would fill it."""
+    if "--remote" not in args and not any(a.startswith("--builders") for a in args):
+        return None
+    mode = "all" if "--all" in args else "split" if "--split" in args else "big"
+    return {
+        "mode": mode,
+        "name": "mbp13",
+        "builders": SPEC,
+        "command": "mbp13-builders" + (f" --{mode}" if mode != "big" else ""),
+        "fell_back": False,
+    }
+
+
 class FakeBackend(Backend):
     def __init__(self, routes: dict[str, Any], *, host: str = "mbp13", delay: float = 0.0):
         super().__init__(host=host, config="/home/master/nixos")
@@ -125,7 +144,7 @@ class FakeBackend(Backend):
         if cancel is not None and verb in LIVE and "--dry-run" not in args:
             self.tokens.append(cancel)
             building, stopped = LIVE[verb]
-            snapshot = load(building)
+            snapshot = {**load(building), "remote": remote_block(args)}
             cancel.step = "build"
             cancel.snapshot = lambda: snapshot
             try:

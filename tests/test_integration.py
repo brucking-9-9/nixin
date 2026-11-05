@@ -81,6 +81,7 @@ ERROR_CODES = {
     "unknown-generation",
     "workspace-dirty",
     "needs-tty",
+    "builders-untrusted",
     "cancelled",
     "push-failed",
     "ssh-failed",

@@ -593,6 +593,30 @@ def build_head(snap: Doc | None) -> str:
     return status_line(snap, 200)
 
 
+def build_where(snap: Doc | None) -> str:
+    """Where a build runs, from its snapshot's (or a `build` summary's) `remote` block:
+    `building on mbp13 · big jobs`; empty for a local build."""
+    if not snap:
+        return ""
+    from ..apply.builders import where
+
+    return where(snap.get("remote"))
+
+
+def build_choices(config: str | None = None) -> list[tuple[str, str]]:
+    """The build-location selector of the UIs: (mode, label), `local` first."""
+    from ..apply.builders import choices
+
+    return choices(config)
+
+
+def build_flags(mode: str) -> list[str]:
+    """The plan/apply flags of a selector mode (none for `local`)."""
+    from ..apply.builders import flags
+
+    return flags(mode)
+
+
 def build_rows(snap: Doc | None, limit: int = BUILD_ROWS) -> list[Field]:
     """The derivations building now (with their phase and time), then the failed and the
     next queued ones: `name  building 12s · configurePhase`."""
@@ -657,7 +681,9 @@ def build_summary(b: Doc | None) -> str:
         size = f" ({human_bytes(d['bytes_done'])})" if d.get("bytes_done") else ""
         parts.append(f"{d['done']} paths fetched{size}")
     text = ", ".join(parts) + f" in {b.get('duration_s')} s"
-    return text + " (stopped)" if b.get("cancelled") else text
+    text = text + " (stopped)" if b.get("cancelled") else text
+    w = build_where(b)
+    return f"{text}; {w}" if w else text
 
 
 def plan_fields(doc: Doc) -> list[Field]:
@@ -813,6 +839,8 @@ def dry_run_fields(doc: Doc) -> list[Field]:
         out.append(
             Field("build", "not built yet: apply builds first (minutes; a kernel: longer)", "warn")
         )
+        if doc.get("remote"):  # --remote: where that build would run
+            out.append(Field("builders", build_where({"remote": doc["remote"]}), "accent"))
     for c in cmds:
         if not c.get("privileged"):
             out.append(Field(str(c.get("step")), str(c.get("command")), "dim"))

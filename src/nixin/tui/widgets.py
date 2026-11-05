@@ -207,6 +207,10 @@ class BuildTracker(Static):
             return
         accent = rich_style(self.app, "accent")
         parts = [Text(view.build_head(snap), style=accent, no_wrap=True, overflow="ellipsis")]
+        where = view.build_where(snap)
+        if where:
+            purple = rich_style(self.app, "option")  # secondary: the purple
+            parts.append(Text(where, style=purple, no_wrap=True, overflow="ellipsis"))
         rows = view.build_rows(snap)
         if rows:
             # one line per derivation, clipped, the name column a third of a narrow screen
@@ -233,7 +237,8 @@ class BuildTracker(Static):
         if not self.snap:
             return ""
         rows = [f"{f.label} {f.value}".strip() for f in view.build_rows(self.snap)]
-        return "\n".join([view.build_head(self.snap), *rows, *view.build_tail(self.snap)])
+        where = [view.build_where(self.snap)] if view.build_where(self.snap) else []
+        return "\n".join([view.build_head(self.snap), *where, *rows, *view.build_tail(self.snap)])
 
 
 class LogView(RichLog):

@@ -62,6 +62,19 @@ Item {
                 ToolTip.text: "update --undo: flake.lock back to the committed one (asks first)"
                 onClicked: page.p.startUndo()
             }
+            ComboBox {
+                id: buildWhere
+                objectName: "buildWhere"
+                model: page.backend.buildChoices()
+                currentIndex: page.backend.buildWhereIndex
+                implicitWidth: 170
+                enabled: page.backend.busy === ""
+                ToolTip.visible: hovered
+                ToolTip.text: "where Plan and Apply build: here, or on the remote builder "
+                              + "(big jobs only, everything, or split between both); "
+                              + "unreachable: built here, with a warning"
+                onActivated: index => page.backend.setBuildWhere(index)
+            }
             Button {
                 objectName: "planButton"
                 text: "Plan"
@@ -138,6 +151,7 @@ Item {
                     Layout.fillWidth: true
                     visible: page.p.planning && (page.p.buildHead !== "" || page.p.stepNote !== "")
                     head: page.p.buildHead
+                    where: page.p.buildPlace
                     note: page.p.stepNote
                     rows: page.p.build
                     tail: page.p.tail

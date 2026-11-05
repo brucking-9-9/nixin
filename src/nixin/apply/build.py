@@ -32,7 +32,7 @@ from typing import Any
 
 from ..cache import default_root
 from ..configrepo import ConfigRepo, NixinError, trim_nix_error
-from . import closure, proc, progress
+from . import builders, closure, proc, progress
 
 EVAL_TIMEOUT = 900.0
 KEEP = 40  # cache entries per kind and host
@@ -131,13 +131,21 @@ def toplevel_attr(repo: ConfigRepo, host: str) -> str:
     return f"{repo.host_attr(host)}.config.system.build.toplevel"
 
 
-def build_command(repo: ConfigRepo, host: str) -> list[str]:
-    """What a person would run for the same result (shown by `apply --dry-run`)."""
+def build_command(repo: ConfigRepo, host: str, remote: dict[str, Any] | None = None) -> list[str]:
+    """What a person would run for the same result (shown by `apply --dry-run`); with a
+    remote the builders flags as the build would get them (a spec still to be fetched
+    shows as `--builders "$(<command>)"`)."""
+    flags = builders.nix_args(remote)
+    if remote and not flags and not remote.get("fell_back"):
+        flags = ["--builders", f"$({remote.get('command')})", "--builders-use-substitutes"]
+        if remote.get("mode") == "all":
+            flags += ["--max-jobs", "0"]
     return [
         "nix",
         "build",
         "--no-link",
         "--print-out-paths",
+        *flags,
         repo.installable(toplevel_attr(repo, host)),
     ]
 
@@ -163,20 +171,34 @@ def _stderr_tty() -> bool:
 
 
 def build(
-    repo: ConfigRepo, host: str, *, stream: bool, cancel: proc.Cancel | None = None
+    repo: ConfigRepo,
+    host: str,
+    *,
+    stream: bool,
+    cancel: proc.Cancel | None = None,
+    remote: dict[str, Any] | None = None,
+    warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     """Evaluate the toplevel's drvPath, then build it with the tracker reading nix's
     events. `stream` (human mode): nix's readable output and the status line on stderr
     (no status line when a UI watches the token: it shows the tracker itself). A
-    `cancelled` error (with the build summary as `.build`) when the token stops it."""
+    `cancelled` error (with the build summary as `.build`) when the token stops it.
+    `remote` (builders.requested): the builders command runs now, right before the
+    build; a failure falls back to a local build with a line in `warnings`."""
     token = cancel or proc.Cancel()
     t0 = time.monotonic()
     token.step = "eval"
     drv = repo.eval_raw(f"{toplevel_attr(repo, host)}.drvPath", timeout=EVAL_TIMEOUT).strip()
     token.check()
+    if remote is not None:
+        remote = builders.resolve(remote, warnings if warnings is not None else [])
+        token.check()
+        if stream:
+            sys.stderr.write(f"nixin: {builders.where(remote)}\n")
+            sys.stderr.flush()
     t1 = time.monotonic()
     token.step = "build"
-    tracker = progress.Tracker(durations=progress.default_durations())
+    tracker = progress.Tracker(durations=progress.default_durations(), remote=remote)
     reporter = None
     if stream and not token.watched:
         reporter = progress.Reporter(tracker, tty=_stderr_tty())
@@ -191,7 +213,15 @@ def build(
 
     try:
         p = proc.run(
-            ["nix", "build", "--no-link", "--print-out-paths", *LOG_FORMAT, f"{drv}^out"],
+            [
+                "nix",
+                "build",
+                "--no-link",
+                "--print-out-paths",
+                *builders.nix_args(remote),
+                *LOG_FORMAT,
+                f"{drv}^out",
+            ],
             stream="stderr" if stream and reporter is None else False,
             on_stderr=on_line,
             cancel=token,

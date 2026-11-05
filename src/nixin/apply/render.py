@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..truth.render import row, sub
+from .builders import where
 from .closure import human_size
 from .progress import human_bytes
 from .safety import reboot_text, space_text
@@ -64,7 +65,19 @@ def build_line(b: dict[str, Any] | None) -> list[str]:
     text = ", ".join(parts) + f" in {b['duration_s']} s"
     if b.get("cancelled"):
         text += " (stopped)"
-    return [row("build", text)]
+    lines = [row("build", text)]
+    if b.get("remote"):
+        lines.append(row("builders", _where(b["remote"])))
+    return lines
+
+
+def _where(remote: dict[str, Any]) -> str:
+    """`building on mbp13 · big jobs (ssh-ng://nixremote@… x86_64-linux …)`."""
+    text = where(remote)
+    if remote.get("builders"):
+        spec = remote["builders"]
+        text += f" ({spec if len(spec) <= 60 else spec[:57] + '…'})"
+    return text
 
 
 def boot_lines(b: dict[str, Any] | None) -> list[str]:

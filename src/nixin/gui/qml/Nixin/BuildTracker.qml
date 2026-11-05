@@ -11,6 +11,7 @@ Rectangle {
     id: box
 
     property string head: ""
+    property string where: ""    // "building on mbp13 · big jobs" (empty: a local build)
     property string note: ""     // the step when it is not the build: "switching (cannot be stopped)"
     property var rows: null      // a Rows model of view.Field (label, value, style)
     property var tail: null      // a Rows model of lines (text)
@@ -37,6 +38,17 @@ Rectangle {
             font.family: Theme.mono
             font.pixelSize: Theme.fontSize
             font.bold: true
+            elide: Text.ElideRight
+        }
+        Text {
+            objectName: "buildPlace"
+            Layout.fillWidth: true
+            visible: box.where !== ""
+            text: box.where
+            textFormat: Text.PlainText
+            color: Theme.purple
+            font.family: Theme.font
+            font.pixelSize: Theme.small
             elide: Text.ElideRight
         }
         Text {

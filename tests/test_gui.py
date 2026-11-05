@@ -1399,3 +1399,63 @@ def test_stop_without_a_run_is_a_calm_notice(ui):
     u = ui()
     u.gui.stop()
     assert u.gui.notice["severity"] == "info" and "nothing is running" in u.gui.notice["message"]
+
+
+# --- the build location (plan/apply --remote) ---------------------------------------------
+
+
+def test_build_where_combo_flags_plan_and_apply(ui):
+    u = ui()
+    u.gui.go("pending")
+    settle(u)
+    g = u.gui
+    assert g["buildWhere"] == "local" and g["buildWhereIndex"] == 0
+    assert g.buildChoices() == [
+        "local",
+        "mbp13: big jobs",
+        "mbp13: everything",
+        "split (mbp13 + local)",
+    ]
+    assert prop(u, "buildWhere", "currentIndex") == 0 and prop(u, "buildWhere", "enabled")
+    g.setBuildWhere(1)
+    assert g["buildWhere"] == "big" and g["buildWhereLabel"] == "mbp13: big jobs"
+    assert prop(u, "buildWhere", "currentIndex") == 1
+    click(u, "planButton")
+    assert u.fake.verbs()[-1] == ["plan", "--remote"] and g.pending["planned"]
+    g.setBuildWhere(3)
+    click(u, "applyButton")
+    a = g.apply
+    assert a["phase"] == "confirm"
+    assert u.fake.verbs()[-1] == ["apply", "--dry-run", "--remote", "--split"]
+    a.confirm("")
+    settle(u)
+    assert u.fake.verbs()[-1] == ["apply", "--remote", "--split"] and a["phase"] == "needs-sudo"
+    click(u, "applyClose")
+    g.setBuildWhere(0)
+    click(u, "planButton")
+    assert u.fake.verbs()[-1] == ["plan"]
+    g.setBuildWhere(9)  # out of range: ignored
+    assert g["buildWhere"] == "local"
+
+
+def test_build_tracker_says_where_it_builds(ui):
+    u = ui()
+    u.fake.build_delay = 5.0
+    u.gui.go("pending")
+    settle(u)
+    u.gui.setBuildWhere(2)
+    p = u.gui.pending
+    p.startPlan()
+    u.qtbot.wait(700)
+    assert p["buildPlace"] == "building on mbp13 · everything"
+    assert shown(u, "buildPlace") and prop(u, "buildPlace", "text") == p["buildPlace"]
+    assert not prop(u, "buildWhere", "enabled")  # busy: no change under a running build
+    click(u, "stopButton")
+    assert p["buildPlace"] == "" and u.fake.verbs()[-1] == ["plan", "--remote", "--all"]
+    # a local build has no location line
+    u.gui.setBuildWhere(0)
+    p.startPlan()
+    u.qtbot.wait(700)
+    assert p["buildHead"].startswith("[7/39") and p["buildPlace"] == ""
+    assert not shown(u, "buildPlace")
+    click(u, "stopButton")
