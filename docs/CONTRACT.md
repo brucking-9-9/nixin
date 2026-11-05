@@ -1443,7 +1443,7 @@ makes HTTPS calls to search.nixos.org and evaluates nothing new. See
 ### `update`
 
 ```
-nixin update [--input NAME] [--to FLAKEREF|REV] [--dry-run] [--config DIR]
+nixin update [--input NAME] [--to FLAKEREF|REV] [--hold NAME,...] [--allow-others] [--dry-run] [--config DIR]
 ```
 
 Takes the update `outdated` describes: it runs the command `outdated` prints under
@@ -1460,6 +1460,13 @@ without `$NIXIN_CONFIG`) and trees you cannot write are `not-a-workspace`.
 | `--to FLAKEREF` | `nix flake lock DIR --override-input <input> FLAKEREF`, the ref as given (nix locks its current commit) |
 | `--input NAME` | another root input of `flake.lock` (default: the nixpkgs input, found as `outdated` finds it) |
 | `--dry-run` | nothing: the document says what would run (`command`), with `to` and `changed` null. Reads `flake.lock` only, no nix |
+| `--allow-others` | keep the new lock even when nix moved other nodes too (see `lock-moved-others`); they are listed in `moved[]` and a warning |
+| `--hold NAME,...` | `nixin pin NAME` for each (at the lock as it is before the move) first, then the update, then the pins' checks against the new lock: `holds[]`, `checks[]` (see `pin`) |
+
+Only the named input may move. After nix ran, both locks are compared node by node: the
+input's node and the nodes reachable only through it (its private sub-inputs, in the new
+lock) may change; any other node that moved (a `follows` target, another root input) makes
+the verb put the saved `flake.lock` back and fail with `lock-moved-others`.
 
 `--host` is not used (the lock is the flake's, shared by every host) except in the
 `nixin plan`/`apply` lines of `commands[]`.
@@ -1474,6 +1481,8 @@ Result:
 | `command` | the nix command line, as a person would type it |
 | `from`, `to` | the locked input before and after: `rev`, `short_rev`, `date`, `last_modified`, `nar_hash` (all null for what the lock does not record). `to` is null with `--dry-run` |
 | `changed` | whether the locked commit (or narHash) moved; false when the ref still resolves to the locked commit. null with `--dry-run` |
+| `moved[]` | other lock nodes that moved too: `{node, from, to}` (short revs); `[]` normally; only non-empty with `--allow-others` |
+| `holds[]`, `checks[]` | with `--hold`: the pins made (as `pins` lists them) and their checks against the new lock (`{id, level, text, data}`; a `block` adds a warning, the lock stays moved) |
 | `dry_run` | `--dry-run` was given |
 | `config` | the workspace path |
 | `commands[]` | after a change: `nixin plan`, `nixin apply` with `--config`/`--host`; `[]` when nothing changed; with `--dry-run`: `[command]` |
@@ -1484,7 +1493,8 @@ Without `--json`: `nixpkgs (github:nixos/nixpkgs/nixos-unstable): 3ec6363 (2026-
 
 Errors: `usage` (a positional argument; `--to REV` for an input that is not on
 github/gitlab/sourcehut), `config-not-found`, `not-a-workspace`, `not-found` (no readable
-`flake.lock`, no nixpkgs input, or `--input` names no root input of the lock), `network`
+`flake.lock`, no nixpkgs input, or `--input` names no root input of the lock),
+`lock-moved-others` (above), the `pin` errors with `--hold`, `network`
 (nix could not fetch the new commit for lack of network), `bad-channel` (GitHub does not
 know the ref: HTTP 404/422), `nix-failed` (nix failed otherwise; nix's message),
 `nix-missing`, `internal`.
@@ -1759,6 +1769,7 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `push-failed` | apply | `apply --host H` for another host: no remote to push the workspace branch to, or the push failed (`rejected: true`: the hub has commits the workspace lacks) |
 | `ssh-failed` | apply | `apply --host H` for another host: `ssh` is missing, could not connect (exit 255), or the session ended otherwise; `committed`, `pushed` say how far it got |
 | `invalid-hosts-config` | apply | `~/.config/nixin/hosts.toml` (`$XDG_CONFIG_HOME/nixin/`) does not parse, or a value is of the wrong type or not a usable path / ssh destination |
+| `lock-moved-others` | outdated (`update`) | nix moved lock nodes other than the requested input and its private sub-inputs; `flake.lock` was put back as it was (`moved[]`: `{node, from, to}`); `--allow-others` takes nix's result |
 | `gc-failed` | apply | `gc`: nix-env `--delete-generations`, the bootloader step or nix-collect-garbage failed, or a generation was still there after the delete; `step` says which, `deleted[]`/`done[]` how far it got |
 
 In a multi-source discovery answer, any discovery code can also appear as one source's

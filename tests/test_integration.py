@@ -62,6 +62,7 @@ ERROR_CODES = {
     "file-conflict",
     "invalid-state",
     "needs-sudo",
+    "lock-moved-others",
     "build-failed",
     "nothing-to-apply",
     "host-not-local",

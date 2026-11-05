@@ -12,6 +12,13 @@ and reports the input's locked commit before and after. It writes flake.lock and
 else: no build, no commit, no switch (`nixin plan`, `nixin apply` take it from there).
 The default input is the nixpkgs one (`outdated`'s pick). nix fetches the new commit's
 tarball (about a minute the first time).
+
+Only the named input may move. After nix ran, the lock is compared node by node: the
+requested root input and the nodes reachable only through it (its private sub-inputs) may
+change; if any other node moved, the saved lock is put back and the verb fails with
+`lock-moved-others` (`--allow-others` keeps nix's result and lists the moves in `moved[]`).
+`--hold NAME,…` pins those (`nixin pin`, at the lock as it is now) before the input moves,
+and runs the pins' checks against the new lock afterwards.
 """
 
 from __future__ import annotations
@@ -50,6 +57,17 @@ def register(sub: argparse._SubParsersAction) -> None:
         "(default: the input's own ref, as `nix flake update` follows it)",
     )
     p.add_argument("--dry-run", action="store_true", help="say what would run; run nothing")
+    p.add_argument(
+        "--allow-others",
+        action="store_true",
+        help="keep the new lock even when nix moved other inputs too (listed in moved[])",
+    )
+    p.add_argument(
+        "--hold",
+        metavar="NAME,...",
+        help="pin these (kernel, or package attributes) at the current lock first, then "
+        "check them against the new lock (see `nixin pin`)",
+    )
     p.set_defaults(run=update)
 
 
@@ -124,6 +142,66 @@ def _side(lk: LockedInput | None) -> dict[str, Any]:
     }
 
 
+def _lock_nodes(lock: dict[str, Any]) -> dict[str, Any]:
+    return lock.get("nodes") or {}
+
+
+def _follow(nodes: dict[str, Any], path: list[str]) -> str | None:
+    """A `follows` path ([] = root, ["nixpkgs"] = root's nixpkgs) to its node name."""
+    node = "root"
+    for name in path:
+        ref = (nodes.get(node, {}).get("inputs") or {}).get(name)
+        if ref is None:
+            return None
+        node = ref if isinstance(ref, str) else _follow(nodes, ref)
+        if node is None:
+            return None
+    return node
+
+
+def _resolve_ref(nodes: dict[str, Any], node: str, ref: Any) -> str | None:
+    return ref if isinstance(ref, str) else _follow(nodes, ref) if isinstance(ref, list) else None
+
+
+def lock_moves(before: dict[str, Any], after: dict[str, Any], node: str) -> list[dict[str, Any]]:
+    """Nodes whose `locked` differs between the two locks and that are not `node` or one of
+    the nodes only `node` reaches (its private sub-inputs, in the *after* lock: a new
+    revision may bring one). Each: {node, from, to} with the short revs (or narHashes)."""
+    b, a = _lock_nodes(before), _lock_nodes(after)
+    root = after.get("root", "root")
+    private = _reach(a, node) - _reach(a, root, avoid=node)
+    allowed = {node} | private
+    out = []
+    for name in sorted(set(b) | set(a)):
+        if name in allowed or name == root:
+            continue
+        lb, la = (b.get(name) or {}).get("locked"), (a.get(name) or {}).get("locked")
+        if lb == la:
+            continue
+        out.append({"node": name, "from": _ident(lb), "to": _ident(la)})
+    return out
+
+
+def _reach(nodes: dict[str, Any], start: str, avoid: str | None = None) -> set[str]:
+    seen: set[str] = set()
+    queue = [start]
+    while queue:
+        n = queue.pop()
+        if n is None or n in seen or n == avoid or n not in nodes:
+            continue
+        seen.add(n)
+        for ref in (nodes[n].get("inputs") or {}).values():
+            queue.append(_resolve_ref(nodes, n, ref))
+    return seen
+
+
+def _ident(locked: dict[str, Any] | None) -> str | None:
+    if not locked:
+        return None
+    rev = locked.get("rev")
+    return rev[:7] if isinstance(rev, str) else locked.get("narHash")
+
+
 def _update(ns: argparse.Namespace) -> dict[str, Any]:
     t0 = time.monotonic()
     if ns.args:
@@ -151,6 +229,14 @@ def _update(ns: argparse.Namespace) -> dict[str, Any]:
         if not ns.json:
             doc["message"] = _render(doc)
         return doc
+    holds = None
+    if ns.hold:
+        from ..pins import hold_before_update  # lazy: the pins layer imports the writer
+
+        holds = hold_before_update(ns, repo, inp)
+        doc["holds"] = holds["pins"]
+    lock_file = repo.path / "flake.lock"
+    saved = lock_file.read_text()
     t = time.monotonic()
     try:
         repo.nix(args, code="nix-failed")
@@ -163,7 +249,19 @@ def _update(ns: argparse.Namespace) -> dict[str, Any]:
             raise NixinError("bad-channel", f"{what} does not resolve: {e.message}") from e
         raise
     seconds = round(time.monotonic() - t, 2)
-    after = parse_lock(_read_lock(repo), inp.input)
+    new_lock = _read_lock(repo)
+    moved = lock_moves(json.loads(saved), new_lock, inp.locked.node)
+    if moved and not ns.allow_others:
+        lock_file.write_text(saved)
+        what = ", ".join(f"{m['node']} {m['from']} → {m['to']}" for m in moved)
+        raise UpdateError(
+            "lock-moved-others",
+            f"nix moved more than {inp.input} ({inp.locked.node}): {what}; flake.lock was "
+            f"put back as it was. `nixin update --input NAME` for each of them, or "
+            f"--allow-others to take nix's result",
+            moved=moved,
+        )
+    after = parse_lock(new_lock, inp.input)
     to = _side(after)
     changed = (to["rev"], to["nar_hash"]) != (before["rev"], before["nar_hash"])
     nixin = f"--config {shlex.quote(str(repo.path))} --host {shlex.quote(ns.host)}"
@@ -171,13 +269,39 @@ def _update(ns: argparse.Namespace) -> dict[str, Any]:
         {
             "to": to,
             "changed": changed,
+            "moved": moved,
             "commands": [f"nixin plan {nixin}", f"nixin apply {nixin}"] if changed else [],
             "timings": {"nix": seconds, "total": round(time.monotonic() - t0, 2)},
         }
     )
+    if moved:
+        doc.setdefault("warnings", []).append(
+            "other inputs moved too (--allow-others): "
+            + ", ".join(f"{m['node']} {m['from']} → {m['to']}" for m in moved)
+        )
+    if holds is not None:
+        from ..pins import check_after_update
+
+        doc["checks"] = check_after_update(ns, repo, holds)
+        if any(c["level"] == "block" for c in doc["checks"]):
+            doc.setdefault("warnings", []).append(
+                "a hold check is blocking: see checks[] (the lock moved anyway; "
+                "`nixin pin NAME --whole-set` or `nixin unpin NAME`)"
+            )
     if not ns.json:
         doc["message"] = _render(doc)
     return doc
+
+
+class UpdateError(NixinError):
+    def __init__(self, code: str, message: str, **extra: Any) -> None:
+        super().__init__(code, message)
+        self.extra = extra
+
+    def doc(self) -> dict[str, Any]:
+        d = super().doc()
+        d["error"].update(self.extra)
+        return d
 
 
 def _when(side: dict[str, Any] | None) -> str:
@@ -193,7 +317,13 @@ def _render(doc: dict[str, Any]) -> str:
     lines = [f"ran: {doc['command']}"]
     if doc["changed"]:
         lines.insert(0, f"{head}: {_when(doc['from'])} → {_when(doc['to'])}")
-        lines += ["next:", *(f"  {c}" for c in doc["commands"])]
     else:
         lines.insert(0, f"{head}: already at {_when(doc['to'])}; flake.lock unchanged")
+    for h in doc.get("holds") or []:
+        lines.append(f"held: {h['name']} ({', '.join(h['attrs'])}) at {h['version'] or '?'}")
+    for c in doc.get("checks") or []:
+        lines.append(f"{c['level']}: {c['text']}")
+    lines += [f"warning: {w}" for w in doc.get("warnings") or []]
+    if doc["changed"]:
+        lines += ["next:", *(f"  {c}" for c in doc["commands"])]
     return "\n".join(lines)

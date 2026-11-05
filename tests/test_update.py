@@ -43,6 +43,7 @@ class FakeNix:
         self.calls: list[list[str]] = []
         self.rev = TARGET_REV
         self.stderr: str | None = None
+        self.also: dict[str, str] = {}  # other nodes nix "moves" too (the guard's case)
 
     def __call__(self, args: list[str], **kw) -> str:
         self.calls.append(args)
@@ -58,9 +59,11 @@ class FakeNix:
         lock_file = self.path / "flake.lock"
         lock = json.loads(lock_file.read_text())
         node = lock["nodes"]["root"]["inputs"][name]
-        locked = lock["nodes"][node]["locked"]
-        if locked["rev"] != rev:
-            locked.update(rev=rev, lastModified=TARGET_TIME, narHash=f"sha256-{rev[:8]}")
+        moves = {node: rev, **self.also}
+        for n, r in moves.items():
+            locked = lock["nodes"].setdefault(n, {"locked": {}})["locked"]
+            if locked.get("rev") != r:
+                locked.update(rev=r, lastModified=TARGET_TIME, narHash=f"sha256-{r[:8]}")
         lock_file.write_text(json.dumps(lock, indent=2))
         return ""
 
@@ -216,6 +219,65 @@ def test_update_needs_a_workspace(repo, capsys, tmp_path):
             doc["error"]["code"] == "not-a-workspace" and "not writable" in doc["error"]["message"]
         )
     assert repo.nix.calls == []
+
+
+# --- the guard: only the named input may move -----------------------------------------------
+
+OTHER_REV = "1d060086d60cb76a40cf37109f979d88a5bd6396"
+
+
+def test_update_puts_the_lock_back_when_nix_moved_other_inputs(repo, capsys):
+    repo.nix.also = {"nixpkgs_2": OTHER_REV}
+    before = (repo.path / "flake.lock").read_text()
+    rc, doc = run(capsys, repo, "--input", "home-manager")
+    assert rc == 1 and doc["error"]["code"] == "lock-moved-others"
+    assert doc["error"]["moved"] == [{"node": "nixpkgs_2", "from": "3ec6363", "to": "1d06008"}]
+    assert "nixpkgs_2 3ec6363 → 1d06008" in doc["error"]["message"]
+    assert "put back" in doc["error"]["message"]
+    assert (repo.path / "flake.lock").read_text() == before  # byte for byte
+
+
+def test_update_allow_others_keeps_the_lock_and_lists_the_moves(repo, capsys):
+    repo.nix.also = {"nixpkgs_2": OTHER_REV}
+    rc, doc = run(capsys, repo, "--input", "home-manager", "--allow-others")
+    assert rc == 0 and doc["ok"] and doc["changed"]
+    assert doc["moved"] == [{"node": "nixpkgs_2", "from": "3ec6363", "to": "1d06008"}]
+    assert any("other inputs moved too" in w for w in doc["warnings"])
+    assert locked_rev(repo) == OTHER_REV
+    rc, doc = run(capsys, repo)  # the normal case: nothing else moved, moved[] is empty
+    assert doc["moved"] == [] and "warnings" not in doc
+
+
+def test_lock_moves_allows_the_inputs_private_sub_inputs():
+    from nixin.outdated.update import lock_moves
+
+    def lock(nixin_rev, foo_rev, nixpkgs_rev):
+        return {
+            "root": "root",
+            "nodes": {
+                "root": {"inputs": {"nixpkgs": "nixpkgs", "nixin": "nixin"}},
+                "nixpkgs": {"locked": {"rev": nixpkgs_rev}},
+                # nixin follows the root nixpkgs and has a private input `foo`
+                "nixin": {
+                    "inputs": {"nixpkgs": ["nixpkgs"], "foo": "foo"},
+                    "locked": {"rev": nixin_rev},
+                },
+                "foo": {"locked": {"rev": foo_rev}},
+            },
+        }
+
+    a = lock("a" * 40, "f" * 40, "0" * 40)
+    # nixin and its private foo move: allowed; nothing else did
+    assert lock_moves(a, lock("b" * 40, "e" * 40, "0" * 40), "nixin") == []
+    # the followed root nixpkgs moved too: reported
+    assert lock_moves(a, lock("b" * 40, "f" * 40, "1" * 40), "nixin") == [
+        {"node": "nixpkgs", "from": "0000000", "to": "1111111"}
+    ]
+    # a new private sub-input appears with the new revision: allowed
+    after = lock("b" * 40, "f" * 40, "0" * 40)
+    after["nodes"]["nixin"]["inputs"]["bar"] = "bar"
+    after["nodes"]["bar"] = {"locked": {"rev": "c" * 40}}
+    assert lock_moves(a, after, "nixin") == []
 
 
 # --- live: a throwaway clone of $NIXIN_CONFIG, never the config itself --------------------
