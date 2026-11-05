@@ -1,0 +1,74 @@
+{
+ "checked": false,
+ "checks": [],
+ "config": "/home/master/nixos",
+ "count": 2,
+ "host": "19BK",
+ "lock": {
+  "date": "2026-11-01",
+  "input": "nixpkgs",
+  "node": "nixpkgs_2",
+  "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+  "short_rev": "0bb2eed"
+ },
+ "ok": true,
+ "pins": [
+  {
+   "attrs": [
+    "firefox"
+   ],
+   "date": "2026-11-03",
+   "drop": "nixin unpin firefox",
+   "mode": "attr",
+   "name": "firefox",
+   "pname": "firefox",
+   "rev": "1d060086d60cb76a40cf37109f979d88a5bd6396",
+   "short_rev": "1d06008",
+   "since": "2026-11-05",
+   "stale": false,
+   "stale_why": null,
+   "version": "158.0",
+   "why": "159 breaks the kiosk profile"
+  },
+  {
+   "attrs": [
+    "linux_7_2",
+    "linuxPackages_7_2"
+   ],
+   "date": "2026-10-23",
+   "drop": "nixin unpin kernel",
+   "mode": "kernel",
+   "name": "kernel",
+   "pname": "linux",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "since": "2026-11-05",
+   "stale": false,
+   "stale_why": null,
+   "version": "7.2.12",
+   "why": "T2 kernel build takes 2-3 h"
+  }
+ ],
+ "stale": 0,
+ "verb": "pins",
+ "revisions": [
+  {
+   "source": "lock",
+   "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
+   "short_rev": "0bb2eed",
+   "date": "2026-11-01",
+   "last_modified": 1793540411,
+   "nar_hash": "sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE=",
+   "running": false
+  },
+  {
+   "source": "committed",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "date": "2026-10-23",
+   "last_modified": 1792773339,
+   "nar_hash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+   "running": true
+  }
+ ]
+}

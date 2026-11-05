@@ -108,10 +108,14 @@ def no_local_index(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_authoritative_tree(tmp_path, monkeypatch):
-    """This machine's /etc/nixos stays out of every test (status's pending block and
-    lock_change read the authoritative tree): the path points at nothing. Tests with a
-    Machine set their own."""
+    """This machine's /etc/nixos and /run/current-system stay out of every test (status's
+    pending block and lock_change read the authoritative tree and the running system): the
+    path points at nothing, the running system names no nixpkgs. Tests with a Machine set
+    their own; tests/test_lockstate.py fakes the running system."""
+    from nixin import lockstate
+
     monkeypatch.setenv("NIXIN_AUTHORITATIVE", str(tmp_path / "no-authoritative"))
+    monkeypatch.setattr(lockstate, "running_system", lambda root="/x": {"nixpkgs_rev": None})
 
 
 @pytest.fixture

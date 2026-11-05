@@ -9,13 +9,20 @@ import asyncio
 import json
 
 import pytest
-from textual.widgets import Button, DataTable, TextArea
+from textual.widgets import Button, DataTable, Input, RadioButton, TextArea
 from tui_fake import COWSAY, HM_OPTIONS, HOLDS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
 
 from nixin.cli import main
 from nixin.tui import options, screens
 from nixin.tui.app import NixinApp
-from nixin.tui.modals import ApplyModal, DiffModal, NoticeModal, SetOptionModal, UpdateModal
+from nixin.tui.modals import (
+    ApplyModal,
+    DiffModal,
+    NoticeModal,
+    PinModal,
+    SetOptionModal,
+    UpdateModal,
+)
 from nixin.tui.options import OptionScreen, OptionsScreen
 from nixin.tui.packages import PackagesScreen
 from nixin.tui.screens import ApplyScreen, DetailsScreen, PendingScreen, SearchScreen
@@ -363,6 +370,42 @@ def test_update_documents():
 
 
 # --- the backend shim on the real handlers (no network, no nix: usage and config errors) --------
+
+
+def test_holds_at_the_previous_revision_and_the_pin_dialog_documents():
+    moved = load("outdated_19BK_moved")
+    old = "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
+    assert view.previous_rev(moved) == old and view.previous_rev(load("outdated_19BK")) == ""
+    rows = view.update_rows(moved)
+    ff = next(r for r in rows if r.pname == "firefox")
+    assert ff.rev == old and ff.hold_args == ["pin", "firefox", "--rev", old]
+    assert ff.hold_label == "hold at 158.0.1 (3ec6363)"
+    plain = next(r for r in view.update_rows(load("outdated_19BK")) if r.pname == "firefox")
+    assert plain.hold_args == ["pin", "firefox"] and plain.hold_label == "hold"
+    held = next(r for r in view.update_rows(load("outdated_19BK_holds")) if r.held)
+    assert held.hold_label == "unhold"
+    assert view.kernel_hold(moved) == (
+        "hold kernel at 7.2.12 (3ec6363)",
+        ["pin", "kernel", "--rev", old],
+    )
+    # the Pin… dialog: the chooser from pins' revisions[], the argv it runs
+    choices = view.pin_rev_choices(load("pins_19BK_revs"))
+    assert [(c.source, c.rev[:7]) for c in choices] == [
+        ("lock", "0bb2eed"),
+        ("committed", "3ec6363"),
+    ]
+    assert choices[0].label == "0bb2eed (2026-11-01) — flake.lock as it is"
+    assert choices[1].label == "3ec6363 (2026-10-23) — committed lock (HEAD), what runs"
+    assert [c.label for c in view.pin_rev_choices(load("pins_19BK"))] == [
+        "3ec6363 (2026-10-23) — flake.lock as it is, what runs"
+    ]
+    assert view.pin_rev_choices(None) == []
+    assert view.pin_at_args(" kernel ", old) == ["pin", "kernel", "--rev", old]
+    assert view.pin_at_args("pkgs.firefox", "3ec6363") == ["pin", "firefox", "--rev", "3ec6363"]
+    assert view.pin_at_args("", old).startswith("name what to pin")
+    assert view.pin_at_args("a b", old).startswith("one name")
+    assert view.pin_at_args("kernel", "xyz") == "xyz: a nixpkgs commit, 7-40 hex digits"
+    assert view.pin_at_args("kernel", "") == "the revision: a nixpkgs commit, 7-40 hex digits"
 
 
 def test_lock_change_and_undo_documents():
@@ -1066,7 +1109,11 @@ MOVED = {
     "status": "status_moved",
     "update --undo --dry-run": "update_undo_dry",
     "update --undo": "update_undo",
+    "pins": "pins_19BK_revs",
+    "pin kernel --rev --dry-run": "pin_kernel_rev_dry",
+    "pin kernel --rev": "pin_kernel_rev",
 }
+OLD_REV = "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
 
 
 @pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
@@ -1125,9 +1172,28 @@ def test_packages_update_then_undo_from_pending_and_updates(size):
         await pilot.press("escape")  # not this time
         await settle(app, pilot)
         assert app.screen is screen
+        # hold the kernel at the old revision instead: pin kernel --rev <committed>
+        if size == DESKTOP:
+            assert "hold kernel at 7.2.12 (3ec6363) (k)" in screen_text(app)
+        await pilot.press("k")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, DiffModal)
+        assert modal.heading == f"pin kernel --rev {OLD_REV} — preview"
+        await pilot.press("w")
+        await settle(app, pilot)
+        assert app.screen is screen
+        assert app.writes[-1].startswith("pin kernel at 7.2.12 (")
 
     _app, fake = drive(script, MOVED, size=size, host="19BK")
     verbs = fake.verbs()
+    assert verbs[-4:-1] == [
+        ["update", "--undo", "--dry-run"],
+        ["pin", "kernel", "--rev", OLD_REV, "--dry-run"],
+        ["pin", "kernel", "--rev", OLD_REV],
+    ]
+    assert verbs[-1] in (["outdated"], ["list"])
+    verbs = verbs[:10]
     assert verbs[:8] == [
         ["list"],
         ["outdated"],
@@ -1139,7 +1205,75 @@ def test_packages_update_then_undo_from_pending_and_updates(size):
         ["status"],
     ]
     assert sorted(verbs[8:10]) == [["list"], ["outdated"]]  # the lock moved back: both again
-    assert verbs[10:] == [["update", "--undo", "--dry-run"]]
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_pins_tab_pin_at_the_running_revision(size):
+    async def script(app, pilot, fake):
+        screen = await open_packages(app, pilot)
+        await pilot.press("p")  # on Installed, p is Pending
+        await settle(app, pilot)
+        assert isinstance(app.screen, PendingScreen)
+        await pilot.press("escape")
+        await settle(app, pilot)
+        await pilot.press("n")
+        await settle(app, pilot)
+        assert screen.tab == "pins"
+        assert screen.query_one("#pn-head", Line).value == (
+            "19BK: 2 pins (flake.lock: nixpkgs 0bb2eed)"
+        )
+        assert "Pin… (p)" in screen_text(app)
+        await pilot.press("p")  # the Pin… modal
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, PinModal)
+        text = screen_text(app)
+        if size == DESKTOP:  # a phone clips the labels
+            assert "0bb2eed (2026-11-01) — flake.lock as it is" in text
+            assert "3ec6363 (2026-10-23) — committed lock (HEAD), what runs" in text
+        else:
+            assert "0bb2eed (2026-11-01)" in text and "3ec6363 (2026-10-23)" in text
+        fits(app)
+        await pilot.press("enter")  # no name yet: a warning, the modal stays
+        await settle(app, pilot)
+        assert app.screen is modal
+        await pilot.press(*"kernel")
+        modal.query_one("#rev-1", RadioButton).value = True  # the running system's
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        diff = app.screen
+        assert isinstance(diff, DiffModal)
+        assert diff.heading == f"pin kernel --rev {OLD_REV} — preview"
+        await pilot.press("w")
+        await settle(app, pilot)
+        assert app.screen is screen and screen.tab == "pins"
+        assert len(app.writes) == 1 and app.writes[0].startswith("pin kernel at 7.2.12 (")
+        # the free field: a typed commit
+        await pilot.press("p")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, PinModal)
+        await pilot.press(*"firefox")
+        modal.query_one("#rev-free", RadioButton).value = True
+        await settle(app, pilot)
+        assert modal.query_one("#pin-rev", Input).has_focus
+        await pilot.press(*"zz", "enter")  # not a commit
+        await settle(app, pilot)
+        assert app.screen is modal
+        await pilot.press("escape")
+        await settle(app, pilot)
+        assert app.screen is screen
+
+    _app, fake = drive(script, MOVED, size=size, host="19BK")
+    verbs = fake.verbs()
+    assert verbs[:2] == [["list"], ["status"]]
+    assert verbs[2:5] == [
+        ["pins"],
+        ["pin", "kernel", "--rev", OLD_REV, "--dry-run"],
+        ["pin", "kernel", "--rev", OLD_REV],
+    ]
+    assert sorted(verbs[5:]) == [["list"], ["pins"]]  # a write: the list is stale too
 
 
 @pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])

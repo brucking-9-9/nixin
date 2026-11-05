@@ -7,8 +7,9 @@ import QtQuick.Layouts
 // Pins: what `nixin pin` holds back on this host (`pins`), each at its nixpkgs commit and
 // whether it still holds anything (stale: the lock is at the pinned revision). Check runs
 // `pins --check` (one eval: do the pins hold, the compatibility checks against the lock as
-// it is now); Unpin drops the selected one through the writer's diff dialog. Holding
-// something starts on Packages › Updates (the row's hold button, or "hold kernel").
+// it is now); Unpin drops the selected one through the writer's diff dialog; Pin… holds
+// something at a chosen revision (PinDialog). Holding at the lock's own revision also
+// starts on Packages › Updates (the row's hold button, or "hold kernel").
 Item {
     id: page
 
@@ -68,6 +69,14 @@ Item {
                 ToolTip.visible: hovered
                 ToolTip.text: "pins --check: do the pins still hold, and the compatibility checks against the lock as it is now (one eval)"
                 onClicked: page.vm.check()
+            }
+            Button {
+                objectName: "pinsPin"
+                text: "Pin…"
+                enabled: !page.vm.loading && page.backend.busy === ""
+                ToolTip.visible: hovered
+                ToolTip.text: "hold the kernel or a package at a nixpkgs revision: the committed one, the running system's, or a commit you name (previewed first)"
+                onClicked: page.vm.startPin()
             }
             Button {
                 objectName: "pinsUnpin"

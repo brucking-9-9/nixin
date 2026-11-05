@@ -20,6 +20,7 @@ PendingPage 1.0 PendingPage.qml
 StatusPage 1.0 StatusPage.qml
 DiffDialog 1.0 DiffDialog.qml
 SetDialog 1.0 SetDialog.qml
+PinDialog 1.0 PinDialog.qml
 ApplyDialog 1.0 ApplyDialog.qml
 UpdateDialog 1.0 UpdateDialog.qml
 TryDialog 1.0 TryDialog.qml

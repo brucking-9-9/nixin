@@ -1218,6 +1218,7 @@ class UpdateRow:
     note: str  # (older), (same order), as kdePackages.x, (added), (removed), (held by pin x)
     style: str  # accent (newer), warn (older or same order), add, del
     held: str = ""  # the pin holding this row (a `holds[]` row), else ""
+    rev: str = ""  # the revision a hold pins at when the lock already moved (`lock_change`)
 
     @property
     def tag(self) -> str:
@@ -1227,8 +1228,27 @@ class UpdateRow:
     def hold_args(self) -> list[str]:
         """What `h` runs for the row: `unpin NAME` for a held one, `pin PNAME` otherwise
         (the pname as the attribute: right for firefox, ripgrep, …; a nested one answers
-        pin-unsupported)."""
-        return ["unpin", self.held] if self.held else ["pin", self.pname]
+        pin-unsupported); `--rev` when the document compares a lock move that already
+        happened, so the hold is at the old revision, not the lock's."""
+        if self.held:
+            return ["unpin", self.held]
+        return ["pin", self.pname, *(["--rev", self.rev] if self.rev else [])]
+
+    @property
+    def hold_label(self) -> str:
+        """`hold`, `hold at 158.0 (3ec6363)` or `unhold` (the GUI's row button)."""
+        if self.held:
+            return "unhold"
+        return f"hold at {self.old} ({short(self.rev)})" if self.rev else "hold"
+
+
+def previous_rev(doc: Doc) -> str:
+    """The revision a hold pins at for an `outdated` document that compares the pending lock
+    move (`lock_change.compared`): the old side's; "" otherwise (the lock's own, pin's default)."""
+    change = doc.get("lock_change") or {}
+    if not change.get("compared"):
+        return ""
+    return str((change.get("from") or {}).get("rev") or "")
 
 
 _DIR = {"down": ("(older)", "warn"), "same": ("(same order)", "warn")}
@@ -1239,6 +1259,7 @@ def update_rows(doc: Doc) -> list[UpdateRow]:
     rows: list[UpdateRow] = []
     order = {(s.get("scope"), s.get("user")): i for i, s in enumerate(doc.get("scopes") or [])}
     lock = doc.get("mode") != "published"
+    rev = previous_rev(doc)
     for r in doc.get("changed") or []:
         note, style = _DIR.get(str(r.get("direction")), ("", "accent"))
         if lock:
@@ -1248,10 +1269,14 @@ def update_rows(doc: Doc) -> list[UpdateRow]:
             attr = str(r.get("attr") or "")
             if attr and attr.rsplit(".", 1)[-1] != r.get("pname"):
                 note = f"{note}  as {attr}".strip()
-        rows.append(UpdateRow(str(r["pname"]), old, new, r["scope"], r.get("user"), note, style))
+        rows.append(
+            UpdateRow(str(r["pname"]), old, new, r["scope"], r.get("user"), note, style, rev=rev)
+        )
     for r in doc.get("removed") or []:
         v = str(r.get("version") or "")
-        rows.append(UpdateRow(str(r["pname"]), v, "removed", r["scope"], r.get("user"), "", "del"))
+        rows.append(
+            UpdateRow(str(r["pname"]), v, "removed", r["scope"], r.get("user"), "", "del", rev=rev)
+        )
     for r in doc.get("added") or []:
         v = str(r.get("version") or "")
         rows.append(UpdateRow(str(r["pname"]), "added", v, r["scope"], r.get("user"), "", "add"))
@@ -1272,12 +1297,16 @@ def update_rows(doc: Doc) -> list[UpdateRow]:
 
 def kernel_hold(doc: Doc) -> tuple[str, list[str]] | None:
     """(label, args) of the kernel's hold toggle for an `outdated` document: `pin kernel`
-    while the kernel changes, `unpin NAME` while a pin holds it; None when neither."""
+    while the kernel changes (`--rev <old>` when the lock already moved: the document
+    compares the pending move), `unpin NAME` while a pin holds it; None when neither."""
     k = doc.get("kernel") or {}
     held = k.get("held") or {}
     if held.get("pin"):
         return f"unhold kernel (pin {held['pin']})", ["unpin", str(held["pin"])]
     if k.get("changed") and doc.get("mode") == "lock":
+        rev = previous_rev(doc)
+        if rev:
+            return f"hold kernel at {k.get('from')} ({short(rev)})", ["pin", "kernel", "--rev", rev]
         return f"hold kernel at {k.get('from')}", ["pin", "kernel"]
     return None
 
@@ -1501,6 +1530,51 @@ def pin_cells(r: PinRow, columns: list[Column]) -> list[Span]:
         style = r.style if c.key == "name" else "warn" if c.key == "note" and r.stale else "dim"
         out.append(Span(clip(str(v), c.width), style if c.key != "version" else ""))
     return out
+
+
+@dataclass(frozen=True)
+class RevChoice:
+    """One entry of the Pin… dialog's revision chooser."""
+
+    rev: str
+    label: str  # "3ec6363 (2026-10-23) — committed lock (HEAD), what runs"
+    source: str  # lock | committed | applied | running
+
+
+_REV_SOURCE = {
+    "lock": "flake.lock as it is",
+    "committed": "committed lock (HEAD)",
+    "applied": "applied lock (/etc/nixos)",
+    "running": "the running system (short rev)",
+}
+_HEX_REV = re.compile(r"[0-9a-f]{7,40}")
+
+
+def pin_rev_choices(doc: Doc | None) -> list[RevChoice]:
+    """`pins`' `revisions[]` as chooser entries: the lock's own first, then the committed,
+    the applied and the running system's revisions when they differ."""
+    out = []
+    for r in (doc or {}).get("revisions") or []:
+        if not r.get("rev"):
+            continue
+        label = short(r["rev"]) + (f" ({r['date']})" if r.get("date") else "")
+        label += f" — {_REV_SOURCE.get(str(r.get('source')), str(r.get('source')))}"
+        if r.get("running") and r.get("source") != "running":
+            label += ", what runs"
+        out.append(RevChoice(str(r["rev"]), label, str(r.get("source"))))
+    return out
+
+
+def pin_at_args(name: str, rev: str) -> list[str] | str:
+    """`pin NAME --rev REV` for the Pin… dialog, or the reason it cannot run yet."""
+    name, rev = name.strip().removeprefix("pkgs."), rev.strip()
+    if not name:
+        return "name what to pin: kernel, or a pkgs attribute (firefox, ripgrep)"
+    if " " in name:
+        return "one name: kernel, or a pkgs attribute (nixin pin NAME --attr A for several)"
+    if not _HEX_REV.fullmatch(rev):
+        return f"{rev or 'the revision'}: a nixpkgs commit, 7-40 hex digits"
+    return ["pin", name, "--rev", rev]
 
 
 def pins_summary(doc: Doc) -> str:

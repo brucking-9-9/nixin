@@ -1795,6 +1795,9 @@ class PinsVM(VM):
         "checked": False,
         "selected": -1,
         "detail": "",
+        "pinOpen": False,  # the Pin… dialog
+        "pinChoices": [],  # the revision chooser's labels (pins' revisions[])
+        "pinName": "",  # what the dialog starts with
     }
     lists: ClassVar = {"pins": models.PIN, "checks": models.FIELD}
     loading = state(bool, "loading", changed)
@@ -1805,6 +1808,9 @@ class PinsVM(VM):
     checked = state(bool, "checked", changed)
     selected = state(int, "selected", changed)
     detail = state(str, "detail", changed)
+    pinOpen = state(bool, "pinOpen", changed)
+    pinChoices = state("QVariantList", "pinChoices", changed)
+    pinName = state(str, "pinName", changed)
     pins = model("pins")
     checks = model("checks")
 
@@ -1812,6 +1818,7 @@ class PinsVM(VM):
         super().__init__(gui)
         self.doc: Doc | None = None
         self.pin_rows: list[view.PinRow] = []
+        self.rev_choices: list[view.RevChoice] = []
 
     def visit(self) -> None:
         if self.doc is None:
@@ -1873,7 +1880,7 @@ class PinsVM(VM):
         self.set(
             note=""
             if self.pin_rows
-            else "no pins · hold a row on Packages › Updates (or the kernel)",
+            else "no pins · Pin… holds something at a revision; Packages › Updates holds a row",
             noteStyle="dim",
             summary=f"{self.gui.backend.host}: {view.pins_summary(doc)}",
             checked=bool(doc.get("checked")),
@@ -1890,6 +1897,38 @@ class PinsVM(VM):
     def unpin(self, i: int) -> None:
         if 0 <= i < len(self.pin_rows):
             self.gui.writer.start("unpin", [self.pin_rows[i].name], after=self.stale)
+
+    # --- Pin…: name + revision → pin NAME --rev REV through the diff dialog
+
+    @Slot()
+    @Slot(str)
+    def startPin(self, name: str = "") -> None:
+        if self.gui["busy"]:
+            self.gui.notice.say(f"wait: {self.gui['busy']} is still running", "warn")
+            return
+        if self.doc is None:
+            self.gui.notice.say("pins is still loading", "info")
+            return
+        self.rev_choices = view.pin_rev_choices(self.doc)
+        self.set(pinOpen=True, pinChoices=[c.label for c in self.rev_choices], pinName=name)
+
+    @Slot(str, int, str)
+    def confirmPin(self, name: str, choice: int, free: str) -> None:
+        """The dialog's Preview: NAME at the chosen revision (`choice` indexes pinChoices;
+        past it: the typed one)."""
+        if not self["pinOpen"]:
+            return
+        rev = self.rev_choices[choice].rev if 0 <= choice < len(self.rev_choices) else free
+        args = view.pin_at_args(name, rev)
+        if isinstance(args, str):
+            self.gui.notice.say(args, "warn")
+            return
+        self.set(pinOpen=False)
+        self.gui.writer.start(args[0], args[1:], after=self.stale)
+
+    @Slot()
+    def cancelPin(self) -> None:
+        self.set(pinOpen=False)
 
 
 # --- options --------------------------------------------------------------------------------

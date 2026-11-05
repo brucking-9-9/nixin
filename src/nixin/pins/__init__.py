@@ -19,7 +19,9 @@ other NAME is a top-level attribute of pkgs (`--attr` to pin several under one n
 
 The default revision is the one flake.lock has now: pin first, then `nixin update` (or
 `nixin update --hold NAME,…`, which does both and checks the pins against the new lock).
-A pin at the lock's own revision holds nothing yet and `pins` says so (stale).
+A pin at the lock's own revision holds nothing yet and `pins` says so (stale). `--rev` at
+the committed or the applied lock's revision (after an update that is not applied yet)
+needs no network: `pins` lists those as `revisions[]` for the UIs' revision chooser.
 
 Pins are per host; Home Manager users on a host with `home-manager.useGlobalPkgs` see the
 host's overlay through the shared pkgs. Nested attributes (python3Packages.x, kdePackages.x)
@@ -37,6 +39,7 @@ from typing import Any
 
 from .. import writer
 from ..configrepo import ConfigRepo, NixinError, nix_attr
+from ..lockstate import LockRevs
 from ..outdated import target as tgt
 from ..writer.nixtext import parse_attrpath
 from ..writer.state import STATE_FILE
@@ -359,14 +362,19 @@ def _pin(ns: argparse.Namespace) -> dict[str, Any]:
             f"(nixpkgs {have['rev'][:7]}); nixin unpin {name} first to change it",
         )
         return doc
-    # the revision
+    # the revision: the lock's, or --rev (a committed/applied lock's node is known without
+    # asking GitHub: its narHash and date come from that lock; anything else is prefetched)
     rev, nar, date = lk.rev, lk.nar_hash, lk.date
     if ns.rev and not (lk.rev.startswith(ns.rev) or ns.rev == lk.rev):
         if not tgt._HEX.fullmatch(ns.rev):
             raise NixinError(
                 "usage", f"--rev {ns.rev}: a commit (7-40 hex digits) of {lk.owner}/{lk.repo}"
             )
-        nar, date, rev = _prefetch(repo, np, ns.rev)
+        known = LockRevs.read(repo, np.input, sc.host).known(ns.rev)
+        if known is not None and known.rev and known.nar_hash:
+            rev, nar, date = known.rev, known.nar_hash, known.date
+        else:
+            nar, date, rev = _prefetch(repo, np, ns.rev)
     url = _tarball(lk.owner or "nixos", lk.repo or "nixpkgs", rev)
     # the attributes
     if name == KERNEL:
@@ -555,10 +563,12 @@ def _pins(ns: argparse.Namespace) -> dict[str, Any]:
     pins_ = read_pins(repo.path, host)
     lock_rev = None
     lock: dict[str, Any] = {}
+    revisions: list[dict[str, Any]] = []
     try:
         np = tgt.nixpkgs_input(repo)
         lock_rev = np.locked.rev
         lock = np.doc()
+        revisions = LockRevs.read(repo, np.input, host).revisions()
     except NixinError:
         pass
     now: dict[str, Any] | None = None
@@ -581,6 +591,7 @@ def _pins(ns: argparse.Namespace) -> dict[str, Any]:
         "config": str(repo.path),
         "host": host,
         "lock": {k: lock.get(k) for k in ("input", "node", "rev", "short_rev", "date")},
+        "revisions": revisions,
         "pins": docs,
         "count": len(docs),
         "stale": sum(1 for d in docs if d["stale"]),

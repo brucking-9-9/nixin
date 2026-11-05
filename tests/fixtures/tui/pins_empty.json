@@ -14,5 +14,16 @@
  "ok": true,
  "pins": [],
  "stale": 0,
- "verb": "pins"
+ "verb": "pins",
+ "revisions": [
+  {
+   "source": "lock",
+   "rev": "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504",
+   "short_rev": "3ec6363",
+   "date": "2026-10-23",
+   "last_modified": 1792773339,
+   "nar_hash": "sha256-rZLrzrC6i+jnTAlvPZHogKDulY7WWDEv9hJeHieO7Zw=",
+   "running": true
+  }
+ ]
 }

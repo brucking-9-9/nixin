@@ -389,6 +389,34 @@ def test_pins_lists_and_flags_stale(cfg, capsys):
     assert lines[-1] == "drop one: nixin unpin NAME; all: nixin unpin --all"
 
 
+def test_pins_revisions_and_a_known_rev_needs_no_prefetch(cfg):
+    """After an update that is not committed, `pins` lists the lock's and the committed
+    revision, and `pin --rev <the committed one>` takes narHash and date from that lock."""
+    if shutil.which("git") is None:
+        pytest.skip("needs git")
+    rc, doc = run(cfg, "pins")
+    assert [r["source"] for r in doc["revisions"]] == ["lock"]  # no git: the lock alone
+    assert doc["revisions"][0]["rev"] == LOCK_REV and doc["revisions"][0]["nar_hash"] == LOCK_NAR
+    for args in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-q", "-m", "lock"]):
+        subprocess.run(
+            ["git", "-c", "user.name=T", "-c", "user.email=t@example.org", "-C", str(cfg), *args],
+            check=True,
+        )
+    assert run(cfg, "update")[0] == 0  # the fake nix moves the lock to NEW_REV
+    rc, doc = run(cfg, "pins")
+    assert [(r["source"], r["short_rev"]) for r in doc["revisions"]] == [
+        ("lock", NEW_REV[:7]),
+        ("committed", LOCK_REV[:7]),
+    ]
+    writer.NIX.pinned_versions = {"firefox": {"version": "158.0.1", "pname": "firefox"}}
+    rc, doc = run(cfg, "pin", "firefox", "--rev", LOCK_REV[:7])
+    assert rc == 0, doc
+    p = doc["pins"][0]
+    assert p["rev"] == LOCK_REV and p["date"] == "2026-10-23" and not p["stale"]
+    assert state(cfg)["nixos"]["19BK"]["pins"]["firefox"]["nar_hash"] == LOCK_NAR
+    assert not [c for c in writer.NIX.calls if c[:2] == ["flake", "prefetch"]]
+
+
 def test_pins_check_after_the_lock_moved(cfg):
     assert run(cfg, "pin", "kernel")[0] == 0
     assert run(cfg, "pin", "openssl")[0] == 0

@@ -634,7 +634,11 @@ MOVED = {
     "status": "status_moved",
     "update --undo --dry-run": "update_undo_dry",
     "update --undo": "update_undo",
+    "pins": "pins_19BK_revs",
+    "pin kernel --rev --dry-run": "pin_kernel_rev_dry",
+    "pin kernel --rev": "pin_kernel_rev",
 }
+OLD_REV = "3ec636362e1816bc2f0888fa0fa2c69f1bc9e504"
 
 
 def test_packages_update_then_undo_from_pending_and_updates(ui):
@@ -676,7 +680,29 @@ def test_packages_update_then_undo_from_pending_and_updates(ui):
     assert shown(u, "updateDialog") and vm["updateConfirmLabel"] == "Undo"
     click(u, "updateCancel")
     assert not shown(u, "updateDialog")
+    # or hold things at the old revision: the kernel, a row (real clicks on the buttons)
+    assert prop(u, "holdKernel", "text") == "hold kernel at 7.2.12 (3ec6363)"
+    click(u, "holdKernel")
+    assert shown(u, "diffDialog") and u.gui.writer["title"] == f"pin kernel --rev {OLD_REV}"
+    click(u, "diffWrite")
+    settle(u)
+    assert u.gui.writes[-1].startswith("pin kernel at 7.2.12 (")
+    ff = next(r for r in vm.rows("updates").rows if r["name"] == "firefox")
+    assert ff["holdLabel"] == "hold at 158.0.1 (3ec6363)"
+    click(u, "pk-tab-updates")
+    item(u, "upList").setProperty("currentIndex", 0)
+    vm.selectUpdate(
+        next(i for i, r in enumerate(vm.rows("updates").rows) if r["name"] == "firefox")
+    )
+    settle(u)
+    click(u, "hold-firefox")
+    assert shown(u, "diffDialog") and u.gui.writer["title"] == f"pin firefox --rev {OLD_REV}"
+    click(u, "diffCancel")
     verbs = u.fake.verbs()
+    assert ["pin", "kernel", "--rev", OLD_REV, "--dry-run"] in verbs
+    assert ["pin", "kernel", "--rev", OLD_REV] in verbs
+    assert verbs[-1] == ["pin", "firefox", "--rev", OLD_REV, "--dry-run"]
+    verbs = [v for v in verbs if v[:1] != ["pin"]][:11]
     assert verbs[:2] == [["list"], ["outdated"]]
     assert verbs[2:8] == [
         ["update", "--dry-run"],
@@ -688,6 +714,54 @@ def test_packages_update_then_undo_from_pending_and_updates(ui):
     ]
     assert sorted(verbs[8:10]) == [["list"], ["outdated"]]
     assert verbs[10:] == [["update", "--undo", "--dry-run"]]
+
+
+def test_pins_page_pin_at_the_running_revision(ui):
+    u = ui(MOVED, host="19BK")
+    keys(u, Qt.Key.Key_6, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "pins" and shown(u, "pinsPage")
+    pins = u.gui.pins
+    assert prop(u, "pinsSummary", "text") == "19BK: 2 pins (flake.lock: nixpkgs 0bb2eed)"
+    click(u, "pinsPin")
+    assert shown(u, "pinDialog") and pins["pinOpen"]
+    assert pins["pinChoices"] == [
+        "0bb2eed (2026-11-01) — flake.lock as it is",
+        "3ec6363 (2026-10-23) — committed lock (HEAD), what runs",
+    ]
+    assert prop(u, "pinRev", "count") == 3 and not shown(u, "pinRevFree")
+    assert prop(u, "pinName", "activeFocus")
+    click(u, "pinPreview")  # no name yet: a warning, the dialog stays
+    assert shown(u, "pinDialog") and u.gui.notice["message"].startswith("name what to pin")
+    click(u, "pinName")  # the click on Preview took the focus
+    keys(u, "kernel")
+    item(u, "pinRev").setProperty("currentIndex", 1)  # the running system's revision
+    settle(u)
+    click(u, "pinPreview")
+    assert not shown(u, "pinDialog")
+    assert shown(u, "diffDialog") and u.gui.writer["title"] == f"pin kernel --rev {OLD_REV}"
+    click(u, "diffWrite")
+    settle(u)
+    assert u.gui.writes == [u.gui.writes[0]] and u.gui.writes[0].startswith(
+        "pin kernel at 7.2.12 ("
+    )
+    # the free field: a typed commit, checked before anything runs
+    click(u, "pinsPin")
+    click(u, "pinName")
+    keys(u, "firefox")
+    item(u, "pinRev").setProperty("currentIndex", 2)
+    settle(u)
+    assert shown(u, "pinRevFree")
+    pins.confirmPin("firefox", 2, "nope")
+    settle(u)
+    assert shown(u, "pinDialog") and "7-40 hex digits" in u.gui.notice["message"]
+    click(u, "pinCancel")
+    assert not shown(u, "pinDialog")
+    assert u.fake.verbs() == [
+        ["pins"],
+        ["pin", "kernel", "--rev", OLD_REV, "--dry-run"],
+        ["pin", "kernel", "--rev", OLD_REV],
+        ["pins"],
+    ]
 
 
 def test_packages_hold_kernel_and_row_then_pins_page(ui):
@@ -975,10 +1049,13 @@ def test_every_page_and_dialog_grabs(ui, tmp_path):
         "update",
         "browse",
         "pins",
+        "pin",
     ):
         if step == "pins":
             u.fake.routes |= {"pins": ["pins_19BK_check"]}
             u.gui.go("pins")
+        elif step == "pin":
+            u.gui.pins.startPin()
         elif step == "browse":
             u.gui.packages.cancelUpdate()
             u.fake.routes |= {k: [v] for k, v in browse_routes().items() if k.startswith("browse")}

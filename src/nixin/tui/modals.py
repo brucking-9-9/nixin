@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, OptionList, Static
+from textual.widgets import Button, Input, Label, OptionList, RadioButton, RadioSet, Static
 from textual.widgets.input import Selection
 from textual.widgets.option_list import Option
 
@@ -266,6 +266,76 @@ class UpdateModal(Modal):
         self.dismiss(True if event.button.id == "update" else None)
 
 
+class PinModal(Modal):
+    """Pin…: what to hold (kernel, or a pkgs attribute) and at which nixpkgs revision: the
+    lock's own, the committed or the applied lock's, the running system's, or one typed.
+    Dismisses with the `pin NAME --rev REV` argv."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [Binding("p", "pin", "Pin", show=False)]
+    FREE = "another commit (type it)"
+
+    def __init__(self, choices: list[view.RevChoice], name: str = "") -> None:
+        super().__init__()
+        self.choices = choices
+        self.initial = name  # `name` is the widget's own
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog"):
+            yield Label("pin at a nixpkgs revision", classes="dialog-title")
+            yield Static("what: kernel, or a pkgs attribute (firefox, ripgrep)", classes="dim")
+            yield Input(self.initial, placeholder="kernel", id="pin-name", compact=True)
+            yield Static("at which nixpkgs:", classes="dim")
+            with RadioSet(id="pin-revs"):
+                for i, c in enumerate(self.choices):
+                    yield RadioButton(c.label, value=i == 0, id=f"rev-{i}")
+                yield RadioButton(self.FREE, value=not self.choices, id="rev-free")
+            yield Input(
+                placeholder="a commit of nixpkgs, 7-40 hex digits", id="pin-rev", compact=True
+            )
+            with Horizontal(classes="buttons"):
+                yield Button("Preview (enter)", id="ok", variant="primary", compact=True)
+                yield Button("Cancel (esc)", id="cancel", compact=True)
+
+    def on_mount(self) -> None:
+        self._free_field()
+        self.query_one("#pin-name", Input).focus()
+
+    def _free_field(self) -> None:
+        free = self.query_one("#rev-free", RadioButton).value
+        self.query_one("#pin-rev", Input).display = free
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        self._free_field()
+        if event.pressed.id == "rev-free":
+            self.query_one("#pin-rev", Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "pin-name" and self.query_one("#rev-free", RadioButton).value:
+            self.query_one("#pin-rev", Input).focus()
+            return
+        self.action_pin()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "ok":
+            self.action_pin()
+        else:
+            self.dismiss(None)
+
+    def action_pin(self) -> None:
+        name = self.query_one("#pin-name", Input).value
+        revs = self.query_one("#pin-revs", RadioSet)
+        i = revs.pressed_index
+        if 0 <= i < len(self.choices):
+            rev = self.choices[i].rev
+        else:
+            rev = self.query_one("#pin-rev", Input).value
+        args = view.pin_at_args(name, rev)
+        if isinstance(args, str):
+            self.notify(args, severity="warning")
+            return
+        self.dismiss(args)
+
+
 KEYS = [
     ("everywhere", ""),
     ("q", "quit (ctrl+q while something runs)"),
@@ -296,6 +366,7 @@ KEYS = [
     ("u", "update the nixpkgs lock (confirm first)"),
     ("h / k", "updates: hold the row (pin) or release it (unpin) / hold the kernel"),
     ("z", "updates, pending: undo the lock move (flake.lock back to the committed one)"),
+    ("p", "pins: pin something at a revision (the committed, the running, or a typed one)"),
     ("n", "pins: what is held back, at which nixpkgs"),
     ("c / u", "pins: check them against the lock / unpin the row"),
     ("r", "refresh (re-evaluate)"),

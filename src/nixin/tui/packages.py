@@ -11,7 +11,8 @@ PNAME`, through the writer's diff modal) or releases it (`unpin`); `k` holds the
 While the moved lock is not committed, `outdated` compares the move itself and `z` undoes
 it (`update --undo`: flake.lock back to the committed one).
 Pins: the host's pins (`pins`), `c` checks them against the lock (`pins --check`), `u`
-drops the one under the cursor.
+drops the one under the cursor, `p` pins something at a chosen revision (the committed or
+the applied lock's, the running system's, or one typed: `pin NAME --rev REV`).
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, ContentSwitcher, DataTable, Input, Tab, Tabs
 
 from ..ui import view
-from .modals import NoticeModal, UpdateModal
+from .modals import NoticeModal, PinModal, UpdateModal
 from .screens import Base, DetailsScreen
 from .widgets import Fields, Line, NoticeBox, Spinner, cell
 
@@ -55,6 +56,7 @@ class PackagesScreen(Base):
         Binding("z", "undo", "Undo lock move", show=False),
         Binding("u", "unpin", "Unpin", show=False),
         Binding("c", "check_pins", "Check", show=False),
+        Binding("p", "pin_at", "Pin…", show=False),
         Binding("r", "refresh", "Refresh", show=False),  # ? lists it; a phone has no room
     ]
 
@@ -112,6 +114,7 @@ class PackagesScreen(Base):
                 yield Fields(id="pn-checks", label_width=6)
                 with Horizontal(id="pn-actions", classes="actions"):
                     yield Button("Check (c)", id="pn-check", variant="primary", compact=True)
+                    yield Button("Pin… (p)", id="pn-pin", compact=True)
                     yield Button("Unpin (u)", id="pn-unpin", compact=True)
         yield from self.compose_bottom()
 
@@ -163,7 +166,7 @@ class PackagesScreen(Base):
             return self.tab == "installed"
         if action in ("update", "mode", "hold", "hold_kernel", "undo"):
             return self.tab == "updates"
-        if action in ("unpin", "check_pins"):
+        if action in ("unpin", "check_pins", "pin_at"):  # elsewhere `p` is Pending
             return self.tab == "pins"
         return True
 
@@ -502,7 +505,7 @@ class PackagesScreen(Base):
         if r is not None:
             line.show(view.pin_detail(r), "dim")
         elif self.nixin.pins_doc is not None and not self.pins:
-            line.show("no pins · h on an Updates row or k holds something back", "dim")
+            line.show("no pins · p pins at a revision; h on an Updates row or k holds back", "dim")
         else:
             line.show("")
 
@@ -511,6 +514,16 @@ class PackagesScreen(Base):
             self.notify("no pins to check", severity="warning")
             return
         self.load_pins(check=True)
+
+    def action_pin_at(self) -> None:
+        """Pin…: name + a revision from `pins`' revisions[] (or typed) → `pin NAME --rev REV`
+        through the writer's diff modal."""
+        doc = self.nixin.pins_doc
+        if doc is None:
+            self.notify("pins is still loading", severity="warning")
+            return
+        choices = view.pin_rev_choices(doc)
+        self.app.push_screen(PinModal(choices), lambda args: args and self._hold(args))
 
     def action_unpin(self) -> None:
         r = self._current(self.query_one("#pn-table", DataTable), self.pins)
@@ -590,5 +603,6 @@ class PackagesScreen(Base):
             "up-kernel-hold": self.action_hold_kernel,
             "up-undo": self.action_undo,
             "pn-check": self.action_check_pins,
+            "pn-pin": self.action_pin_at,
             "pn-unpin": self.action_unpin,
         }[event.button.id or ""]()

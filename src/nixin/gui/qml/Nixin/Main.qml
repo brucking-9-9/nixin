@@ -143,6 +143,9 @@ ApplicationWindow {
     UpdateDialog {
         packages: win.backend.packages
     }
+    PinDialog {
+        pins: win.backend.pins
+    }
     TryDialog {
         trying: win.backend.trying
     }

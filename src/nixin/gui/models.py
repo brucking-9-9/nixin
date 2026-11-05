@@ -32,7 +32,7 @@ SPAN = ("text", "style")
 HIT = ("kind", "badge", "name", "target", "detail", "description", "isOption")
 CLOSURE = ("sign", "name", "version", "size", "style")
 PACKAGE = ("name", "drv", "version", "tag", "where", "isHome")
-UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome", "held")
+UPDATE = ("name", "before", "after", "tag", "note", "style", "isHome", "held", "holdLabel")
 PIN = ("name", "attrs", "version", "heldAt", "mode", "stale", "why", "note", "drop")
 LINE = ("text",)
 APP = ("name", "target", "version", "summary", "icon", "installed", "curated", "marks")
@@ -180,6 +180,7 @@ def updates(xs: Iterable[view.UpdateRow]) -> list[Row]:
             "style": r.style,
             "isHome": r.user is not None,
             "held": r.held,
+            "holdLabel": r.hold_label,
         }
         for r in xs
     ]

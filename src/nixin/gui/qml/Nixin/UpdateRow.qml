@@ -18,6 +18,7 @@ Rectangle {
     required property string style
     required property bool isHome
     required property string held
+    required property string holdLabel
     property bool selected: false
     property bool current: false
 
@@ -56,7 +57,7 @@ Rectangle {
         rightPadding: 8
         flat: true
         visible: row.held !== "" || row.selected || row.current || mouse.containsMouse
-        text: row.held !== "" ? "unhold" : "hold"
+        text: row.holdLabel
         font.family: Theme.font
         font.pixelSize: Theme.small
         ToolTip.visible: hovered
