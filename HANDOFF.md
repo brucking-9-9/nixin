@@ -66,6 +66,10 @@ conflict decision, the live smoke table.
   `gc [--keep N] [--older-than DAYS] [--dry-run]`, `outdated`'s evals side by side, lazy
   imports and the cached host list (branch `gc-generations-speed`; a real `gc --keep 3` on
   mbp13 deleted gens 87–117 and freed 3.5 GB). One section per branch in HANDOFF-apply.
+- [pins](docs/HANDOFF-pins.md) — branch `pins` (2026-11-05, 19BK, not merged): `pin`/`unpin`/`pins`
+  (hold a package or the kernel at the lock's nixpkgs through a narHash-fetched second nixpkgs + overlay in
+  the generated module), the `update` lock guard (`lock-moved-others`, `--hold`), holds in
+  `outdated`/`plan`/`apply`; design with the deferred security section in `docs/DESIGN-pins.md`.
 - [outdated](docs/HANDOFF-outdated.md) — branch `outdated-verb`, merged: what a nixpkgs
   lock update would change for a host, and `--published` against a channel; `update`
   takes it (branch `ui-packages`).

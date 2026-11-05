@@ -1,7 +1,9 @@
-# DESIGN: holds, pins and "reasons to switch" (branch `pins`, phase 1: design only)
+# DESIGN: holds, pins and "reasons to switch" (branch `pins`)
 
-Written 2026-11-05 on 19BK in `~/Projects/nixin-wt-pins`. Nothing implemented. `~/nixos` was only read;
-probes ran on throwaway clones and `nix eval` (no lock written, no build, no sudo).
+Written 2026-11-05 on 19BK in `~/Projects/nixin-wt-pins`; `~/nixos` was only read, probes ran on throwaway
+clones and `nix eval` (no lock written, no build, no sudo). **Status**: steps 1-3 of §7 are implemented on
+this branch (`docs/HANDOFF-pins.md`); §4 (security) is **deferred** by the user (no `reasons[]`, no
+`--security` in any document yet); §5 (TUI tab, GUI page, hold toggles) waits for the plan-progress merge.
 
 ## Probes (facts the design rests on)
 
@@ -128,7 +130,9 @@ one summary line (`2 pins, 1 stale`). `unpin NAME` removes the entry, re-renders
 (the writer's rule); `unpin --all`. `outdated` gains a `holds[]` block and its table marks held rows `(held)`
 instead of listing them as changes; `plan`/`apply` carry `pins[]` and the stale note.
 
-## 4. Security / reasons to switch (`nixin outdated --security`; offline-first, no accounts)
+## 4. Security / reasons to switch (`nixin outdated --security`; offline-first, no accounts) — DEFERRED
+
+*Deferred 2026-11-05 by the user: not implemented, nothing of it appears in the documents. Kept as designed.*
 
 - Source: vulnix found on PATH (`vulnix-missing` names `nixin add vulnix`; not a runtime dep of nixin, so the
   security phase does not grow every closure; `nix run` never implicit) — open for the manager. `now`: `vulnix -C /run/current-system --json` (exact: the running closure). `after`: `vulnix -f
@@ -150,7 +154,7 @@ instead of listing them as changes; `plan`/`apply` carry `pins[]` and the stale 
   6 running system older than 30 days (generation link mtime); 7 a pin blocking a fix. One line each, highest
   first, e.g. `security  2 CVEs (CVSS 9.8, 7.5) in the running system are gone with the pending lock; kernel 7.2.15 is out`.
 
-## 5. UX
+## 5. UX — step 5, after the plan-progress merge
 
 - CLI: `nixin pin NAME [--attr A] [--rev R] [--whole-set] [--why TEXT] [--force]`, `nixin unpin NAME|--all`,
   `nixin pins [--sizes] [--check]`, `nixin update [--hold N,…] [--allow-others]`, `nixin outdated [--security]`.
