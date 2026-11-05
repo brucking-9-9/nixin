@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 
+from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 from textual import events
@@ -171,6 +172,10 @@ class Spinner(Static):
         self._timer.pause()
         self.display = False
 
+    def relabel(self, label: str) -> None:
+        """A new label while it runs (the build tracker names the step)."""
+        self._label = label
+
     @property
     def running(self) -> bool:
         return bool(self.display)
@@ -182,6 +187,45 @@ class Spinner(Static):
         if self._hint:
             pieces.append(view.Span(f"\n{self._hint}", "dim"))
         self.update(spans_text(self.app, pieces))
+
+
+class BuildTracker(Static):
+    """The build while plan or apply runs it: the status line (built/total, fetched, the
+    current derivation, elapsed, ETA), the derivations building and queued, and the
+    current build's last log lines. Fed with the tracker's snapshot (apply.progress)."""
+
+    DEFAULT_CSS = "BuildTracker { height: auto; display: none; }"
+
+    def __init__(self, **kw) -> None:
+        super().__init__("", **kw)
+        self.snap: dict | None = None
+
+    def show(self, snap: dict | None) -> None:
+        self.snap = snap
+        if not snap or not (snap.get("total") or (snap.get("downloads") or {}).get("expected")):
+            self.display = False
+            return
+        parts = [Text(view.build_head(snap), style=rich_style(self.app, "accent"))]
+        rows = view.build_rows(snap)
+        if rows:
+            parts.append(fields_table(self.app, rows, 32))
+        muted = rich_style(self.app, "dim")
+        for ln in view.build_tail(snap):
+            parts.append(Text(f"  {ln}", style=muted, no_wrap=True, overflow="ellipsis"))
+        self.update(Group(*parts))
+        self.display = True
+
+    def hide(self) -> None:
+        self.snap = None
+        self.display = False
+
+    @property
+    def text(self) -> str:
+        """Plain text (tests): the head, `label value` per row, the tail."""
+        if not self.snap:
+            return ""
+        rows = [f"{f.label} {f.value}".strip() for f in view.build_rows(self.snap)]
+        return "\n".join([view.build_head(self.snap), *rows, *view.build_tail(self.snap)])
 
 
 class LogView(RichLog):

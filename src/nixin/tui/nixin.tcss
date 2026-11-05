@@ -233,6 +233,12 @@ LogView {
     border-left: tall $panel;
     padding-left: 1;
 }
+
+BuildTracker {
+    margin: 0 1;
+    padding: 0 1;
+    border-left: tall $accent;
+}
 Screen.-narrow LogView {
     max-height: 8;
 }

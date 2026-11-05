@@ -1,0 +1,28 @@
+{
+  "error": {
+    "build": {
+      "cancelled": true,
+      "counts": {
+        "building": 0,
+        "done": 8,
+        "failed": 0,
+        "queued": 31,
+        "skipped": 0
+      },
+      "downloads": {
+        "bytes_done": 1572864,
+        "done": 2
+      },
+      "duration_s": 74.1,
+      "failed": [],
+      "state": "cancelled",
+      "total": 39
+    },
+    "code": "cancelled",
+    "committed": "716ed68c2b0f5f2a8d4e9b1c3a7f6e5d4c3b2a19",
+    "message": "the build was stopped after 1m14s (8 of 39 derivations built, 2 paths fetched); nothing was applied"
+  },
+  "host": "mbp13",
+  "ok": false,
+  "verb": "apply"
+}
