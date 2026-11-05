@@ -81,7 +81,8 @@ class Cancel:
         self.refused = ""  # why the last request() was refused
         self.snapshot: Callable[[], dict[str, Any]] | None = None
         self._event = threading.Event()
-        self._lock = threading.Lock()
+        # re-entrant: the SIGINT handler may run request() while the main thread holds it
+        self._lock = threading.RLock()
         self._procs: list[subprocess.Popen] = []
 
     @property
