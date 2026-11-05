@@ -135,9 +135,10 @@ def nix_store(args: list[str]) -> list[str] | None:
 STORE = nix_store  # tests swap this
 
 
-def dependents(out: str | None, system: str = RUNNING_SYSTEM) -> list[str] | None:
+def dependents(out: str | None, system: str | None = None) -> list[str] | None:
     """Store paths of the running system's closure that depend on `out` (`out` itself not
     counted); None when the path is not in the store or there is no running system."""
+    system = system or RUNNING_SYSTEM  # read at call time: the tests point it elsewhere
     if not out or not os.path.exists(system):
         return None
     refs = STORE(["-q", "--referrers-closure", out])
