@@ -532,6 +532,7 @@ def moved(repo, monkeypatch):
     from nixin import lockstate
 
     monkeypatch.setattr(lockstate, "running_system", lambda root="/x": {"nixpkgs_rev": "3ec6363"})
+    monkeypatch.setattr(lockstate, "local_hostname", lambda: "19BK")  # this machine is the host
     return repo
 
 
