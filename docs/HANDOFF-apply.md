@@ -50,10 +50,22 @@ Done: CLI, documents, tracker, TUI, GUI, tests, docs. Nothing half-done.
 
 ### Live check (19BK, 2026-11-05)
 
-See the end of this section: `plan --remote` against a throwaway clone of `~/nixos` with
-`XDG_CACHE_HOME` pointed at a scratch dir (plan's cache is content-keyed: at the applied
-commit a warm cache never reaches the builders command). mbp13 was awake; nix had every
-path, so the "build" returned at once with the spec in `build.remote`.
+Against a throwaway clone of `~/nixos` (`/tmp/nixin-remote-live/nixos`), run from the
+worktree (`nix develop -c env PYTHONPATH=src python -m nixin.cli …`), each run with its
+own `XDG_CACHE_HOME` under `/tmp/nixin-remote-live/` (plan's cache is content-keyed: a
+warm cache never reaches the builders command). mbp13 was awake; nix had every path of
+the toplevel, so each "build" was the eval plus a no-op `nix build`. Plan only; no
+`apply --remote` (it switches).
+
+| run | result |
+|---|---|
+| `--json plan --remote` | `ok`, not cached, `build.remote` = `{mode: big, name: mbp13, builders: "ssh-ng://nixremote@100.97.50.80 x86_64-linux /etc/nix/mbp13-builder 2 1 big-parallel,kvm,nixos-test,benchmark big-parallel <key>", command: mbp13-builders, fell_back: false}`, `warnings: []`, nothing on stderr |
+| `NIXIN_BUILDERS_CMD="sh -c 'echo mbp13 is asleep >&2; exit 1'"` `--json plan --remote --all` | `ok`, `build.remote` = `{mode: all, name: sh, builders: null, command: "sh -c '…' --all", fell_back: true}`, `warnings: ["sh is not available (mbp13 is asleep): built locally instead"]`, nothing on stderr |
+| human `plan --remote --split` | stderr: `nixin: building on both (mbp13 takes any job) · split`; stdout: `plan 19BK: … (built in 73.03 s)`, `build     nothing to build in 5.7 s`, `builders  building on both (mbp13 takes any job) · split (ssh-ng://nixremote@100.97.50.80 …)` |
+
+Left behind: `/tmp/nixin-remote-live/` (the clone, three cache dirs, the outputs),
+`/tmp/nixin-remote-suites.log`, `/tmp/nixin-remote-live/nix-build.log` (the gate):
+`rm -rf /tmp/nixin-remote-live /tmp/nixin-remote-suites.log`.
 
 ### Judgement calls
 
@@ -78,6 +90,12 @@ path, so the "build" returned at once with the spec in `build.remote`.
   `plan --remote`, covered offline.
 - The selector is per session; a `NIXIN_BUILD_WHERE` default or a settings page could
   remember it.
+- The UI tests assert the default labels (`mbp13: big jobs`); `tests/conftest.py` unsets
+  `NIXIN_BUILDERS_CMD` for every test so a shell that sets it does not change them. A
+  `builders_cmd` in the fake's config path (`/home/master/nixos/installer/state.json` on
+  mbp13) still would.
+- The Pending screenshots (`docs/tui/*-4-plan.svg`, `docs/gui/4-plan.png`) predate the
+  selector; `scripts/tui-screenshots.py` / `gui-screenshots.py` redraw them.
 
 ### How to test
 

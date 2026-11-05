@@ -118,6 +118,14 @@ def _no_authoritative_tree(tmp_path, monkeypatch):
     monkeypatch.setattr(lockstate, "running_system", lambda root="/x": {"nixpkgs_rev": None})
 
 
+@pytest.fixture(autouse=True)
+def _no_builders_env(monkeypatch):
+    """The remote builder's command stays the default (`mbp13-builders`) in every test, so
+    the UIs' selector labels (`mbp13: big jobs`) do not follow a shell that set
+    $NIXIN_BUILDERS_CMD. The apply tests set their own fake command after this."""
+    monkeypatch.delenv("NIXIN_BUILDERS_CMD", raising=False)
+
+
 @pytest.fixture
 def transport():
     s = FakeSession()
