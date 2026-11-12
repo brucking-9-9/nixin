@@ -24,6 +24,7 @@ from .. import cli
 from ..apply.proc import Cancel
 from ..ui import view
 from ..ui.backend import Backend
+from .branches import BranchesScreen
 from .modals import ApplyModal, DiffModal, HelpModal, NoticeModal, SetOptionModal, UpdateModal
 from .options import OptionsScreen
 from .packages import PackagesScreen
@@ -54,10 +55,15 @@ class NixinApp(App[str]):
         Binding("o,ctrl+5,ctrl+right_square_bracket", "options", "Options"),
         Binding("p", "pending", "Pending"),
         Binding("s", "status", "Status"),
+        # ctrl+7: a terminal without the kitty keyboard protocol sends 0x1f, ctrl+_
+        Binding("g,ctrl+7,ctrl+underscore", "branches", "Branches"),
+        # C: the last run's error and log, as text to paste (screens with a log copy theirs)
+        Binding("C,shift+c", "copy_last", "Copy", show=False),
         Binding("i,ctrl+4,ctrl+backslash", "go('packages')", "Packages", group=PAGE_KEYS),
         Binding("o,ctrl+5,ctrl+right_square_bracket", "go('options')", "Options", group=PAGE_KEYS),
         Binding("p", "go('pending')", "Pending", group=PAGE_KEYS),
         Binding("s", "go('status')", "Status", group=PAGE_KEYS),
+        Binding("g,ctrl+7,ctrl+underscore", "go('branches')", "Branches", group=PAGE_KEYS),
     ]
 
     def __init__(self, backend: Backend, *, channel: str = "unstable") -> None:
@@ -75,6 +81,10 @@ class NixinApp(App[str]):
         self.list_stale = True
         self.outdated_docs: dict[str, Doc] = {}  # mode (lock | published) → document
         self.pins_doc: Doc | None = None  # the Pins tab's last ok `pins` document
+        self.branches_doc: Doc | None = None  # the Branches page's last ok list
+        # the last run's document and its streamed log (plain): what C copies anywhere
+        self.last_run: tuple[Doc, str] | None = None
+        self.last_failure: tuple[Doc, str] | None = None
         # where plan and apply build (Pending's `w`): a mode of view.build_choices, for the session
         self.build_choices = view.build_choices(backend.config)
         self.build_where = self.build_choices[0][0]
@@ -131,6 +141,9 @@ class NixinApp(App[str]):
             if log is not None:
                 log.flush_partial()
                 self.end_capture_print(log)
+            self.last_run = (doc, log.plain if log is not None else "")
+            if not doc.get("ok"):
+                self.last_failure = self.last_run
             if spinner is not None:
                 spinner.stop()
             if busy:
@@ -361,6 +374,25 @@ class NixinApp(App[str]):
             label="apply --dry-run",
         )
 
+    # --- copy: errors and logs out of the TUI ------------------------------------------------
+
+    def copy_report(self, doc: Doc | None, log: str = "") -> bool:
+        """Put view.copy_text(doc, log) on the clipboard (OSC 52); False when it is empty."""
+        text = view.copy_text(doc, log)
+        if not text.strip():
+            return False
+        self.copy_to_clipboard(text)
+        n = len(text.splitlines())
+        self.notify(f"copied {n} line{'s' if n != 1 else ''} (OSC 52: the terminal must allow it)")
+        return True
+
+    def action_copy_last(self) -> None:
+        """The most recent failure (its error document and log), else the last run's log."""
+        for run in (self.last_failure, self.last_run):
+            if run is not None and self.copy_report(*run):
+                return
+        self.notify("nothing to copy yet: no error, no log", severity="information")
+
     # --- where the build runs -------------------------------------------------------------
 
     @property
@@ -390,6 +422,7 @@ class NixinApp(App[str]):
         "options": OptionsScreen,
         "pending": PendingScreen,
         "status": StatusScreen,
+        "branches": BranchesScreen,
     }
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
@@ -433,12 +466,22 @@ class NixinApp(App[str]):
     def action_status(self) -> None:
         self._go(StatusScreen)
 
+    def action_branches(self) -> None:
+        self._go(BranchesScreen)
+
+    def branches_changed(self) -> None:
+        """A merge or a prune ran: the list, status and the plan are stale."""
+        self.branches_doc = None
+        self.status_stale = True
+        self.list_stale = True
+        self.plan_doc = None
+
     def action_help(self) -> None:
         if not isinstance(self.screen, HelpModal):
             self.push_screen(HelpModal())
 
     def action_quit_safely(self) -> None:
-        if self.busy in ("writing", "updating", "applying"):
+        if self.busy in ("writing", "updating", "applying", "merging", "pruning"):
             self.notify(f"{self.busy} is running; ctrl+q quits anyway", severity="warning")
             return
         self.exit(view.farewell(self.writes, self.applied))
@@ -460,6 +503,10 @@ class NixinApp(App[str]):
             "Status", "lock, HEAD, running system, counts, caches", self.action_status
         )
         yield SystemCommand("Sync", "git fetch of the hub", self._palette_sync)
+        yield SystemCommand(
+            "Branches", "the config's branches: merge into main, prune", self.action_branches
+        )
+        yield SystemCommand("Copy", "the last error and log, to paste", self.action_copy_last)
         other = "stable" if self.channel == "unstable" else "unstable"
         yield SystemCommand(f"Channel: {other}", "search another channel", self.cycle_channel)
         yield SystemCommand("Keys", "every key", self.action_help)
