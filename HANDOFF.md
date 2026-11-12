@@ -4,6 +4,32 @@ Per-layer handoff notes live in `docs/HANDOFF-<layer>.md` (state, rough edges, n
 how to test). A layer branch keeps its own `HANDOFF.md` at the root while it is in flight;
 on merge it moves here.
 
+## Now: branch `branches-verb` (2026-11-12, 19BK)
+
+Written in the worktree `~/Projects/nixin-wt-branches`, cut from main @ 2688d11. PR 1 of
+2: the CLI verb; PR 2 adds a Branches page to the TUI and the GUI.
+
+- **Done**: `nixin branches [list|merge BRANCH...|prune]` (apply/branches.py; CONTRACT
+  `### branches`, three new error codes `merge-conflict`, `branch-checked-out`,
+  `unknown-branch`). `merge` merges in the object store (merge-tree + commit-tree, one
+  `--no-ff`-style merge commit per branch), builds the result from a detached worktree
+  under the cache (commit cache filled), then fast-forwards the target with `git fetch .
+  REF:main` (git's own check refuses a branch another worktree has checked out). It runs
+  from any branch, with a dirty tree. `prune` deletes branches main contains (`--hub`:
+  on the hub too, never another remote). `Git` gained `refs`, `worktrees`,
+  `names_changed`, `merge_tree`, `commit_tree`; `upstream_remote(branch)`.
+  tests/test_branches.py (11, on test_apply's Machine).
+- **Live** (a scratch clone of 19BK's ~/nixos, read-only for ~/nixos): `list` shows the 3
+  unmerged branches and 8 prunable; `merge accent-surfaces feat/spotify-player-page
+  --no-build` made the two merge commits with the clone on accent-surfaces and dirty;
+  main checked out in another worktree → `branch-checked-out`; `prune --hub --dry-run`
+  left the `mbp13` remote alone.
+- **Next**: PR 2 (the TUI/GUI pages; TUI page key: `b` is Plan on PendingScreen, pick
+  another, ctrl+7's legacy-terminal fallback); `merge` with the build, live; bump the
+  hub's nixin input.
+- **How to test**: `nix develop -c pytest tests/test_branches.py`; by hand, read-only:
+  `nixin branches --config ~/nixos`, `nixin branches merge A B --dry-run --config ~/nixos`.
+
 ## Now: branch `integrate-night` (2026-11-02/03, mbp13)
 
 [HANDOFF-integrate-night](docs/HANDOFF-integrate-night.md): the merge record, every

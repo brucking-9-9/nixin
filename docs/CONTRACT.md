@@ -1101,6 +1101,71 @@ network or authentication), `internal`.
 
 Costs: network (the remote), git in the workspace only.
 
+### `branches`
+
+```
+nixin branches [list] [--into BRANCH] [--config DIR]
+nixin branches merge BRANCH... [--into BRANCH] [--no-build] [--push] [--dry-run] [--config DIR]
+nixin branches prune [--hub] [--dry-run] [--into BRANCH] [--config DIR]
+```
+
+The workspace's git branches against the target branch (`--into`, else the hub's HEAD
+`refs/remotes/<hub>/HEAD`, else `main`; the hub is the target's upstream remote, else
+`origin`). Read only for `list`; `merge` and `prune` take apply's lock.
+
+`list`: every local branch, and every hub branch with no local branch of that name
+(`where: "hub"`), unmerged ones first, newest first. Only git runs (no network: the
+remote-tracking refs as the last fetch left them).
+
+`merge`: merges each BRANCH (a local branch, else `<hub>/BRANCH`) into the target in
+order, in the object store (`git merge-tree --write-tree`, then `commit-tree`: one merge
+commit per branch, first parent along the target, message `Merge branch 'NAME'` plus
+the merged subjects). No checkout is touched, so it runs from any branch and with
+uncommitted changes. A BRANCH the target already contains is `skipped[]`. Then, unless
+`--no-build`, the merged commit is built for `--host` from a detached worktree under the
+cache (`<cache>/branches/<sha12>`, removed again) and its out path goes into plan's
+commit cache. Only then does the target move: a fast-forward `git fetch . REF:TARGET`
+(`diverged` when it moved meanwhile; `branch-checked-out` when a worktree other than the
+workspace has it checked out, also mid-rebase or bisect, checked before the build too),
+or `git merge --ff-only` when the workspace itself is on the target (its files move
+with it). A conflict or a failed build changes nothing. `--push`: push the target to the
+same name on the hub. It never switches: `nixin apply` from the target branch does; a
+`warnings[]` line says so when the workspace is on another branch. `--dry-run`: the
+merge check only (no commits, no build, nothing moves).
+
+`prune`: deletes every local branch whose tip the target contains (nixin checks the
+ancestry itself, then `git branch -D`), except the target, the workspace's branch and
+a branch a worktree has checked out (`skipped[]` with the reason). `--hub`: the same on
+the hub (`git push --delete`, one call), never on another remote; a hub branch whose
+local branch was kept stays too. Stale worktrees (their directory gone) are pruned
+first and never hold a branch. `--dry-run`: what it would delete.
+
+Result:
+
+| action | fields |
+|---|---|
+| `list` | `into`, `into_head`, `hub` (null: no hub), `workspace` = `{path, branch}`, `branches[]` = `{name, where (local, hub), commit, subject, date, upstream, hub_commit (the hub's tip of that name, null: not there), ahead, behind (of the target), merged, files[] (first 200 the branch changes since the merge base), files_total, merges_clean (null when merged), conflicts[], checked_out_in (a worktree path, null)}`, `counts` = `{unmerged, merged}`, `duration_s`, `warnings[]` |
+| `merge` | `dry_run`, `into`, `old`, `new` (the target before and after), `merged[]` = `{branch, commit, merge (the merge commit; null in a dry run), commits, files[]}`, `skipped[]` = `{branch, reason}`, `build` = `{host, out, drv, eval_s, build_s}` (null: `--no-build`, dry run, nothing merged), `pushed`, `hub`, `workspace`, `duration_s`, `warnings[]` |
+| `prune` | `dry_run`, `into`, `hub` (null without `--hub`), `deleted[]` = `{branch, where (local, hub), commit}`, `skipped[]` = `{branch, where, reason}`, `unmerged` (local branches kept because the target lacks them), `duration_s`, `warnings[]` |
+
+Human output: `list` one line per unmerged branch (`clean`/`conflict`, +ahead -behind,
+files, age, subject; conflicting files and other worktrees under it) and a `prunable`
+line with the merged ones; `merge` the move, one line per merged/skipped branch, the
+build, the push and `next`; `prune` one line per deleted and kept branch. With a build,
+nix's progress streams on stderr as in `plan`.
+
+Errors: `usage` (an unknown action, `merge` without BRANCH, branch names after `list`
+or `prune`, a flag of another action, `--push`/`--hub` without a hub remote, the target
+as BRANCH), `config-not-found`, `not-a-workspace`, `unknown-branch` (no such BRANCH, or
+`--into` names no local branch), `unknown-host` (merge with a build), `merge-conflict`
+(`branch`, `files[]`), `eval-failed`/`build-failed`/`cancelled` (the merged commit;
+`build` summary), `branch-checked-out` (`path`), `diverged`, `busy`, `git-failed`,
+`internal`.
+
+Costs: git only for `list` (one `merge-tree` per unmerged branch; 0.16 s for 11
+branches on 19BK's ~/nixos); `merge` adds a whole host build (as `plan`, mostly substituted or
+cached); `--push` and `prune --hub` are network (the hub).
+
 ### `history`
 
 ```
@@ -1956,8 +2021,11 @@ the next run outside them does). `report` prints Markdown of two outdated docume
 | `switch-failed` | apply | `nixos-rebuild` (or the `nixos-switch` helper) failed, or the helper is already running; `rollback`: nix-env or switch-to-configuration failed |
 | `verify-failed` | apply | after the switch the system is not the out path nixin built |
 | `git-failed` | apply | a git command failed (or git is not on PATH); the message has git's last lines |
-| `diverged` | apply (`sync`) | `--pull` cannot fast-forward, or `--push` was rejected |
-| `busy` | apply | another `nixin apply`, `rollback` or `gc` holds the lock |
+| `diverged` | apply (`sync`, `branches`) | `--pull` cannot fast-forward, or `--push` was rejected; `branches merge`: the target moved while merging |
+| `merge-conflict` | apply (`branches`) | `merge`: BRANCH does not merge cleanly into the target (`branch`, `files[]`); nothing changed |
+| `branch-checked-out` | apply (`branches`) | `merge`: another worktree has the target branch checked out (`path`), so it cannot move under it |
+| `unknown-branch` | apply (`branches`) | no such branch (BRANCH, `--into`), or no main branch to default to |
+| `busy` | apply | another `nixin apply`, `rollback`, `gc` or `branches merge`/`prune` holds the lock |
 | `boot-space` | apply | `apply`/`rollback`: the new system's kernels and initrds do not fit on /boot (`boot_space` has the numbers); nothing ran as root |
 | `unknown-generation` | apply | `rollback GEN`: no such system generation, or none before the running one |
 | `workspace-dirty` | apply | `rollback`: the workspace has uncommitted changes (`files[]`) or unapplied commits (`commits[]`) its revert would sweep in or drop |

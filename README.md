@@ -42,6 +42,7 @@ add rm set unset            writer      edit a user-owned workspace clone of the
 plan apply sync             apply       build + closure diff + boot check; commit, pull into /etc/nixos, switch
                                         (--remote [--all|--split]: build on the remote builder)
                                         (another host: push to the hub, pull and switch there over ssh); hub sync
+branches                    apply       branches vs main; merge them (built first), prune the merged
 history rollback            apply       the system generations with nixin's commits; back to one, config reverted with it
 generations gc              apply       sizes, boot entries, what gc drops; delete old generations + collect garbage (sudo)
 outdated update             outdated    what a nixpkgs lock update would change (--published: newer on a channel); take it

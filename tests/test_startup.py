@@ -37,6 +37,7 @@ def test_cli_verbs_import_no_toolkit_and_no_http(tmp_path):
         ["--json", "--host", "testhost", "status", "--config", "/nonexistent/nixin-x"],
         ["--json", "--host", "testhost", "list", "--config", "/nonexistent/nixin-x"],
         ["--json", "--host", "testhost", "plan", "--config", "/nonexistent/nixin-x"],
+        ["--json", "--host", "testhost", "branches", "--config", "/nonexistent/nixin-x"],
         ["--json", "--host", "testhost", "generations", "--config", "/nonexistent/nixin-x"],
         ["--json", "--host", "testhost", "gc", "--dry-run"],
     ]

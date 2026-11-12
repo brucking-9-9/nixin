@@ -13,7 +13,9 @@ Two checkouts of the config:
 two privileged steps (privilege.py): root pulls the commit into the authoritative tree
 and `nixos-rebuild switch`es from there; then it checks that /run/current-system is the
 out path it built and appends a line to installer/history.jsonl (committed by the next
-apply). `sync` moves commits between the workspace and a git remote (the hub).
+apply). `sync` moves commits between the workspace and a git remote (the hub); `branches`
+lists the workspace's branches against main, merges them into it (built first) and
+prunes the merged ones (branches.py).
 
 plan and apply also read what the new system does to boot (safety.py): a new kernel,
 initrd, module tree or command line needs a reboot (`reboot_needed`), and its new
@@ -56,7 +58,7 @@ from . import build, builders, commitmsg, privilege, proc, render, safety, syste
 from .git import Git, Status
 from .system import HISTORY
 
-VERBS = ("plan", "apply", "sync", "history", "rollback", "generations", "gc")
+VERBS = ("plan", "apply", "sync", "branches", "history", "rollback", "generations", "gc")
 ENV_AUTHORITATIVE = "NIXIN_AUTHORITATIVE"
 
 
@@ -74,12 +76,13 @@ class ApplyError(NixinError):
 
 
 def register(sub: argparse._SubParsersAction) -> None:
-    from . import gc, generations, history, rollback  # they import this package's pieces
+    from . import branches, gc, generations, history, rollback  # they import this package
 
     handlers = {
         "plan": plan,
         "apply": apply,
         "sync": sync,
+        "branches": branches.branches,
         "history": history.history,
         "rollback": rollback.rollback,
         "generations": generations.generations,
@@ -111,6 +114,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="nixos-rebuild boot: make it the boot default, activate at the next boot",
     )
     history.add_arguments(sub.choices["history"])
+    branches.add_arguments(sub.choices["branches"])
     rb = sub.choices["rollback"]
     for a in rb._actions:  # cli.py's generic positional is the generation here
         if a.dest == "args":

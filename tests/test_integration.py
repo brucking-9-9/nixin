@@ -38,6 +38,9 @@ X11 = "services.openssh.settings.X11Forwarding"
 
 # docs/CONTRACT.md, "Error codes" (test_contract_lists_every_code keeps the two in step)
 ERROR_CODES = {
+    "merge-conflict",
+    "branch-checked-out",
+    "unknown-branch",
     "usage",
     "internal",
     "not-implemented",
