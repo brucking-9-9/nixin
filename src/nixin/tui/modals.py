@@ -142,7 +142,10 @@ class SetOptionModal(Modal):
 
 class NoticeModal(Modal):
     """An error document. With candidates (`ambiguous`, or `--where` matching nothing) the
-    person can pick one: the modal dismisses with its `--where FILE:LINE` value."""
+    person can pick one: the modal dismisses with its `--where FILE:LINE` value. C copies
+    the error (and the run's log, if it streamed one) as text to paste."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [Binding("C,shift+c", "copy", "Copy")]
 
     def __init__(self, doc: dict, heading: str, can_pick: bool = False) -> None:
         super().__init__()
@@ -168,6 +171,7 @@ class NoticeModal(Modal):
                 )
             with Horizontal(classes="buttons"):
                 yield Button("Close (esc)", id="close", compact=True)
+                yield Button("Copy (C)", id="copy", compact=True)
 
     def on_mount(self) -> None:
         self.query_one("#notice", NoticeBox).show(self.notice)
@@ -177,7 +181,15 @@ class NoticeModal(Modal):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self.dismiss(event.option.id)
 
+    def action_copy(self) -> None:
+        run = getattr(self.app, "last_run", None)
+        log = run[1] if run is not None and run[0] is self.doc else ""
+        self.app.copy_report(self.doc, log)  # type: ignore[attr-defined]
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "copy":
+            self.action_copy()
+            return
         self.dismiss(None)
 
 
@@ -345,6 +357,9 @@ KEYS = [
     ("o", "options: NixOS and Home Manager (ctrl+5)"),
     ("p", "pending: status.pending, plan, apply"),
     ("s", "status"),
+    ("g", "branches: merge into main, prune (ctrl+7)"),
+    ("C", "copy the last error and log (on a screen with a log: its own)"),
+    ("ctrl+c", "copy the text selected with the mouse (logs, notices)"),
     ("ctrl+p", "command palette"),
     ("?", "these keys"),
     ("search", ""),
@@ -381,6 +396,13 @@ KEYS = [
     ("a", "apply… (confirm first)"),
     ("y", "sync: fetch the hub"),
     ("r", "refresh status"),
+    ("C", "copy the plan's error and build log"),
+    ("branches", ""),
+    ("space", "tick / untick the branch (clean, unmerged ones)"),
+    ("m", "merge the ticked (or the highlighted) into main: build first (confirm)"),
+    ("x", "prune the merged branches (a dry run first; x stops a merge)"),
+    ("C", "copy the merge's error and build log"),
+    ("r", "refresh"),
     ("status", ""),
     ("r / f", "refresh / --full (slow)"),
     ("try", ""),

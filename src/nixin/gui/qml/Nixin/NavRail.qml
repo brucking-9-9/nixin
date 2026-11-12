@@ -4,7 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// Search, Browse, Pending, Status, Packages, Options, Pins, with their keys; under them what runs.
+// Search, Browse, Pending, Status, Packages, Options, Pins, Branches, with their keys; under them what runs.
 Rectangle {
     id: rail
 
@@ -25,7 +25,8 @@ Rectangle {
                 { page: "status", text: "Status", key: "Ctrl+3" },
                 { page: "packages", text: "Packages", key: "Ctrl+4" },
                 { page: "options", text: "Options", key: "Ctrl+5" },
-                { page: "pins", text: "Pins", key: "Ctrl+6" }
+                { page: "pins", text: "Pins", key: "Ctrl+6" },
+                { page: "branches", text: "Branches", key: "Ctrl+7" }
             ]
             delegate: ItemDelegate {
                 id: item

@@ -123,6 +123,17 @@ class BuildScreen(Base):
         self.nixin.stop()
         self._tick()
 
+    def copy_doc(self) -> dict | None:
+        """The document whose error Copy (C) takes along with the log."""
+        return None
+
+    def action_copy_log(self) -> None:
+        """C: this screen's error and build log as text to paste; without either, the app's
+        last failure."""
+        log = self.query_one("#log", LogView).plain
+        if not self.nixin.copy_report(self.copy_doc(), log):
+            self.nixin.action_copy_last()
+
 
 # --- search -------------------------------------------------------------------------------------
 
@@ -537,6 +548,7 @@ class PendingScreen(BuildScreen):
         Binding("x", "stop", "Stop", show=False),
         Binding("z", "undo", "Undo lock move", show=False),
         Binding("r", "refresh", "Refresh"),
+        Binding("C,shift+c", "copy_log", "Copy", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -695,6 +707,9 @@ class PendingScreen(BuildScreen):
             )
         table.display = bool(rows)
 
+    def copy_doc(self) -> dict | None:
+        return self.nixin.plan_doc
+
     def action_apply(self) -> None:
         self.nixin.start_apply()
 
@@ -742,6 +757,7 @@ class ApplyScreen(BuildScreen):
         Binding("c", "copy", "Copy commands", show=False),
         Binding("r", "retry", "Retry", show=False),
         Binding("x", "stop", "Stop", show=False),
+        Binding("C,shift+c", "copy_log", "Copy log"),
     ]
 
     def __init__(self, message: str) -> None:
@@ -821,6 +837,9 @@ class ApplyScreen(BuildScreen):
         cmds.display = False
         self.query_one("#result", Fields).show(view.apply_fields(doc))
         self.query_one("#closure-head", Line).show(view.closure_head(doc.get("diff")), "head")
+
+    def copy_doc(self) -> dict | None:
+        return self.doc
 
     def action_copy(self) -> None:
         n = view.notice(self.doc) if self.doc else None

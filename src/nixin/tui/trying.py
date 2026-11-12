@@ -33,6 +33,7 @@ class TryScreen(Base):
         Binding("l", "launch", "Launch", show=False),
         Binding("c", "copy", "Copy command", show=False),
         Binding("r", "retry", "Retry", show=False),
+        Binding("C,shift+c", "copy_log", "Copy log", show=False),
     ]
 
     def __init__(self, target: str, program: str | None = None) -> None:
@@ -175,6 +176,12 @@ class TryScreen(Base):
         if text:
             self.app.copy_to_clipboard(text.splitlines()[0])
             self.notify("command copied (OSC 52: your terminal must allow it)")
+
+    def action_copy_log(self) -> None:
+        """C: the try's error and build log, to paste."""
+        log = self.query_one("#log", LogView).plain
+        if not self.app.copy_report(self.doc, log):  # type: ignore[attr-defined]
+            self.app.action_copy_last()  # type: ignore[attr-defined]
 
     def action_retry(self) -> None:
         if not self.running:

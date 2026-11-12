@@ -126,6 +126,8 @@ Item {
                           ? "status: evaluating the config (about a minute cold, under a second warm)"
                           : page.p.statusNote
                     noteStyle: page.p.statusNote !== "" ? page.p.statusNoteStyle : "dim"
+                    copyable: true
+                    onCopyRequested: page.backend.copyLastError("status")
                 }
 
                 SectionHead {
@@ -169,6 +171,8 @@ Item {
                     model: page.p.plan
                     note: page.p.planNote
                     noteStyle: page.p.planNoteStyle
+                    copyable: true
+                    onCopyRequested: page.backend.copyLastError("plan")
                 }
                 Text {
                     objectName: "closureHead"

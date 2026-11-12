@@ -1,5 +1,6 @@
 module NixinStyle
 Button 6.0 Button.qml
+CheckBox 6.0 CheckBox.qml
 BusyIndicator 6.0 BusyIndicator.qml
 ComboBox 6.0 ComboBox.qml
 Dialog 6.0 Dialog.qml

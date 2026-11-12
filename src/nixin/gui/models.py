@@ -8,7 +8,7 @@ log of plan/apply: chunks of text in, whole lines out, ANSI escapes dropped.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from PySide6.QtCore import (
@@ -38,6 +38,21 @@ LINE = ("text",)
 APP = ("name", "target", "version", "summary", "icon", "installed", "curated", "marks")
 CATEGORY = ("key", "label", "count", "installed")
 SHOT = ("url", "caption")
+BRANCH = (
+    "name",
+    "where",
+    "state",
+    "badge",
+    "style",
+    "ahead",
+    "behind",
+    "files",
+    "age",
+    "subject",
+    "mergeable",
+    "merged",
+    "checked",
+)
 
 
 class Rows(QAbstractListModel):
@@ -76,6 +91,15 @@ class Rows(QAbstractListModel):
         self.endInsertRows()
         self.countChanged.emit()
 
+    def set_row(self, i: int, **kw: Any) -> None:
+        """Change some of row `i`'s values in place (the view keeps its position)."""
+        if not 0 <= i < len(self.rows):
+            return
+        self.rows[i].update({k: v for k, v in kw.items() if k in self.keys})
+        idx = self.index(i, 0)
+        roles = [r for r, k in self._roles.items() if k in kw]
+        self.dataChanged.emit(idx, idx, roles)
+
     def column(self, key: str) -> list[Any]:
         return [r[key] for r in self.rows]
 
@@ -99,9 +123,10 @@ class LogModel(Rows):
 
     incoming = Signal(str)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, copier: Callable[[str], Any] | None = None) -> None:
         super().__init__(LINE, parent)
         self._partial = ""
+        self.copier = copier  # what copyAll hands the text to (the root's copy + notice)
         self.incoming.connect(self.feed)
 
     @Slot(str)
@@ -127,6 +152,21 @@ class LogModel(Rows):
     @property
     def lines(self) -> list[str]:
         return self.column("text")
+
+    @Slot(result=str)
+    def text(self) -> str:
+        """Every line, as one pasteable string (with a line still being written)."""
+        return "\n".join([*self.lines, *([self._partial] if self._partial else [])])
+
+    @Slot()
+    def copyAll(self) -> None:
+        """The log's Copy button: the whole log on the clipboard."""
+        if self.copier is not None:
+            self.copier(self.text())
+        else:
+            from PySide6.QtGui import QGuiApplication
+
+            QGuiApplication.clipboard().setText(self.text())
 
 
 # --- view.py → rows -------------------------------------------------------------------------
@@ -198,6 +238,28 @@ def pins(xs: Iterable[view.PinRow]) -> list[Row]:
             "why": r.why,
             "note": r.note,
             "drop": r.drop,
+        }
+        for r in xs
+    ]
+
+
+def branches(xs: Iterable[view.BranchRow], checked: Iterable[str] = ()) -> list[Row]:
+    ticked = set(checked)
+    return [
+        {
+            "name": r.name,
+            "where": r.where,
+            "state": r.state,
+            "badge": r.badge,
+            "style": r.style,
+            "ahead": r.ahead,
+            "behind": r.behind,
+            "files": r.files,
+            "age": r.age,
+            "subject": r.subject,
+            "mergeable": r.mergeable,
+            "merged": r.merged,
+            "checked": r.mergeable and r.name in ticked,
         }
         for r in xs
     ]

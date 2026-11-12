@@ -161,6 +161,49 @@ Screen.-narrow #up-notes {
     padding: 0 1;
 }
 
+/* --- branches: the list, then the selected one's detail and the last merge / prune */
+
+#br-head {
+    height: auto;
+    max-height: 3;
+    padding: 0 1;
+}
+#br-table {
+    height: 1fr;
+    min-height: 4;
+    margin: 0 1;
+    background: $background;
+    scrollbar-size-vertical: 1;
+}
+#br-lower {
+    height: auto;
+    max-height: 50%;
+    padding: 0 1;
+    border-top: hkey $panel;
+    scrollbar-size-vertical: 1;
+}
+#br-lower Spinner, #br-lower NoticeBox {
+    padding: 0;
+    margin: 0;
+}
+#br-lower NoticeBox {
+    padding-left: 1;
+}
+#br-lower LogView {
+    margin-top: 1;
+}
+Screen.-narrow #br-refresh {
+    display: none;
+}
+.prune-dialog {
+    border: round $error;
+}
+.dialog Checkbox {
+    background: $background;
+    border: none;
+    margin-top: 1;
+}
+
 /* --- details, pending, apply, status */
 
 #details-title {
