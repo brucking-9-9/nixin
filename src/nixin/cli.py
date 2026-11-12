@@ -58,6 +58,10 @@ VERBS: dict[str, tuple[str, str]] = {
     "plan": ("apply", "build the pending config and show the closure diff"),
     "apply": ("apply", "commit into the authoritative config and switch (needs sudo)"),
     "sync": ("apply", "push/pull the config hub repo"),
+    "branches": (
+        "apply",
+        "the config's git branches against main: list, merge (built first), prune",
+    ),
     "history": ("apply", "this machine's system generations, with the commits nixin applied"),
     "rollback": ("apply", "switch back to an earlier generation, revert the config with it"),
     "generations": ("apply", "system generations: closure size, boot entry, what gc would drop"),

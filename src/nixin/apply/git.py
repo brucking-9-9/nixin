@@ -117,13 +117,70 @@ class Git:
     def remotes(self) -> list[str]:
         return self.check("remote").split()
 
-    def upstream_remote(self) -> str | None:
-        """The remote the current branch tracks (branch.<b>.remote), if any."""
-        b = self.branch()
+    def upstream_remote(self, branch: str | None = None) -> str | None:
+        """The remote a branch tracks (branch.<b>.remote; default: the checked-out one)."""
+        b = branch or self.branch()
         if b is None:
             return None
         p = self.run("config", "--get", f"branch.{b}.remote")
         return (p.out.strip() or None) if p.ok else None
+
+    def refs(self, *patterns: str) -> list[Ref]:
+        """for-each-ref over `patterns` (refs/heads, refs/remotes/<r>), newest commit first."""
+        fmt = "%(refname)%00%(objectname)%00%(upstream:short)%00%(committerdate:iso-strict)"
+        out = self.check(
+            "for-each-ref", "--sort=-committerdate", f"--format={fmt}%00%(subject)", *patterns
+        )
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\0")
+            if len(parts) != 5:
+                continue
+            name, sha, upstream, date, subject = parts
+            rows.append(Ref(name, sha, upstream or None, date or None, subject))
+        return rows
+
+    def worktrees(self) -> list[Worktree]:
+        """`git worktree list --porcelain`: every checkout of this repository."""
+        out = self.check("worktree", "list", "--porcelain")
+        rows: list[Worktree] = []
+        cur: Worktree | None = None
+        for line in out.splitlines():
+            key, _, val = line.partition(" ")
+            if key == "worktree":
+                cur = Worktree(Path(val))
+                rows.append(cur)
+            elif cur is None:
+                continue
+            elif key == "branch":
+                cur.branch = val.removeprefix("refs/heads/")
+            elif key == "HEAD":
+                cur.head = val
+            elif key == "prunable":
+                cur.prunable = True
+        return rows
+
+    def names_changed(self, rev_range: str) -> list[str]:
+        return self.check("diff", "--name-only", "--no-renames", rev_range).splitlines()
+
+    def merge_tree(self, ours: str, theirs: str) -> tuple[str | None, list[str]]:
+        """Merge two commits in the object store (no checkout touched): (tree, []) when
+        it is clean, (None, conflicting files) when it is not."""
+        p = self.run("merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs)
+        lines = p.out.splitlines()
+        if p.rc == 0 and lines:
+            return lines[0], []
+        if p.rc == 1 and lines:
+            return None, sorted(set(lines[1:]))
+        proc.need(p, "git-failed", f"git merge-tree {ours[:12]} {theirs[:12]}")
+        raise NixinError("git-failed", f"git merge-tree printed nothing for {theirs[:12]}")
+
+    def commit_tree(self, tree: str, parents: list[str], message: str) -> str:
+        """A commit object for `tree` (the repo's own identity, as `commit`); no ref moves."""
+        args = ["commit-tree", tree]
+        for parent in parents:
+            args += ["-p", parent]
+        return self.check(*args, "-m", message, what="git commit-tree").strip()
 
     # --- writing (workspace only) -----------------------------------------------------
 
@@ -155,3 +212,20 @@ class Git:
         if head is None:
             raise NixinError("git-failed", "git commit left no HEAD")
         return head
+
+
+@dataclass
+class Ref:
+    name: str  # refs/heads/x, refs/remotes/origin/x
+    commit: str
+    upstream: str | None  # origin/x
+    date: str | None  # the tip's committer date, ISO 8601
+    subject: str
+
+
+@dataclass
+class Worktree:
+    path: Path
+    branch: str | None = None  # None: detached (also mid-rebase or bisect)
+    head: str | None = None
+    prunable: bool = False  # its directory is gone; `git worktree prune` drops it
