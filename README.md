@@ -262,6 +262,8 @@ AppStream data as text (app name, summary, categories, the number of screenshots
 images). Error documents show as `code` + message.
 
 Keys: `/` search, `i` packages (`ctrl+4`), `o` options (`ctrl+5`), `p` pending, `s` status,
+`g` branches (`ctrl+7`: tick with `space`, `m` merge into main built first, `x` prune),
+`C` copies the error and the build log on screen (also: a mouse selection + `ctrl+c`),
 `?` all keys, `ctrl+p` command palette, `esc` back, `q` quit (`ctrl+q` while typing or
 while something runs). Below 80 cells the footer groups the page keys (`i o p s go`). It is laid out for a
 phone over ssh (50×25: panes stacked, the description column dropped) as well as 120+
@@ -306,6 +308,11 @@ move…", here and on Pending, takes an update back before it is committed). **P
 (Ctrl+6) lists what is held back, at which nixpkgs, whether it still holds anything; Check
 runs `pins --check`, Unpin drops one, Pin… holds something at a chosen revision (the
 committed lock's, the running system's, or a commit typed in).
+**Branches** (Ctrl+7) lists the config's branches against main (clean, conflict, merged,
+on the hub only); Merge selected… merges the ticked ones (built first, optionally pushed),
+Prune merged… shows the dry run, then deletes (also on the hub, when ticked). Every log has
+a Copy button, error notices and notes are selectable with their own Copy (the error, its
+fields and the log), and Ctrl+Shift+C copies the latest error from anywhere.
 **Options** searches NixOS or Home Manager options
 (a combo picks which) and shows the selected one beside the list: type, default, example,
 the description, its value on this host and where it is set (`where`; for a Home Manager

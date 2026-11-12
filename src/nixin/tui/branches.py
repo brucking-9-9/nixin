@@ -13,7 +13,6 @@ prune makes status and the plan stale. `C` copies the run's error and build log.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any, ClassVar
 
 from textual import on
@@ -33,19 +32,9 @@ Doc = dict[str, Any]
 TICK = view.Column("tick", "", 1)
 
 
-WIDE_MIN = 79  # branch_columns' wide set: 68 cells + a subject of 10 + the scrollbar
-
-
 def tick_columns(width: int) -> list[view.Column]:
-    """branch_columns with a one-cell tick column in front, fitted to `width` (its gaps of
-    2 and the scrollbar included). Between view.NARROW and WIDE_MIN the wide set does not
-    fit: the narrow one, its name widened."""
-    inner = width - 5  # the tick and its gap; branch_columns' sets come out 1-2 cells wide
-    if inner >= WIDE_MIN or inner < view.NARROW:
-        return [TICK, *view.branch_columns(inner)]
-    cols = view.branch_columns(view.NARROW - 1)
-    name = replace(cols[0], width=width - 6 - sum(c.width + 2 for c in cols[1:]))
-    return [TICK, name, *cols[1:]]
+    """branch_columns with a one-cell tick column (and its gap of 2) in front."""
+    return [TICK, *view.branch_columns(width - 3)]
 
 
 def without_hub(doc: Doc) -> Doc:

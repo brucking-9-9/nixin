@@ -2213,21 +2213,25 @@ def branch_rows(doc: Doc, now: float | None = None) -> list[BranchRow]:
     return out
 
 
+BRANCH_WIDE = 81  # the wide set: 58 cells of fixed columns, 6 gaps of 2, a scrollbar, 10 of subject
+
+
 def branch_columns(width: int) -> list[Column]:
-    """branch · state · +/- · files · age · subject; narrow drops files, age and subject."""
-    if width < NARROW:  # 22 + 9 + 9 + three gaps of 2
+    """branch · state · +/- · files · age · subject for a table `width` cells wide (every
+    column pays a gap of 2, one cell is the scrollbar); narrow: branch, state, +/-."""
+    if width < BRANCH_WIDE:
         return [
-            Column("name", "branch", max(12, width - 9 - 9 - 7)),
+            Column("name", "branch", max(8, width - 1 - 9 - 9 - 3 * 2)),
             Column("badge", "state", 9),
             Column("counts", "+/-", 9),
         ]
-    return [  # 26 + 14 + 9 + 5 + 4 + five gaps of 2 = 68
+    return [
         Column("name", "branch", 26),
         Column("badge", "state", 14),
         Column("counts", "+/-", 9),
         Column("files", "files", 5),
         Column("age", "age", 4),
-        Column("subject", "last commit", max(10, width - 69)),
+        Column("subject", "last commit", width - 1 - 58 - 6 * 2),
     ]
 
 
