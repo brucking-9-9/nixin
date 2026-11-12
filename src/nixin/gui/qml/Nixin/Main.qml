@@ -5,7 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 // The window: the top bar, the navigation on the left (Search, Browse, Pending, Status,
-// Packages, Options, Pins),
+// Packages, Options, Pins, Branches),
 // the page, the non-modal notice over the bottom of the page, and the dialogs (diff, set,
 // apply, update).
 // `backend` is the Python root object (nixin/gui/bridge.py: Gui); everything shown comes
@@ -73,7 +73,7 @@ ApplicationWindow {
             id: pages
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: ["search", "pending", "status", "packages", "options", "browse", "pins"].indexOf(win.backend.page)
+            currentIndex: ["search", "pending", "status", "packages", "options", "browse", "pins", "branches"].indexOf(win.backend.page)
             // the keys follow the page: the query on Search, the page itself elsewhere (a
             // hidden text field keeping the focus would take "/" as a letter)
             onCurrentIndexChanged: {
@@ -87,6 +87,8 @@ ApplicationWindow {
                     browsePage.focusList();
                 else if (currentIndex === 6)
                     pinsPage.focusList();
+                else if (currentIndex === 7)
+                    branchesPage.focusList();
                 else if (currentIndex > 0)
                     children[currentIndex].forceActiveFocus();
             }
@@ -115,6 +117,10 @@ ApplicationWindow {
             }
             PinsPage {
                 id: pinsPage
+                backend: win.backend
+            }
+            BranchesPage {
+                id: branchesPage
                 backend: win.backend
             }
         }
@@ -148,6 +154,12 @@ ApplicationWindow {
     }
     TryDialog {
         trying: win.backend.trying
+    }
+    BranchMergeDialog {
+        branches: win.backend.branches
+    }
+    BranchPruneDialog {
+        branches: win.backend.branches
     }
 
     function showPage(name: string) {
@@ -189,6 +201,17 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+6"
         onActivated: win.showPage("pins")
+    }
+    Shortcut {
+        sequence: "Ctrl+7"
+        onActivated: win.showPage("branches")
+    }
+    Shortcut {
+        // the newest error (code, message, its fields, stderr) and its run's log, to paste
+        objectName: "copyErrorShortcut"
+        sequence: "Ctrl+Shift+C"
+        context: Qt.ApplicationShortcut
+        onActivated: win.backend.copyLastError()
     }
     Shortcut {
         sequence: "Ctrl+Q"
