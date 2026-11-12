@@ -29,7 +29,17 @@ from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
-from tui_fake import BROWSE, COWSAY, HM_OPTIONS, HOLDS, OPTIONS, PACKAGES, FakeBackend, load
+from tui_fake import (
+    BRANCHES,
+    BROWSE,
+    COWSAY,
+    HM_OPTIONS,
+    HOLDS,
+    OPTIONS,
+    PACKAGES,
+    FakeBackend,
+    load,
+)
 
 from nixin.cli import main
 from nixin.gui import app as gui_app
@@ -1459,3 +1469,249 @@ def test_build_tracker_says_where_it_builds(ui):
     assert p["buildHead"].startswith("[7/39") and p["buildPlace"] == ""
     assert not shown(u, "buildPlace")
     click(u, "stopButton")
+
+
+# --- branches -------------------------------------------------------------------------------
+
+
+def branches_page(u: SimpleNamespace) -> None:
+    keys(u, Qt.Key.Key_7, mods=Qt.KeyboardModifier.ControlModifier)
+    assert u.gui["page"] == "branches" and shown(u, "branchesPage")
+
+
+def test_branches_page_lists_and_ctrl_7_opens_it(ui):
+    u = ui(dict(BRANCHES), host="19BK")
+    branches_page(u)
+    vm = u.gui.branches
+    assert u.fake.verbs() == [["branches"]]
+    assert prop(u, "branchesList", "count") == 11
+    assert prop(u, "branchesHead", "text") == view.branches_head(load("branches_19BK"))
+    assert "8 merged" in prop(u, "branchesHead", "text")
+    rows = {r["name"]: r for r in vm.rows("branches").rows}
+    assert rows["accent-surfaces"]["badge"] == "clean" and rows["accent-surfaces"]["mergeable"]
+    assert rows["nixin-bump"]["badge"] == "merged · hub" and not rows["nixin-bump"]["mergeable"]
+    assert shown(u, "tick-accent-surfaces") and not shown(u, "tick-nixin-bump")
+    assert prop(u, "badge-accent-surfaces", "text") == "clean"
+    assert not prop(u, "branchesMerge", "enabled")  # nothing ticked
+    # a row's detail, selectable
+    assert not shown(u, "branchesDetail")
+    click(u, "branch-kernel-7.3-port")
+    assert vm["selected"] == 1 and shown(u, "branchesDetail")
+    detail = prop(u, "branchesDetail", "text")
+    assert detail == view.branch_detail(view.branch_rows(load("branches_19BK"))[1], "main")
+    assert prop(u, "branchesDetail", "readOnly") and prop(u, "branchesDetail", "selectByMouse")
+    click(u, "branch-kernel-7.3-port")  # again: closed
+    assert vm["selected"] == -1 and not shown(u, "branchesDetail")
+    # the rail's entry
+    u.gui.go("search")
+    settle(u)
+    click(u, "nav-branches")
+    assert u.gui["page"] == "branches" and u.fake.verbs() == [["branches"]]  # read once
+
+
+def test_branches_tick_two_merge_confirm(ui):
+    u = ui(dict(BRANCHES), host="19BK")
+    u.gui.status_doc, u.gui.status_stale = load("status_clean"), False
+    u.gui.plan_doc = load("plan_cowsay")
+    branches_page(u)
+    vm = u.gui.branches
+    click(u, "tick-accent-surfaces")
+    click(u, "tick-feat/spotify-player-page")
+    click(u, "branch-accent-surfaces")  # selected: it stays so through the refresh
+    vm.toggle(1)  # the model drives the tick, after a click too
+    settle(u)
+    assert prop(u, "tick-kernel-7.3-port", "checked")
+    vm.toggle(1)
+    settle(u)
+    assert not prop(u, "tick-kernel-7.3-port", "checked")
+    click(u, "tick-accent-surfaces")
+    vm.toggle(0)
+    settle(u)
+    assert prop(u, "tick-accent-surfaces", "checked")
+    assert vm["checked"] == ["accent-surfaces", "feat/spotify-player-page"]
+    assert prop(u, "branchesMerge", "text") == "Merge selected (2)…"
+    click(u, "branchesMerge")
+    assert shown(u, "branchMergeDialog") and vm["mergeOpen"]
+    assert vm["mergeNames"] == ["accent-surfaces", "feat/spotify-player-page"]
+    assert prop(u, "mergeName-1", "text") == "2.  feat/spotify-player-page"
+    assert prop(u, "mergeHost", "text").startswith("19BK")
+    assert prop(u, "mergeBuild", "checked") and not prop(u, "mergePush", "checked")
+    click(u, "mergeConfirm")
+    assert not shown(u, "branchMergeDialog")
+    assert u.fake.verbs()[1] == ["branches", "merge", "accent-surfaces", "feat/spotify-player-page"]
+    # the build's log streamed into the page, then the result and the list again
+    log = vm.logmodel("log")
+    assert log.lines[0] == "[0/9 built] · 3s (eta 45s)" and shown(u, "branchesLog")
+    result = {r["label"]: r["value"] for r in vm.rows("result").rows}
+    assert result["into"] == "main 61b685c → e5fe645"
+    assert result["built"].startswith("19BK: /nix/store/8608bwc")
+    assert u.fake.verbs()[2] == ["branches"]  # refreshed: the merged list
+    rows = {r["name"]: r for r in vm.rows("branches").rows}
+    assert rows["accent-surfaces"]["merged"] and vm["checked"] == []
+    assert vm.branch_rows[vm["selected"]].name == "accent-surfaces"
+    assert vm["detail"].endswith(
+        "main contains it: prune deletes it\nchecked out in /home/brucking/nixos"
+    )
+    # main moved: status and the plan are stale
+    assert u.gui.status_stale and u.gui.plan_doc is None and u.gui.writes == []
+    assert u.gui.notice["message"].startswith("merged into main: accent-surfaces")
+    # the flags: no build, push
+    vm.toggle(0)  # kernel-7.3-port, first now
+    vm.openMerge()
+    settle(u)
+    item(u, "mergeBuild").setProperty("checked", False)
+    item(u, "mergePush").setProperty("checked", True)
+    click(u, "mergeConfirm")
+    assert u.fake.verbs()[3] == ["branches", "merge", "kernel-7.3-port", "--no-build", "--push"]
+
+
+def test_branches_merge_conflict_shows_its_files_and_copies(ui):
+    u = ui(dict(BRANCHES), host="19BK")
+    branches_page(u)
+    vm = u.gui.branches
+    vm.startBranchMerge(["clash"], True, False)
+    settle(u)
+    assert u.fake.verbs()[-1] == ["branches", "merge", "clash"]
+    n = u.gui.notice
+    assert n["code"] == "merge-conflict" and n["severity"] == "error"
+    assert "home/config/quickshell/bottom/Bar.qml" in n["items"]
+    assert vm["resultNote"].startswith("merge: merge-conflict: clash does not merge cleanly")
+    doc = u.gui.errors["branches"][0]
+    want = view.copy_text(doc, "")
+    assert '"files": [' in want and "Bar.qml" in want
+    click(u, "branchesResultCopy")
+    assert QGuiApplication.clipboard().text() == want
+    QGuiApplication.clipboard().setText("")
+    click(u, "noticeCopyError")
+    assert QGuiApplication.clipboard().text() == want
+    assert u.fake.verbs()[-1] == ["branches", "merge", "clash"]  # no refresh after a failure
+
+
+def test_branches_prune_dry_run_then_prune(ui):
+    u = ui(dict(BRANCHES), host="19BK")
+    branches_page(u)
+    vm = u.gui.branches
+    click(u, "branchesPrune")
+    assert shown(u, "branchPruneDialog") and vm["prunePhase"] == "confirm"
+    assert u.fake.verbs()[-1] == ["branches", "prune", "--dry-run"]
+    assert vm["pruneCount"] == 10 and prop(u, "pruneConfirm", "text") == "Delete 10"
+    rows = vm.rows("prune").rows
+    assert rows[0] == {
+        "label": "would delete",
+        "value": "10 branch(es); 1 unmerged kept",
+        "style": "accent",
+    }
+    assert {
+        "label": "kept",
+        "value": "accent-surfaces (local): the workspace has it checked out",
+        "style": "warn",
+    } in rows
+    click(u, "pruneHub")  # the dry run again, with --hub
+    assert vm["pruneHub"] and u.fake.verbs()[-1] == ["branches", "prune", "--hub", "--dry-run"]
+    vm.cancelPrune()  # reopened: without --hub again, and the box says so
+    settle(u)
+    click(u, "branchesPrune")
+    assert not vm["pruneHub"] and not prop(u, "pruneHub", "checked")
+    click(u, "pruneHub")
+    assert vm["pruneHub"] and prop(u, "pruneHub", "checked")
+    click(u, "pruneConfirm")
+    assert not shown(u, "branchPruneDialog")
+    assert u.fake.verbs()[-2:] == [["branches", "prune", "--hub"], ["branches"]]
+    assert vm["resultTitle"] == "prune --hub"
+    assert vm.rows("result").rows[0]["value"] == "10 branch(es); 1 unmerged kept"
+    assert u.gui.status_stale
+
+
+# --- copying logs and errors ----------------------------------------------------------------
+
+
+class _FailingPlan(FakeBackend):
+    """`plan` streams two lines of log, then fails the build."""
+
+    def call(self, verb, *args, stream=False, cancel=None):
+        if verb == "plan":
+            import sys
+
+            sys.stderr.write("building '/nix/store/x-etc.drv'\n")
+            sys.stderr.write("error: builder for x-etc.drv failed\n")
+        return super().call(verb, *args, stream=stream, cancel=cancel)
+
+
+BUILD_FAILED = {
+    "ok": False,
+    "error": {
+        "code": "build-failed",
+        "message": "nix build failed for mbp13",
+        "drv": "/nix/store/x-etc.drv",
+        "stderr": "error: builder for x-etc.drv failed with exit code 1",
+    },
+}
+
+
+def test_log_copy_error_copy_and_ctrl_shift_c(ui):
+    u = ui()
+    fake = _FailingPlan({**COWSAY, "plan": BUILD_FAILED})
+    u.gui.backend = fake  # the failing plan from here on
+    u.fake = fake
+    u.gui.go("pending")
+    settle(u)
+    assert not shown(u, "planLogCopy")  # no log yet
+    click(u, "planButton")
+    p = u.gui.pending
+    log = "building '/nix/store/x-etc.drv'\nerror: builder for x-etc.drv failed"
+    assert p.logmodel("log").text() == log
+    # the log's Copy
+    assert shown(u, "planLogCopy")
+    click(u, "planLogCopy")
+    assert QGuiApplication.clipboard().text() == log
+    # the plan's error under the plan: selectable, and its Copy
+    assert p["planNoteStyle"] == "error" and shown(u, "planCopy")
+    assert prop(u, "planNote", "selectByMouse") and prop(u, "planNote", "readOnly")
+    want = view.copy_text({**BUILD_FAILED, "verb": "plan", "host": "mbp13"}, log)
+    assert want.startswith("plan: build-failed: nix build failed for mbp13\n\n{\n")
+    assert '"drv": "/nix/store/x-etc.drv"' in want and want.endswith(log)
+    QGuiApplication.clipboard().setText("")
+    click(u, "planCopy")
+    assert QGuiApplication.clipboard().text() == want
+    # the notice: its message selectable, its Copy the same
+    assert prop(u, "noticeMessage", "selectByMouse")
+    QGuiApplication.clipboard().setText("")
+    click(u, "noticeCopyError")
+    assert QGuiApplication.clipboard().text() == want
+    # Ctrl+Shift+C, from another page
+    u.gui.go("status")
+    settle(u)
+    QGuiApplication.clipboard().setText("")
+    mods = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+    keys(u, Qt.Key.Key_C, mods=mods)
+    assert QGuiApplication.clipboard().text() == want
+    # the error notice stays up through the copies; its Copy says so for a moment
+    assert u.gui.notice["code"] == "build-failed" and u.gui.notice["copies"] == 4
+    assert prop(u, "noticeCopyError", "text") == "Copied ✓"
+    u.gui.notice.dismiss()
+    keys(u, Qt.Key.Key_C, mods=mods)
+    assert u.gui.notice["message"] == "copied to the clipboard"
+
+
+def test_ctrl_shift_c_without_an_error_says_so(ui):
+    u = ui()
+    QGuiApplication.clipboard().setText("before")
+    mods = Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+    keys(u, Qt.Key.Key_C, mods=mods)
+    assert QGuiApplication.clipboard().text() == "before"
+    assert u.gui.notice["message"] == "no error to copy"
+
+
+def test_apply_error_is_selectable_and_copies(ui):
+    u = ui()
+    u.gui.go("pending")
+    settle(u)
+    click(u, "applyButton")
+    keys(u, Qt.Key.Key_Return)
+    a = u.gui.apply
+    assert a["phase"] == "needs-sudo"
+    assert prop(u, "applyMessageText", "selectByMouse")
+    click(u, "applyCopyError")
+    doc = u.gui.errors["apply"][0]
+    assert QGuiApplication.clipboard().text() == view.copy_text(doc, a.logmodel("log").text())
+    assert QGuiApplication.clipboard().text().startswith("apply: needs-sudo: ")

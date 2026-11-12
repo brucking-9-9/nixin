@@ -12,13 +12,15 @@ update confirmation; then Options: mbp13's openssh options with one in full, the
 dialog, its diff, and a Home Manager option on 19BK; then the Try dialog on the recorded
 `try` documents (a CLI program opened in the terminal, a GUI app launched, the program
 picker; nothing is started); then Browse on mbp13's documents (the fixture icon stands in
-for every image). --live drives the real verb handlers instead (network for discovery,
+for every image); then Branches on 19BK's recorded `branches` documents: the list with
+two rows ticked and one's detail, the merge confirmation, the merge's result under its
+build log (with the log's Copy), and the Prune merged… dialog. --live drives the real verb handlers instead (network for discovery,
 nix against --config): search, details with `where`, the `add --dry-run` preview, an
 option's details and Set dialog, Packages (`list`, `outdated`), the Options page (an
 option, Set, the `set --dry-run` diff; with --hm-host a Home Manager option there),
 Browse (an installed game and one that is not, their screenshots fetched from
 search.nixos.org); it writes nothing (the dialogs are cancelled, `update` is never run).
-`--only SECTION` draws one section (main, packages, options, try, browse; --try is
+`--only SECTION` draws one section (main, packages, options, try, browse, branches; --try is
 `--only try`). OUTDIR defaults to docs/gui. Files are named <n>-<step>.png
 (live-<n>-<step>.png with --live), 1200x780.
 """
@@ -34,7 +36,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parent.parent
-SECTIONS = ("main", "packages", "options", "try", "browse")  # in drawing order
+SECTIONS = ("main", "packages", "options", "try", "browse", "branches")  # in drawing order
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
 from nixin.gui.app import Window, application
@@ -271,6 +273,30 @@ def browse(outdir: Path) -> None:
     s.done()
 
 
+def branches(outdir: Path) -> None:
+    from tui_fake import BRANCHES, FakeBackend
+
+    gui = Gui(FakeBackend(dict(BRANCHES), host="19BK"))
+    s = Shooter(gui, outdir)
+    g = gui
+    g.go("branches")
+    s.settle()
+    g.branches.toggle(0)
+    g.branches.toggle(2)
+    g.branches.select(0)
+    s.shot("23-branches")
+    g.branches.openMerge()
+    s.shot("24-branch-merge-confirm")
+    g.branches.confirmMerge(True, False)
+    s.settle()
+    g.notice.dismiss()
+    s.shot("25-branch-merged-log-copy")
+    g.branches.openPrune()
+    s.shot("26-branch-prune")
+    g.branches.cancelPrune()
+    s.done()
+
+
 def live_browse(outdir: Path, host: str, config: str) -> None:
     gui = Gui(Backend(host=host, config=config))
     s = Shooter(gui, outdir, "live-")
@@ -368,6 +394,8 @@ def main() -> int:
         trying(out)
     if "browse" in want:
         browse(out)
+    if "branches" in want:
+        branches(out)
     return 0
 
 

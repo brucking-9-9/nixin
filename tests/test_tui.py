@@ -10,11 +10,22 @@ import json
 
 import pytest
 from textual.widgets import Button, DataTable, Input, RadioButton, TextArea
-from tui_fake import COWSAY, HM_OPTIONS, HOLDS, OPTIONS, PACKAGES, FakeBackend, load, screen_text
+from tui_fake import (
+    BRANCHES,
+    COWSAY,
+    HM_OPTIONS,
+    HOLDS,
+    OPTIONS,
+    PACKAGES,
+    FakeBackend,
+    load,
+    screen_text,
+)
 
 from nixin.cli import main
 from nixin.tui import options, screens
 from nixin.tui.app import NixinApp
+from nixin.tui.branches import BranchesScreen, MergeModal, PruneModal, tick_columns, without_hub
 from nixin.tui.modals import (
     ApplyModal,
     DiffModal,
@@ -1411,12 +1422,12 @@ def test_page_keys_fold_into_one_group_on_a_phone():
         drive(script, PACKAGES, size=size)
         return out["text"]
 
-    assert "i Packages o Options p Pending s Status" in footer(DESKTOP, [])
-    assert footer(PHONE, []).rstrip().endswith("? Keys  i o p s go")
+    assert "i Packages o Options p Pending s Status g Branches" in footer(DESKTOP, [])
+    assert footer(PHONE, []).rstrip().endswith("? Keys  i o p s g go")
     assert "esc Back t Updates q Quit" in footer(PHONE, ["i"])
     assert "t Installed" in footer(PHONE, ["i", "t"])
-    assert " i o s go" in footer(PHONE, ["p"])  # the page you are on is left out
-    assert footer(PHONE, ["o", "escape"]).rstrip().endswith("? Keys  i p s go")
+    assert " i o s g go" in footer(PHONE, ["p"])  # the page you are on is left out
+    assert footer(PHONE, ["o", "escape"]).rstrip().endswith("? Keys  i p s g go")
 
 
 def test_screenshots_export_at_both_sizes():
@@ -1925,3 +1936,272 @@ def test_build_where_view_helpers():
     assert view.build_summary(b).endswith("(stopped); building on mbp13 · big jobs")
     assert view.build_flags("local") == [] and view.build_flags("split") == ["--remote", "--split"]
     assert view.build_choices(None)[0] == ("local", "local")
+
+
+# --- the Branches page: list, merge (built first), prune; Copy ------------------------------------
+
+
+async def open_branches(app, pilot, *keys: str) -> BranchesScreen:
+    await pilot.press("escape", *(keys or ("g",)))
+    await settle(app, pilot)
+    assert isinstance(app.screen, BranchesScreen)
+    return app.screen
+
+
+@pytest.mark.parametrize("width", [40, 50, 60, 66, 79, 83, 84, 120, 200])
+def test_branch_tick_columns_fit(width):
+    cols = tick_columns(width)
+    assert cols[0].key == "tick" and cols[0].width == 1
+    assert sum(c.width + 2 for c in cols) + 1 <= width
+    assert ("subject" in [c.key for c in cols]) == (width >= 84)
+
+
+def test_prune_dry_run_without_the_hub():
+    dry = load("branches_prune_dry")
+    local = without_hub(dry)
+    assert {x["where"] for x in local["deleted"]} == {"local"} and len(local["deleted"]) == 3
+    assert local["hub"] is None and len(dry["deleted"]) == 10
+
+
+@pytest.mark.parametrize("size", [PHONE, DESKTOP], ids=["phone", "desktop"])
+def test_branches_list(size):
+    async def script(app, pilot, fake):
+        screen = await open_branches(app, pilot)
+        table = screen.query_one("#br-table", DataTable)
+        assert table.row_count == 11 and table.has_focus
+        assert [r.name for r in screen.rows[:3]] == [
+            "accent-surfaces",
+            "kernel-7.3-port",
+            "feat/spotify-player-page",
+        ]
+        assert all(r.merged for r in screen.rows[3:])  # unmerged first, the merged dimmed
+        assert screen.rows[3].style == "dim"
+        head = screen.query_one("#br-head", Line).value
+        assert head == "against main @ 61b685c · hub origin · 3 unmerged, 8 merged"
+        assert "accent-surfaces" in screen_text(app)
+        assert "checked out in /home/brucking/nixos" in screen.query_one("#br-detail", Line).value
+        assert app.branches_doc is not None
+        await pilot.press("escape", "g")  # the second visit comes from the app's document
+        await settle(app, pilot)
+
+    _, fake = drive(script, BRANCHES, size=size, host="19BK")
+    assert fake.verbs() == [["branches"]]
+
+
+def test_branches_merge_ticked_builds_then_stale():
+    async def script(app, pilot, fake):
+        app.status_stale = False
+        app.plan_doc = {"ok": True}
+        screen = await open_branches(app, pilot)
+        await pilot.press("space")  # accent-surfaces; the cursor moves on
+        await pilot.press("space")  # kernel-7.3-port …
+        await pilot.press("up", "space", "space")  # … unticked; feat/spotify-player-page
+        assert screen.ticked == ["accent-surfaces", "feat/spotify-player-page"]
+        await pilot.press("space")  # accent-mono: merged, not tickable
+        assert screen.ticked == ["accent-surfaces", "feat/spotify-player-page"]
+        await pilot.press("m")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, MergeModal)
+        text = screen_text(app)
+        assert "builds 19BK from the merged commit, then moves main" in text
+        assert "feat/spotify-player-page: 3 commit(s), 3 file(s), 30 behind" in text
+        await pilot.press("u")  # push
+        assert modal.push and modal.build
+        await pilot.press("m")
+        await settle(app, pilot, 0.1)
+        assert app.screen is screen
+        log = screen.query_one("#log", LogView)
+        assert log.lines_seen[0].startswith("[0/9 built]") and len(log.lines_seen) == 12
+        result = screen.query_one("#br-result", Fields).text
+        assert "into main 61b685c → e5fe645" in result
+        assert "merged feat/spotify-player-page: 3 commit(s), 3 file(s)" in result
+        assert app.status_stale and app.plan_doc is None
+        assert screen.ticked == [] and screen.rows[0].name == "kernel-7.3-port"  # refreshed
+        assert app.branches_doc["counts"] == {"merged": 10, "unmerged": 1}
+        app.copy_to_clipboard = lambda text: setattr(app, "copied", text)
+        await pilot.press("C")
+        assert app.copied == view.copy_text(screen.result, log.plain)
+        assert "[9/9 built]" in app.copied
+
+    _, fake = drive(script, BRANCHES, host="19BK")
+    assert fake.verbs() == [
+        ["branches"],
+        ["branches", "merge", "accent-surfaces", "feat/spotify-player-page", "--push"],
+        ["branches"],
+    ]
+
+
+def test_branches_merge_highlighted_without_build():
+    async def script(app, pilot, fake):
+        await open_branches(app, pilot)
+        await pilot.press("down", "m")  # nothing ticked: the highlighted row
+        await settle(app, pilot)
+        assert isinstance(app.screen, MergeModal)
+        await pilot.press("n")
+        assert "moves main without building it" in screen_text(app)
+        await pilot.press("enter")  # the Merge button has the focus
+        await settle(app, pilot)
+
+    _, fake = drive(script, BRANCHES, host="19BK")
+    assert fake.verbs()[1] == ["branches", "merge", "kernel-7.3-port", "--no-build"]
+
+
+def test_branches_merge_conflict_shows_its_files_and_copies():
+    doc = load("branches_19BK")
+    clash = {**doc["branches"][0], "name": "clash", "checked_out_in": None}
+    routes = {**BRANCHES, "branches": {**doc, "branches": [clash, *doc["branches"][1:]]}}
+
+    async def script(app, pilot, fake):
+        screen = await open_branches(app, pilot)
+        await pilot.press("space", "m")
+        await settle(app, pilot)
+        await pilot.press("m")
+        await settle(app, pilot)
+        notice = screen.query_one("#br-notice", NoticeBox)
+        assert notice.display and notice.notice.code == "merge-conflict"
+        assert notice.notice.items == ["home/config/quickshell/bottom/Bar.qml"]
+        assert "home/config/quickshell/bottom/Bar.qml" in screen_text(app)
+        assert app.branches_doc is not None  # nothing changed: the list stays
+        app.copy_to_clipboard = lambda text: setattr(app, "copied", text)
+        await pilot.press("C")
+        assert app.copied == view.copy_text(
+            load("branches_merge_conflict") | {"verb": "branches", "host": "19BK"}
+        )
+        assert app.copied.startswith("branches: merge-conflict: clash does not merge cleanly")
+        assert '"files": [' in app.copied
+
+    _, fake = drive(script, routes, host="19BK")
+    assert fake.verbs()[1] == ["branches", "merge", "clash"]
+
+
+@pytest.mark.parametrize("hub", [False, True], ids=["local", "hub"])
+def test_branches_prune_dry_run_confirm_prune(hub):
+    async def script(app, pilot, fake):
+        app.status_stale = False
+        screen = await open_branches(app, pilot)
+        await pilot.press("x")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, PruneModal)
+        fields = modal.query_one("#prune-fields", Fields).text
+        assert "would delete 3 branch(es); 1 unmerged kept" in fields
+        if hub:
+            await pilot.press("u")
+            fields = modal.query_one("#prune-fields", Fields).text
+            assert "would delete 10 branch(es)" in fields and "hub nixin-bump" in fields
+        await pilot.press("x")
+        await settle(app, pilot)
+        assert app.screen is screen
+        assert "deleted 10 branch(es)" in screen.query_one("#br-result", Fields).text
+        assert app.status_stale
+
+    _, fake = drive(script, BRANCHES, host="19BK")
+    assert fake.verbs() == [
+        ["branches"],
+        ["branches", "prune", "--hub", "--dry-run"],  # the preview always sees the hub
+        ["branches", "prune", *(["--hub"] if hub else [])],
+        ["branches"],
+    ]
+
+
+def test_branches_prune_cancel_prunes_nothing():
+    async def script(app, pilot, fake):
+        await open_branches(app, pilot)
+        await pilot.press("x")
+        await settle(app, pilot)
+        await pilot.press("escape")
+        await settle(app, pilot)
+
+    _, fake = drive(script, BRANCHES, host="19BK")
+    assert fake.verbs() == [["branches"], ["branches", "prune", "--hub", "--dry-run"]]
+
+
+@pytest.mark.parametrize("key", ["g", "ctrl+7", "ctrl+underscore"])
+def test_branches_page_keys(key):
+    async def script(app, pilot, fake):
+        await open_branches(app, pilot, key)
+
+    drive(script, BRANCHES, host="19BK")
+
+
+# --- copy: errors and logs out of the TUI --------------------------------------------------------
+
+
+def test_copy_the_plan_log_from_pending():
+    async def script(app, pilot, fake):
+        app.copy_to_clipboard = lambda text: setattr(app, "copied", text)
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        await pilot.press("b")
+        await settle(app, pilot, 0.1)
+        await pilot.press("C")
+        log = app.screen.query_one("#log", LogView).plain
+        assert app.copied == view.copy_text(app.plan_doc, log)
+        assert app.copied.startswith("these 39 derivations will be built:")
+
+    drive(script)
+
+
+def test_copy_the_apply_error_and_the_app_level_copy():
+    async def script(app, pilot, fake):
+        app.copy_to_clipboard = lambda text: setattr(app, "copied", text)
+        await pilot.press("escape", "C")  # nothing ran yet
+        assert not hasattr(app, "copied")
+        await pilot.press("p")
+        await settle(app, pilot)
+        await pilot.press("a")
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await settle(app, pilot)
+        apply = app.screen
+        assert isinstance(apply, ApplyScreen)
+        await pilot.press("C")
+        assert app.copied == view.copy_text(apply.doc, apply.query_one("#log", LogView).plain)
+        assert app.copied.startswith("apply: needs-sudo: ")
+        del app.copied
+        await pilot.press("escape", "s")  # the Status page has no log: the app's last failure
+        await settle(app, pilot)
+        await pilot.press("C")
+        assert app.copied.startswith("apply: needs-sudo: ")
+
+    drive(script)
+
+
+def test_copy_from_a_notice_modal():
+    routes = {**COWSAY, "add --dry-run": load("rm_git_ambiguous")}
+
+    async def script(app, pilot, fake):
+        app.copy_to_clipboard = lambda text: setattr(app, "copied", text)
+        await open_details(app, pilot)
+        await pilot.press("a")
+        await settle(app, pilot)
+        modal = app.screen
+        assert isinstance(modal, NoticeModal)
+        await pilot.press("C")
+        assert app.copied == view.copy_text(modal.doc)
+        assert "candidates" in app.copied
+
+    drive(script, routes)
+
+
+def test_log_view_text_can_be_selected():
+    from textual.geometry import Offset
+    from textual.selection import Selection
+
+    async def script(app, pilot, fake):
+        await pilot.press("escape", "p")
+        await settle(app, pilot)
+        await pilot.press("b")
+        await settle(app, pilot, 0.1)
+        log = app.screen.query_one("#log", LogView)
+        text, end = log.get_selection(Selection(Offset(0, 0), Offset(5, 0)))
+        assert text == "these" and end == "\n"
+        whole, _ = log.get_selection(Selection(None, None))
+        assert whole.splitlines()[0] == "these 39 derivations will be built:"
+        strip = log.render_line(0)
+        metas = [seg.style.meta.get("offset") for seg in strip if seg.style]
+        assert (0, 0) in metas  # the offsets Textual's mouse selection reads
+        log.text_selection  # noqa: B018 -- the property exists (Widget)
+
+    drive(script)

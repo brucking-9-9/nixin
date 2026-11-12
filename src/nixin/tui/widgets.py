@@ -12,6 +12,8 @@ from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 from textual import events
+from textual.selection import Selection
+from textual.strip import Strip
 from textual.widgets import RichLog, Static
 
 from ..ui import view
@@ -275,3 +277,39 @@ class LogView(RichLog):
         self.clear()
         self._partial = ""
         self.lines_seen = []
+
+    @property
+    def plain(self) -> str:
+        """Every line so far without its ANSI colours (what Copy puts on the clipboard)."""
+        return "\n".join(Text.from_ansi(line).plain for line in self.lines_seen)
+
+    # Mouse selection: RichLog has none (Textual's Log does). The rendered lines carry their
+    # offsets, the selection is drawn over them, and ctrl+c (Screen.copy_text) gets the text.
+
+    def get_selection(self, selection: Selection) -> tuple[str, str] | None:
+        return selection.extract("\n".join(s.text.rstrip() for s in self.lines)), "\n"
+
+    def selection_updated(self, selection: Selection | None) -> None:
+        self._line_cache.clear()
+        self.refresh()
+
+    def _render_line(self, y: int, scroll_x: int, width: int) -> Strip:
+        if y >= len(self.lines):
+            return super()._render_line(y, scroll_x, width)
+        line = self.lines[y]
+        span = self.text_selection.get_span(y) if self.text_selection is not None else None
+        if span is not None:
+            start, end = span
+            end = line.cell_length if end == -1 else end
+            style = self.screen.get_component_rich_style("screen--selection")
+            if start < end:
+                line = Strip.join(
+                    [
+                        line.crop(0, start),
+                        line.crop(start, end).apply_style(style),
+                        line.crop(end, line.cell_length),
+                    ]
+                )
+        return line.crop_extend(scroll_x, scroll_x + width, self.rich_style).apply_offsets(
+            scroll_x, y
+        )

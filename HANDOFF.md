@@ -24,9 +24,16 @@ Written in the worktree `~/Projects/nixin-wt-branches`, cut from main @ 2688d11.
   --no-build` made the two merge commits with the clone on accent-surfaces and dirty;
   main checked out in another worktree → `branch-checked-out`; `prune --hub --dry-run`
   left the `mbp13` remote alone.
-- **Next**: PR 2 (the TUI/GUI pages; TUI page key: `b` is Plan on PendingScreen, pick
-  another, ctrl+7's legacy-terminal fallback); `merge` with the build, live; bump the
-  hub's nixin input.
+- **PR 2, branch `branches-ui`** (from `branches-verb`): ui/view.py branch helpers +
+  `copy_text`; TUI `tui/branches.py` (`g`, ctrl+7 / ctrl+_ fallback; `C` copies error +
+  log everywhere, RichLog selection); GUI BranchesPage/BranchRow/BranchMergeDialog/
+  BranchPruneDialog (Ctrl+7), LogView Copy button, selectable error text with Copy,
+  Ctrl+Shift+C. Built in parallel worktrees `branches-ui-tui` / `branches-ui-gui`, merged.
+- **Live**: `merge accent-surfaces feat/spotify-player-page` with the 19BK build ran on
+  the real ~/nixos (2026-11-12): main 61b685c -> 6749556, built in ~70 s.
+- **Next**: tests/tui_fake.py `LIVE` has no `branches` entry, so the merge's build tracker
+  and Stop are only wired, not exercised; the GUI log rows no longer drag-scroll (wheel and
+  scrollbar do); bump the hub's nixin input.
 - **How to test**: `nix develop -c pytest tests/test_branches.py`; by hand, read-only:
   `nixin branches --config ~/nixos`, `nixin branches merge A B --dry-run --config ~/nixos`.
 

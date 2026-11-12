@@ -10,13 +10,15 @@ reproducible): search, details, the add preview, plan, the apply confirmation,
 updates (lock, --published), the update confirmation; then the Options page: mbp13's
 openssh options, one in full, the Set dialog, its diff, Pending after the write, and a
 Home Manager option on 19BK; then the Try screen on the recorded `try` documents (a CLI
-program, a GUI app with its streamed fetch, the program picker; nothing is launched).
+program, a GUI app with its streamed fetch, the program picker; nothing is launched);
+then the Branches page on 19BK's recorded `branches` documents: the list with two
+branches ticked, the merge confirmation, and the merge's result with its build log.
 --live drives the real verb handlers instead (network for discovery, nix against
 --config): search, details with `where`, the `add --dry-run` preview, the Packages page
 (`list`, `outdated`), and the Options page (an option, the Set dialog and its `set
 --dry-run` diff; with --hm-host a Home Manager option there); it writes nothing (the diff
 modals are cancelled, `update` is never run). `--only options` takes only the Options
-part, --try only the Try shots. OUTDIR defaults to docs/tui.
+part, --try only the Try shots, --branches only the Branches shots. OUTDIR defaults to docs/tui.
 Files are named <size>-<step>.svg (live-<size>-<step>.svg with --live).
 """
 
@@ -147,6 +149,24 @@ async def options(size: str, outdir: Path) -> None:
         shot(app, outdir / f"{size}-18-option-hm.svg", "option: Home Manager")
 
 
+async def branches(size: str, outdir: Path) -> None:
+    from tui_fake import BRANCHES, FakeBackend
+
+    app = NixinApp(FakeBackend(dict(BRANCHES), host="19BK"))
+    async with app.run_test(size=SIZES[size]) as pilot:
+        await pilot.press("escape", "g")
+        await settle(app, pilot)
+        await pilot.press("space", "down", "space", "up", "up")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-22-branches.svg", "branches")
+        await pilot.press("m")
+        await settle(app, pilot)
+        shot(app, outdir / f"{size}-23-merge-confirm.svg", "branches: merge")
+        await pilot.press("m")
+        await settle(app, pilot, 0.3)
+        shot(app, outdir / f"{size}-24-merge-result.svg", "branches: merged")
+
+
 async def live_options(
     size: str, outdir: Path, host: str, config: str, query: str, option: str, value: str
 ) -> None:
@@ -234,6 +254,7 @@ def main() -> int:
     ap.add_argument("outdir", nargs="?", default=str(ROOT / "docs" / "tui"))
     ap.add_argument("--live", action="store_true")
     ap.add_argument("--try", dest="try_only", action="store_true", help="only the Try shots")
+    ap.add_argument("--branches", action="store_true", help="only the Branches shots")
     ap.add_argument("--config")
     ap.add_argument("--host", default=socket.gethostname())
     ap.add_argument("--query", default="cowsay")
@@ -251,6 +272,8 @@ def main() -> int:
     for size in SIZES:
         if a.try_only:
             asyncio.run(trying(size, out))
+        elif a.branches:
+            asyncio.run(branches(size, out))
         elif a.live:
             if a.only == "all":
                 asyncio.run(live(size, out, a.host, a.config, a.query, a.package))
@@ -266,6 +289,7 @@ def main() -> int:
             asyncio.run(options(size, out))
             if a.only == "all":
                 asyncio.run(trying(size, out))
+                asyncio.run(branches(size, out))
     return 0
 
 

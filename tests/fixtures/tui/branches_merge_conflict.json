@@ -1,0 +1,13 @@
+{
+  "ok": false,
+  "verb": "branches",
+  "host": "19BK",
+  "error": {
+    "code": "merge-conflict",
+    "message": "clash does not merge cleanly into main (after accent-surfaces): home/config/quickshell/bottom/Bar.qml. Nothing was changed; merge it by hand (git switch main && git merge clash) or rebase clash first",
+    "branch": "clash",
+    "files": [
+      "home/config/quickshell/bottom/Bar.qml"
+    ]
+  }
+}

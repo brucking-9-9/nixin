@@ -35,3 +35,7 @@ ClosureTable 1.0 ClosureTable.qml
 Card 1.0 Card.qml
 DangerButton 1.0 DangerButton.qml
 DialogFooter 1.0 DialogFooter.qml
+BranchesPage 1.0 BranchesPage.qml
+BranchRow 1.0 BranchRow.qml
+BranchMergeDialog 1.0 BranchMergeDialog.qml
+BranchPruneDialog 1.0 BranchPruneDialog.qml
