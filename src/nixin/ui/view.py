@@ -2129,3 +2129,220 @@ def browse_footer(doc: Doc) -> str:
     elif s.get("cached"):
         tag += " (cached)"
     return " · ".join([*bits, tag])
+
+
+# --- branches -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BranchRow:
+    """One branch of `branches`' list against the target (main)."""
+
+    name: str
+    where: str  # local | hub
+    state: str  # clean | conflict | merged
+    ahead: int
+    behind: int
+    files: int
+    age: str  # "15h", "6d"
+    subject: str
+    checked_out_in: str  # a worktree path, or ""
+    conflicts: tuple[str, ...]
+    file_list: tuple[str, ...]
+    commit: str
+
+    @property
+    def merged(self) -> bool:
+        return self.state == "merged"
+
+    @property
+    def mergeable(self) -> bool:
+        """What the page lets you tick for `merge`: unmerged and clean."""
+        return self.state == "clean"
+
+    @property
+    def style(self) -> str:
+        return {"clean": "accent", "conflict": "warn", "merged": "dim"}[self.state]
+
+    @property
+    def badge(self) -> str:
+        return self.state + ("" if self.where == "local" else " · hub")
+
+
+def _age_of(date: str | None, now: float | None = None) -> str:
+    import time
+    from datetime import datetime
+
+    try:
+        ts = datetime.fromisoformat(date).timestamp() if date else 0.0
+    except ValueError:
+        ts = 0.0
+    if not ts:
+        return "?"
+    days = ((now or time.time()) - ts) / 86400
+    return f"{max(days, 0) * 24:.0f}h" if days < 1 else f"{days:.0f}d"
+
+
+def branch_rows(doc: Doc, now: float | None = None) -> list[BranchRow]:
+    """`branches`' rows in its order: unmerged first (newest first), then the merged."""
+    out = []
+    for b in doc.get("branches") or []:
+        state = (
+            "merged"
+            if b.get("merged")
+            else "conflict"
+            if b.get("merges_clean") is False
+            else "clean"
+        )
+        out.append(
+            BranchRow(
+                str(b.get("name")),
+                str(b.get("where") or "local"),
+                state,
+                int(b.get("ahead") or 0),
+                int(b.get("behind") or 0),
+                int(b.get("files_total") or 0),
+                _age_of(b.get("date"), now),
+                str(b.get("subject") or ""),
+                str(b.get("checked_out_in") or ""),
+                tuple(b.get("conflicts") or ()),
+                tuple(b.get("files") or ()),
+                str(b.get("commit") or ""),
+            )
+        )
+    return out
+
+
+def branch_columns(width: int) -> list[Column]:
+    """branch · state · +/- · files · age · subject; narrow drops files, age and subject."""
+    if width < NARROW:  # 22 + 9 + 9 + three gaps of 2
+        return [
+            Column("name", "branch", max(12, width - 9 - 9 - 7)),
+            Column("badge", "state", 9),
+            Column("counts", "+/-", 9),
+        ]
+    return [  # 26 + 14 + 9 + 5 + 4 + five gaps of 2 = 68
+        Column("name", "branch", 26),
+        Column("badge", "state", 14),
+        Column("counts", "+/-", 9),
+        Column("files", "files", 5),
+        Column("age", "age", 4),
+        Column("subject", "last commit", max(10, width - 69)),
+    ]
+
+
+def branch_cells(r: BranchRow, columns: list[Column]) -> list[Span]:
+    values = {
+        "name": r.name,
+        "badge": r.badge,
+        "counts": f"+{r.ahead} -{r.behind}",
+        "files": str(r.files),
+        "age": r.age,
+        "subject": r.subject,
+    }
+    style = {"name": r.style, "badge": r.style}
+    return [Span(clip(values[c.key], c.width), style.get(c.key, "dim")) for c in columns]
+
+
+def branch_detail(r: BranchRow, into: str = "main") -> str:
+    """The text under the table for the selected branch (plain, copyable)."""
+    head = f"{r.name} ({r.where}) @ {short(r.commit)}: {r.ahead} commit(s) not in {into}, "
+    lines = [head + f"{r.behind} behind; last: {r.subject}"]
+    if r.merged:
+        lines.append(f"{into} contains it: prune deletes it")
+    elif r.conflicts:
+        lines.append("does not merge cleanly: " + ", ".join(r.conflicts))
+    if r.checked_out_in:
+        lines.append(f"checked out in {r.checked_out_in}")
+    if r.file_list:
+        more = r.files - len(r.file_list)
+        lines.append("files: " + ", ".join(r.file_list) + (f" (+{more})" if more > 0 else ""))
+    return "\n".join(lines)
+
+
+def branches_head(doc: Doc) -> str:
+    c = doc.get("counts") or {}
+    hub = f" · hub {doc['hub']}" if doc.get("hub") else ""
+    return (
+        f"against {doc.get('into')} @ {short(doc.get('into_head'))}{hub} · "
+        f"{c.get('unmerged', 0)} unmerged, {c.get('merged', 0)} merged"
+    )
+
+
+def merge_args(
+    names: list[str], *, build: bool = True, push: bool = False, dry: bool = False
+) -> list[str]:
+    args = ["merge", *names]
+    if not build:
+        args.append("--no-build")
+    if push:
+        args.append("--push")
+    if dry:
+        args.append("--dry-run")
+    return args
+
+
+def prune_args(*, hub: bool = False, dry: bool = False) -> list[str]:
+    return ["prune", *(["--hub"] if hub else []), *(["--dry-run"] if dry else [])]
+
+
+def merge_fields(doc: Doc) -> list[Field]:
+    dry = bool(doc.get("dry_run"))
+    moved = "(not moved: dry run)" if dry else short(doc.get("new"))
+    out = [Field("into", f"{doc.get('into')} {short(doc.get('old'))} → {moved}", "accent")]
+    for m in doc.get("merged") or []:
+        out.append(
+            Field(
+                "merged", f"{m['branch']}: {m['commits']} commit(s), {len(m['files'])} file(s)", ""
+            )
+        )
+    for s in doc.get("skipped") or []:
+        out.append(Field("skipped", f"{s['branch']}: {s['reason']}", "dim"))
+    b = doc.get("build")
+    if b:
+        out.append(Field("built", f"{b['host']}: {b['out']}", "dim"))
+    if doc.get("pushed"):
+        out.append(Field("pushed", f"{doc.get('hub')}/{doc.get('into')}", "dim"))
+    if doc.get("merged") and not dry:
+        out.append(Field("next", "Plan, then Apply (from the target branch)", "accent"))
+    out += [Field("warning", w, "warn") for w in doc.get("warnings") or []]
+    return out
+
+
+def prune_fields(doc: Doc) -> list[Field]:
+    verb = "would delete" if doc.get("dry_run") else "deleted"
+    out = [
+        Field(
+            verb,
+            f"{len(doc.get('deleted') or [])} branch(es); {doc.get('unmerged', 0)} unmerged kept",
+            "accent",
+        )
+    ]
+    for x in doc.get("deleted") or []:
+        out.append(Field(x["where"], f"{x['branch']} ({short(x['commit'])})", "dim"))
+    for x in doc.get("skipped") or []:
+        out.append(Field("kept", f"{x['branch']} ({x['where']}): {x['reason']}", "warn"))
+    out += [Field("warning", w, "warn") for w in doc.get("warnings") or []]
+    return out
+
+
+def copy_text(doc: Doc | None, log: str = "") -> str:
+    """What a "copy" puts on the clipboard: the error (code, message, the fields it
+    carries) or the message, then the log, so a failure can be pasted whole."""
+    parts = []
+    if doc:
+        err = doc.get("error")
+        if err:
+            parts.append(f"{doc.get('verb', 'nixin')}: {err.get('code')}: {err.get('message')}")
+            extra = {k: v for k, v in err.items() if k not in ("code", "message", "stderr")}
+            if extra:
+                import json
+
+                parts.append(json.dumps(extra, indent=2, default=str))
+            if err.get("stderr"):
+                parts.append(str(err["stderr"]).rstrip())
+        elif doc.get("message"):
+            parts.append(str(doc["message"]))
+    if log.strip():
+        parts.append(log.rstrip())
+    return "\n\n".join(parts)

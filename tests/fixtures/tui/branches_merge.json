@@ -1,0 +1,55 @@
+{
+  "build": {
+    "build_s": 5.45,
+    "drv": "/nix/store/qhg4cb0vwmzb4kdhq3q7pv02y6cblgr6-nixos-system-19BK-26.11.20261107.f4a03c0.drv",
+    "eval_s": 53.34,
+    "host": "19BK",
+    "out": "/nix/store/8608bwc99k2cg56vkhrjb5q7f4fypn8k-nixos-system-19BK-26.11.20261107.f4a03c0"
+  },
+  "dry_run": false,
+  "duration_s": 59.45,
+  "host": "19BK",
+  "hub": "origin",
+  "into": "main",
+  "merged": [
+    {
+      "branch": "accent-surfaces",
+      "commit": "0d48eb1d542cfdab756404e27feaa093f379f7b8",
+      "commits": 2,
+      "files": [
+        "configuration.nix",
+        "home/config/quickshell/bottom/Theme.qml",
+        "home/config/quickshell/bottom/TopCalendar.qml",
+        "home/modules/bar/quickshell-bottom.nix",
+        "home/modules/bar/wallpaper-accent-derive.py",
+        "home/modules/lock/hyprlock.nix",
+        "prochot.nix"
+      ],
+      "merge": "48832d7a40d60c440a53d19b6b55ea7c36fdc693"
+    },
+    {
+      "branch": "feat/spotify-player-page",
+      "commit": "ca8c432da02e6946e85fd70e1a1b2a5b43b89836",
+      "commits": 3,
+      "files": [
+        "home/config/niri/config.kdl",
+        "home/modules/terminal/spotify-player-player-page.patch",
+        "home/modules/terminal/spotify-player.nix"
+      ],
+      "merge": "e5fe645f89dc9c944338bdd39c1fa4b590e5808c"
+    }
+  ],
+  "new": "e5fe645f89dc9c944338bdd39c1fa4b590e5808c",
+  "ok": true,
+  "old": "61b685caf9e91681411d11c4b606eb07b9665e14",
+  "pushed": false,
+  "skipped": [],
+  "verb": "branches",
+  "warnings": [
+    "the workspace is on accent-surfaces, not main: `git switch main` before nixin apply (uncommitted changes come along)"
+  ],
+  "workspace": {
+    "branch": "accent-surfaces",
+    "path": "/home/brucking/nixos"
+  }
+}

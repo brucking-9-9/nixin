@@ -1,0 +1,12 @@
+[0/9 built] · 3s (eta 45s)
+building '/nix/store/n9ab66vjgf2jj8hrh3ndmf2dchbnl9p8-nixin-options-home.json.drv'
+building '/nix/store/ibni0ynqc81s6hcj99fiby9mknhrwg0j-home-manager-files.drv'
+building '/nix/store/hqr71jckzi120p0dwpsqvz51chp7f3fl-hm-putter.json.drv'
+building '/nix/store/i1k86p1m22h03ih51c7zfm53yn7bch2m-home-manager-generation.drv'
+building '/nix/store/wzrhv3rjm92mq3pjas15v0n43s5f1ml3-unit-home-manager-brucking.service.drv'
+building '/nix/store/26b5j96fx7hf293pnb7r9p39mdnr94wm-system-units.drv'
+[6/9 built] · 13s (eta 15s)
+building '/nix/store/hilk7dplc60yiv6xk640hj0sxd06pkf1-etc.drv'
+building '/nix/store/19v0ylih8hh3p5vk5qkn58zw0ifl07c5-activate.drv'
+building '/nix/store/qhg4cb0vwmzb4kdhq3q7pv02y6cblgr6-nixos-system-19BK-26.11.20261107.f4a03c0.drv'
+[9/9 built] · 16s

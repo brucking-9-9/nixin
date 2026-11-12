@@ -65,6 +65,19 @@ PACKAGES = {
 HOLDS = {**PACKAGES, "outdated": ["outdated_19BK", "outdated_19BK_holds"]}
 
 
+# the Branches page: 19BK's ~/nixos branches (recorded on a clone of it, 2026-11-12): the
+# list, then the list after merging accent-surfaces + feat/spotify-player-page
+BRANCHES = {
+    "branches": ["branches_19BK", "branches_19BK_merged"],
+    "branches merge --dry-run": "branches_merge_dry",
+    "branches merge": "branches_merge",
+    "branches merge clash": "branches_merge_conflict",
+    "branches prune --dry-run": "branches_prune_dry",
+    "branches prune": "branches_prune",
+    "status": "status_clean",
+}
+
+
 # the Options page: NixOS options on mbp13 (services.openssh.*, recorded against ~/nixos, the
 # writes in a throwaway clone of it) and Home Manager options on 19BK (programs.git.*, user
 # brucking, read-only against ~/nixos)

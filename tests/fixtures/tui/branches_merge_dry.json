@@ -1,0 +1,47 @@
+{
+  "build": null,
+  "dry_run": true,
+  "duration_s": 0.11,
+  "host": "19BK",
+  "hub": "origin",
+  "into": "main",
+  "merged": [
+    {
+      "branch": "accent-surfaces",
+      "commit": "0d48eb1d542cfdab756404e27feaa093f379f7b8",
+      "commits": 2,
+      "files": [
+        "configuration.nix",
+        "home/config/quickshell/bottom/Theme.qml",
+        "home/config/quickshell/bottom/TopCalendar.qml",
+        "home/modules/bar/quickshell-bottom.nix",
+        "home/modules/bar/wallpaper-accent-derive.py",
+        "home/modules/lock/hyprlock.nix",
+        "prochot.nix"
+      ],
+      "merge": null
+    },
+    {
+      "branch": "feat/spotify-player-page",
+      "commit": "ca8c432da02e6946e85fd70e1a1b2a5b43b89836",
+      "commits": 3,
+      "files": [
+        "home/config/niri/config.kdl",
+        "home/modules/terminal/spotify-player-player-page.patch",
+        "home/modules/terminal/spotify-player.nix"
+      ],
+      "merge": null
+    }
+  ],
+  "new": "61b685caf9e91681411d11c4b606eb07b9665e14",
+  "ok": true,
+  "old": "61b685caf9e91681411d11c4b606eb07b9665e14",
+  "pushed": false,
+  "skipped": [],
+  "verb": "branches",
+  "warnings": [],
+  "workspace": {
+    "branch": "accent-surfaces",
+    "path": "/home/brucking/nixos"
+  }
+}

@@ -31,12 +31,13 @@ from .. import cli
 from ..apply.proc import Cancel
 
 # verbs whose human mode streams a log worth showing (CONTRACT.md: the slow ones)
-STREAMING = frozenset({"plan", "apply", "try"})
+STREAMING = frozenset({"plan", "apply", "try", "branches"})  # branches: merge builds
 # verbs that read --config (discovery ignores it)
 CONFIG_VERBS = frozenset(
     {"status", "where", "list", "add", "rm", "set", "unset", "plan", "apply", "sync"}
     | {"outdated", "update", "try", "info"}  # info: the lock its AppStream lookup evaluates
     | {"pin", "unpin", "pins"}
+    | {"branches"}
 )
 
 

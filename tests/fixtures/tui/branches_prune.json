@@ -1,0 +1,75 @@
+{
+  "deleted": [
+    {
+      "branch": "accent-mono",
+      "commit": "44389187d6904da53e83bd9e2834f3ee03e5efbe",
+      "where": "local"
+    },
+    {
+      "branch": "feat/spotify-player-page",
+      "commit": "ca8c432da02e6946e85fd70e1a1b2a5b43b89836",
+      "where": "local"
+    },
+    {
+      "branch": "review/bar-qml",
+      "commit": "aeb72f07f753045ceb89ccae1a5a88cf0262f026",
+      "where": "local"
+    },
+    {
+      "branch": "accent-mono",
+      "commit": "44389187d6904da53e83bd9e2834f3ee03e5efbe",
+      "where": "hub"
+    },
+    {
+      "branch": "accent-derived-secondary",
+      "commit": "23aa10b7ae20b765b01ef02b19ffb00c9f3af1f2",
+      "where": "hub"
+    },
+    {
+      "branch": "mbp13/kiosk-trust-19bk",
+      "commit": "9be2aa1a07fab60b5da4cebd19311ef27954a16e",
+      "where": "hub"
+    },
+    {
+      "branch": "mbp13/kiosk-niri",
+      "commit": "9ac47bc9a63ed02d0aa35452533ff8f3fc9f1dea",
+      "where": "hub"
+    },
+    {
+      "branch": "mbp13/kiosk-niri-scripts",
+      "commit": "80382c88417b743e2018e60057d4ef4289083307",
+      "where": "hub"
+    },
+    {
+      "branch": "update/nixpkgs-0bb2eed",
+      "commit": "5d81a8614cb6dae2f61a26d973f3511e289ea109",
+      "where": "hub"
+    },
+    {
+      "branch": "nixin-bump",
+      "commit": "3b576bf2ca5e7252f004d65d532de5c6a57d5071",
+      "where": "hub"
+    }
+  ],
+  "dry_run": false,
+  "duration_s": 0.08,
+  "host": "19BK",
+  "hub": "origin",
+  "into": "main",
+  "ok": true,
+  "skipped": [
+    {
+      "branch": "accent-surfaces",
+      "reason": "the workspace has it checked out",
+      "where": "local"
+    },
+    {
+      "branch": "accent-surfaces",
+      "reason": "kept locally (above)",
+      "where": "hub"
+    }
+  ],
+  "unmerged": 1,
+  "verb": "branches",
+  "warnings": []
+}
