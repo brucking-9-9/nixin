@@ -67,7 +67,9 @@ Dialog {
         CheckBox {
             objectName: "pruneHub"
             text: "also on the hub (git push --delete for the hub's merged branches)"
-            checked: dlg.branches.pruneHub
+            Binding on checked {
+                value: dlg.branches.pruneHub
+            }
             enabled: dlg.phase === "confirm"
             onToggled: dlg.branches.setPruneHub(checked)
         }

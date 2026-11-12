@@ -1518,6 +1518,16 @@ def test_branches_tick_two_merge_confirm(ui):
     click(u, "tick-accent-surfaces")
     click(u, "tick-feat/spotify-player-page")
     click(u, "branch-accent-surfaces")  # selected: it stays so through the refresh
+    vm.toggle(1)  # the model drives the tick, after a click too
+    settle(u)
+    assert prop(u, "tick-kernel-7.3-port", "checked")
+    vm.toggle(1)
+    settle(u)
+    assert not prop(u, "tick-kernel-7.3-port", "checked")
+    click(u, "tick-accent-surfaces")
+    vm.toggle(0)
+    settle(u)
+    assert prop(u, "tick-accent-surfaces", "checked")
     assert vm["checked"] == ["accent-surfaces", "feat/spotify-player-page"]
     assert prop(u, "branchesMerge", "text") == "Merge selected (2)…"
     click(u, "branchesMerge")
@@ -1598,6 +1608,12 @@ def test_branches_prune_dry_run_then_prune(ui):
     } in rows
     click(u, "pruneHub")  # the dry run again, with --hub
     assert vm["pruneHub"] and u.fake.verbs()[-1] == ["branches", "prune", "--hub", "--dry-run"]
+    vm.cancelPrune()  # reopened: without --hub again, and the box says so
+    settle(u)
+    click(u, "branchesPrune")
+    assert not vm["pruneHub"] and not prop(u, "pruneHub", "checked")
+    click(u, "pruneHub")
+    assert vm["pruneHub"] and prop(u, "pruneHub", "checked")
     click(u, "pruneConfirm")
     assert not shown(u, "branchPruneDialog")
     assert u.fake.verbs()[-2:] == [["branches", "prune", "--hub"], ["branches"]]

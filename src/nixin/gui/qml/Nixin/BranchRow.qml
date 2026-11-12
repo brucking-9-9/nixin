@@ -59,7 +59,10 @@ Rectangle {
         anchors.leftMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         visible: row.mergeable
-        checked: row.checked
+        // an explicit Binding: a click's own write does not end it (Space toggles too)
+        Binding on checked {
+            value: row.checked
+        }
         focusPolicy: Qt.NoFocus
         ToolTip.visible: hovered
         ToolTip.text: "merge this one (Merge selected…)"
