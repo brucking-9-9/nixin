@@ -6,7 +6,8 @@ import QtQuick.Layouts
 
 // An error document as `code` + message, non-modal, over the bottom of the page: the
 // candidates to pick (ambiguous writes), the commands to copy, hints and files. Passing
-// messages (written, copied) go away by themselves.
+// messages (written, copied) go away by themselves. The message is selectable; Copy puts
+// the error document whole and its run's log on the clipboard.
 Rectangle {
     id: bar
 
@@ -37,8 +38,15 @@ Rectangle {
         interval: 5000
         onTriggered: bar.notice.dismiss()
     }
+    Timer {
+        id: copied
+        interval: 1500
+    }
     Connections {
         target: bar.notice
+        function onCopiesChanged() {
+            copied.restart();
+        }
         function onSerialChanged() {
             if (bar.notice.transient)
                 hide.restart();
@@ -67,15 +75,19 @@ Rectangle {
                 font.pixelSize: Theme.fontSize
                 font.bold: true
             }
-            Text {
+            TextEdit {
                 objectName: "noticeMessage"
                 Layout.fillWidth: true
+                Layout.maximumHeight: 6 * Theme.fontSize * 1.4  // about six lines; Copy has it all
+                clip: true
                 text: bar.notice.message
-                textFormat: Text.PlainText
-                wrapMode: Text.Wrap
-                maximumLineCount: 6
-                elide: Text.ElideRight
+                textFormat: TextEdit.PlainText
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.Wrap
                 color: Theme.fg
+                selectionColor: Theme.sel
+                selectedTextColor: Theme.fg
                 font.family: Theme.font
                 font.pixelSize: Theme.fontSize
             }
@@ -88,6 +100,16 @@ Rectangle {
                 font.pixelSize: Theme.small
                 elide: Text.ElideLeft
                 Layout.maximumWidth: bar.width * 0.3
+            }
+            Button {
+                objectName: "noticeCopyError"
+                visible: bar.notice.code !== ""
+                text: copied.running ? "Copied ✓" : "Copy"
+                flat: true
+                focusPolicy: Qt.NoFocus
+                ToolTip.visible: hovered
+                ToolTip.text: "copy the error whole (code, message, its fields, stderr) and the run's log · Ctrl+Shift+C"
+                onClicked: bar.notice.copyError()
             }
             Button {
                 objectName: "noticeDismiss"
@@ -142,7 +164,7 @@ Rectangle {
             }
             Button {
                 objectName: "noticeCopy"
-                text: "Copy"
+                text: copied.running ? "Copied ✓" : "Copy"
                 onClicked: bar.notice.copyCommands()
             }
         }

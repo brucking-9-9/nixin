@@ -132,14 +132,28 @@ Dialog {
                     font.pixelSize: Theme.fontSize
                     font.bold: true
                 }
-                Text {
+                TextEdit {
+                    objectName: "applyMessageText"
                     Layout.fillWidth: true
                     text: dlg.apply.noticeMessage
-                    textFormat: Text.PlainText
-                    wrapMode: Text.Wrap
+                    textFormat: TextEdit.PlainText
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
                     color: Theme.fg
+                    selectionColor: Theme.sel
+                    selectedTextColor: Theme.fg
                     font.family: Theme.font
                     font.pixelSize: Theme.fontSize
+                }
+                Button {
+                    objectName: "applyCopyError"
+                    Layout.alignment: Qt.AlignTop
+                    text: "Copy"
+                    focusPolicy: Qt.NoFocus
+                    ToolTip.visible: hovered
+                    ToolTip.text: "copy the error whole (code, message, its fields, stderr) and the apply's log"
+                    onClicked: dlg.apply.copyError()
                 }
             }
         }

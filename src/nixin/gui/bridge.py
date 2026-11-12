@@ -84,7 +84,7 @@ class VM(QObject):
         self._gui = gui
         self._s = copy.deepcopy(self.defaults)
         self._models: dict[str, Rows] = {k: Rows(keys, self) for k, keys in self.lists.items()}
-        self._models |= {k: LogModel(self) for k in self.logs}
+        self._models |= {k: LogModel(self, copier=self.copy) for k in self.logs}
 
     @property
     def gui(self) -> Gui:
@@ -110,6 +110,11 @@ class VM(QObject):
         assert isinstance(m, LogModel)
         return m
 
+    @Slot(str)
+    def copy(self, text: str) -> None:
+        """TEXT on the clipboard, and the "copied" notice (the root's copy)."""
+        (self._gui or self).copy(text)  # type: ignore[union-attr]
+
 
 # --- notice ---------------------------------------------------------------------------------
 
@@ -131,6 +136,7 @@ class NoticeVM(VM):
         "commands": "",
         "transient": False,
         "serial": 0,  # bumps on every new notice (QML restarts its hide timer)
+        "copies": 0,  # bumps on a copy while an error shows (its Copy says "Copied")
     }
     visible = state(bool, "visible", changed)
     code = state(str, "code", changed)
@@ -143,15 +149,18 @@ class NoticeVM(VM):
     commands = state(str, "commands", changed)
     transient = state(bool, "transient", changed)
     serial = state(int, "serial", changed)
+    copies = state(int, "copies", changed)
 
     def __init__(self, gui: Gui) -> None:
         super().__init__(gui)
         self._pick: Callable[[str], None] | None = None
+        self.doc: Doc | None = None  # the error document shown (its Copy copies it whole)
 
     def show(self, doc: Doc, context: str = "", pick: Callable[[str], None] | None = None) -> None:
         n = view.notice(doc)
         if n is None:
             return
+        self.doc = doc
         self._pick = pick if n.candidates else None
         cands = []
         items = list(n.items)
@@ -178,6 +187,7 @@ class NoticeVM(VM):
 
     def say(self, text: str, severity: str = "ok") -> None:
         self._pick = None
+        self.doc = None
         self.set(
             visible=True,
             code="",
@@ -206,6 +216,11 @@ class NoticeVM(VM):
     @Slot()
     def copyCommands(self) -> None:
         self.gui.copy(self["commands"])
+
+    @Slot()
+    def copyError(self) -> None:
+        """The error shown, whole (code, message, its fields, stderr) and its run's log."""
+        self.gui.copy_error(self.doc)
 
 
 # --- search ---------------------------------------------------------------------------------
@@ -1365,6 +1380,10 @@ class ApplyVM(VM, _Tracking):
         self.gui.copy(self["commands"])
 
     @Slot()
+    def copyError(self) -> None:
+        self.gui.copyLastError("apply")
+
+    @Slot()
     def close(self) -> None:
         if self["phase"] == "running":
             self.gui.notice.say("apply is running; it finishes on its own", "warn")
@@ -1951,6 +1970,311 @@ class PinsVM(VM):
         self.set(pinOpen=False)
 
 
+# --- branches -------------------------------------------------------------------------------
+
+
+class BranchesVM(VM, _Tracking):
+    """The Branches page: the config's branches against main (`branches`), ticked rows
+    merged into main through a confirm dialog (`branches merge A B`: built first, with its
+    log streaming and the build tracker, Stop stops the build), and Prune merged… (`branches
+    prune --dry-run` → the list in a dialog, `--hub` or not → `branches prune`). A merge or
+    a prune since: the list again, and status and the plan are stale (main moved)."""
+
+    changed = Signal()
+    defaults: ClassVar = {
+        "loading": False,
+        "head": "",
+        "note": "",
+        "noteStyle": "",
+        "selected": -1,
+        "detail": "",
+        "checked": [],  # the ticked branches, in the list's order
+        "merging": False,
+        "resultTitle": "",  # "merge" | "prune" | "merge --dry-run" …: the result's head
+        "resultNote": "",  # the run's error (code: message), under the result
+        "resultNoteStyle": "",
+        "mergeOpen": False,  # the merge confirm dialog
+        "mergeNames": [],
+        "mergeHost": "",
+        "pruneOpen": False,  # the prune dialog
+        "prunePhase": "",  # checking | confirm | pruning
+        "pruneHub": False,
+        "pruneCount": 0,  # what the dry run would delete
+        **TRACKING_STATE,
+    }
+    lists: ClassVar = {
+        "branches": models.BRANCH,
+        "result": models.FIELD,
+        "prune": models.FIELD,
+        **TRACKING_LISTS,
+    }
+    logs: ClassVar = ("log",)
+    loading = state(bool, "loading", changed)
+    head = state(str, "head", changed)
+    note = state(str, "note", changed)
+    noteStyle = state(str, "noteStyle", changed)
+    selected = state(int, "selected", changed)
+    detail = state(str, "detail", changed)
+    checked = state("QVariantList", "checked", changed)
+    merging = state(bool, "merging", changed)
+    resultTitle = state(str, "resultTitle", changed)
+    resultNote = state(str, "resultNote", changed)
+    resultNoteStyle = state(str, "resultNoteStyle", changed)
+    mergeOpen = state(bool, "mergeOpen", changed)
+    mergeNames = state("QVariantList", "mergeNames", changed)
+    mergeHost = state(str, "mergeHost", changed)
+    pruneOpen = state(bool, "pruneOpen", changed)
+    prunePhase = state(str, "prunePhase", changed)
+    pruneHub = state(bool, "pruneHub", changed)
+    pruneCount = state(int, "pruneCount", changed)
+    buildHead = state(str, "buildHead", changed)
+    buildPlace = state(str, "buildPlace", changed)
+    stepNote = state(str, "stepNote", changed)
+    stopEnabled = state(bool, "stopEnabled", changed)
+    stopLabel = state(str, "stopLabel", changed)
+    branches = model("branches")
+    result = model("result")
+    prune = model("prune")
+    log = model("log")
+    build = model("build")
+    tail = model("tail")
+
+    def __init__(self, gui: Gui) -> None:
+        super().__init__(gui)
+        self.doc: Doc | None = None
+        self.branch_rows: list[view.BranchRow] = []
+        self._selected_name = ""
+
+    def visit(self) -> None:
+        if self.doc is None:
+            self.load()
+
+    @Slot()
+    def load(self) -> None:
+        self.startBranches()
+
+    @Slot()
+    def startBranches(self) -> None:
+        self.set(loading=True)
+        self.gui.fetch(
+            "branches",
+            done=self._listed,
+            group="branches-list",
+            exclusive=True,
+            label="branches: the config's branches against main",
+            hint="git only (a merge-tree per branch): about a second",
+        )
+
+    def _listed(self, doc: Doc) -> None:
+        self.set(loading=False)
+        n = view.notice(doc)
+        if n is not None:
+            self.doc, self.branch_rows = None, []
+            self.rows("branches").reset([])
+            self.set(note=f"branches: {n.code}: {n.message}", noteStyle="error", head="")
+            return
+        self.doc = doc
+        self.branch_rows = view.branch_rows(doc)
+        names = {r.name for r in self.branch_rows if r.mergeable}
+        checked = [n for n in self["checked"] if n in names]
+        self.rows("branches").reset(models.branches(self.branch_rows, checked))
+        sel = next(  # the selected branch stays selected, wherever the refresh puts it
+            (i for i, r in enumerate(self.branch_rows) if r.name == self._selected_name), -1
+        )
+        self.set(
+            head=view.branches_head(doc),
+            note="" if self.branch_rows else "no branches besides the target",
+            noteStyle="dim",
+            checked=checked,
+            selected=sel if 0 <= sel < len(self.branch_rows) else -1,
+            detail=self._detail(sel),
+        )
+
+    def _detail(self, i: int) -> str:
+        if not 0 <= i < len(self.branch_rows) or self.doc is None:
+            return ""
+        return view.branch_detail(self.branch_rows[i], str(self.doc.get("into") or "main"))
+
+    @Slot(int)
+    def select(self, i: int) -> None:
+        """Click a row: its detail under the list; again: the detail closes."""
+        if not 0 <= i < len(self.branch_rows):
+            return
+        if i == self["selected"]:
+            self._selected_name = ""
+            self.set(selected=-1, detail="")
+        else:
+            self._selected_name = self.branch_rows[i].name
+            self.set(selected=i, detail=self._detail(i))
+
+    @Slot(int)
+    def toggle(self, i: int) -> None:
+        """Tick or untick a mergeable row for Merge selected…"""
+        if not 0 <= i < len(self.branch_rows) or not self.branch_rows[i].mergeable:
+            return
+        name = self.branch_rows[i].name
+        ticked = set(self["checked"]) ^ {name}
+        self.set(checked=[r.name for r in self.branch_rows if r.name in ticked])
+        self.rows("branches").set_row(i, checked=name in ticked)
+
+    # --- merge: the confirm dialog, then `branches merge NAMES` (built first, streamed)
+
+    @Slot()
+    def openMerge(self) -> None:
+        g = self.gui
+        if g["busy"]:
+            g.notice.say(f"wait: {g['busy']} is still running", "warn")
+            return
+        if not self["checked"]:
+            g.notice.say("tick the branches to merge first (clean ones only)", "info")
+            return
+        self.set(mergeOpen=True, mergeNames=list(self["checked"]), mergeHost=g.backend.host)
+
+    @Slot()
+    def cancelMerge(self) -> None:
+        self.set(mergeOpen=False)
+
+    @Slot(bool, bool)
+    def confirmMerge(self, build: bool, push: bool) -> None:
+        if self["mergeOpen"]:
+            self.set(mergeOpen=False)
+            self.startBranchMerge(list(self["mergeNames"]), build, push)
+
+    @Slot("QVariantList", bool, bool)
+    def startBranchMerge(self, names: list[str], build: bool, push: bool) -> None:
+        names = [str(n) for n in names]
+        if not names:
+            return
+        log = self.logmodel("log")
+        token = Cancel(watched=True)
+        started = self.gui.fetch(
+            "branches",
+            *view.merge_args(names, build=build, push=push),
+            done=lambda doc, n=names: self._merged(n, doc),
+            stream=True,
+            log=log,
+            busy="merging",
+            label=f"branches merge: {', '.join(names)}"
+            + (": building the result" if build else ""),
+            hint="a merge-tree per branch, then one build of the host (seconds when "
+            "nothing is new, minutes for new packages); Stop stops the build"
+            if build
+            else "git only: a second",
+            cancel=token,
+        )
+        if started:
+            log.clear()
+            self.rows("result").reset([])
+            self.set(
+                merging=True,
+                resultTitle=f"merge {' '.join(names)}",
+                resultNote="",
+                resultNoteStyle="",
+            )
+            self.track(token)
+
+    @Slot()
+    def stop(self) -> None:
+        self.stop_run()
+
+    def _merged(self, names: list[str], doc: Doc) -> None:
+        self.untrack()
+        self.set(merging=False)
+        n = view.notice(doc)
+        if n is not None:
+            self.rows("result").reset([])
+            self.set(
+                resultNote=f"merge: {n.code}: {n.message}",
+                resultNoteStyle="dim" if n.severity == "info" else "error",
+            )
+            self.gui.notice.show(doc, f"branches merge {' '.join(names)}")
+            return
+        self.rows("result").reset(models.fields(view.merge_fields(doc)))
+        if doc.get("merged") and not doc.get("dry_run"):
+            self.set(checked=[c for c in self["checked"] if c not in names])
+            self.gui.moved()
+            self.gui.notice.say(
+                f"merged into {doc.get('into')}: {', '.join(names)} · Pending: plan, apply", "ok"
+            )
+        self.load()
+
+    # --- prune: --dry-run → the dialog (hub or not) → prune
+
+    @Slot()
+    def openPrune(self) -> None:
+        g = self.gui
+        if g["busy"]:
+            g.notice.say(f"wait: {g['busy']} is still running", "warn")
+            return
+        self.rows("prune").reset([])
+        self.set(pruneOpen=True, prunePhase="checking", pruneHub=False, pruneCount=0)
+        self.startBranchPrune(False, True)
+
+    @Slot(bool)
+    def setPruneHub(self, hub: bool) -> None:
+        """The dialog's "also on the hub": the dry run again, with --hub or without."""
+        if self["pruneOpen"] and hub != self["pruneHub"]:
+            self.set(pruneHub=hub, prunePhase="checking")
+            self.startBranchPrune(hub, True)
+
+    @Slot(bool, bool)
+    def startBranchPrune(self, hub: bool, dry: bool) -> None:
+        started = self.gui.fetch(
+            "branches",
+            *view.prune_args(hub=hub, dry=dry),
+            done=lambda doc, h=hub, d=dry: self._pruned(h, d, doc),
+            group="branches-prune",
+            exclusive=True,
+            busy="" if dry else "pruning",
+            label=f"branches prune{' --hub' if hub else ''}{' --dry-run' if dry else ''}",
+            hint="git only: a second" + ("; the hub: a push" if hub and not dry else ""),
+        )
+        if started and not dry:
+            self.set(prunePhase="pruning")
+
+    @Slot()
+    def confirmPrune(self) -> None:
+        if self["pruneOpen"] and self["prunePhase"] == "confirm":
+            self.startBranchPrune(self["pruneHub"], False)
+
+    @Slot()
+    def cancelPrune(self) -> None:
+        if self["prunePhase"] == "pruning":
+            self.gui.notice.say("prune is running; it finishes on its own", "warn")
+            return
+        self.set(pruneOpen=False, prunePhase="")
+
+    def _pruned(self, hub: bool, dry: bool, doc: Doc) -> None:
+        n = view.notice(doc)
+        if dry:
+            if not self["pruneOpen"] or hub != self["pruneHub"]:
+                return
+            if n is not None:
+                self.set(pruneOpen=False, prunePhase="")
+                self.gui.notice.show(doc, "branches prune --dry-run")
+                return
+            self.rows("prune").reset(models.fields(view.prune_fields(doc)))
+            self.set(prunePhase="confirm", pruneCount=len(doc.get("deleted") or []))
+            return
+        self.set(pruneOpen=False, prunePhase="")
+        self.set(resultTitle="prune" + (" --hub" if hub else ""))
+        if n is not None:
+            self.rows("result").reset([])
+            self.set(resultNote=f"prune: {n.code}: {n.message}", resultNoteStyle="error")
+            self.gui.notice.show(doc, "branches prune" + (" --hub" if hub else ""))
+            return
+        self.rows("result").reset(models.fields(view.prune_fields(doc)))
+        self.set(resultNote="", resultNoteStyle="")
+        if doc.get("deleted"):
+            self.gui.moved()
+            self.gui.notice.say(f"pruned: {len(doc['deleted'])} branch(es)", "ok")
+        self.load()
+
+    @Slot()
+    def copyError(self) -> None:
+        self.gui.copyLastError("branches")
+
+
 # --- options --------------------------------------------------------------------------------
 
 
@@ -2442,7 +2766,7 @@ class Gui(VM):
         "host": "",
         "configLabel": "",
         "channel": "unstable",
-        "busy": "",  # writing | updating | planning | checking | applying | trying while one runs
+        "busy": "",  # writing | updating | planning | checking | applying | trying | merging | pruning
         "running": False,  # any verb is running
         "activity": "",  # the newest running verb, as the busy indicator says it
         "activityHint": "",
@@ -2481,6 +2805,9 @@ class Gui(VM):
         self._status_waiting: dict[bool, list[Callable[[Doc], None]]] = {}
         self._tokens: dict[str, int] = {}
         self._cancel: Cancel | None = None  # the busy run's stop token (plan, apply)
+        # the last error document of each verb and the log of its run (Copy, Ctrl+Shift+C)
+        self.errors: dict[str, tuple[Doc, str]] = {}
+        self.last_error: tuple[Doc, str] | None = None
         self._jobs: set[JobSignals] = set()
         self._acts: list[Activity] = []
         self._refused = 0.0
@@ -2499,6 +2826,7 @@ class Gui(VM):
             "status": StatusVM(self),
             "browse": BrowseVM(self),
             "pins": PinsVM(self),
+            "branches": BranchesVM(self),
         }
         from .trying import TryVM  # it subclasses VM, from this module
 
@@ -2536,6 +2864,7 @@ class Gui(VM):
     trying = area("trying")
     browse = area("browse")
     pins = area("pins")
+    branches = area("branches")
 
     # --- running verbs
 
@@ -2587,6 +2916,8 @@ class Gui(VM):
                 self._cancel = None
             if exclusive and self._tokens.get(key) != token:
                 return
+            if not doc.get("ok"):
+                self.remember_error(doc, log.text() if stream and log is not None else "")
             done(doc)
 
         signals.done.connect(finished)
@@ -2703,6 +3034,40 @@ class Gui(VM):
             self.pending.render_session()
             self.pending.render_plan()
 
+    def moved(self) -> None:
+        """Main moved (a branch merged) or branches went (a prune): status and the plan are
+        stale, as after a write, without counting as one of this session's writes."""
+        self._edits += 1
+        self.status_stale = True
+        self.plan_doc = None
+        self.pending.render_plan()
+        self.packages.stale()
+        if self["page"] == "pending":
+            self.pending.refresh()
+
+    def remember_error(self, doc: Doc, log: str = "") -> None:
+        entry = (doc, log)
+        self.errors[str(doc.get("verb") or "")] = entry
+        self.last_error = entry
+
+    def copy_error(self, doc: Doc | None) -> None:
+        """DOC (an error document) and the log of the run that answered it, as one text."""
+        if doc is None:
+            self.copyLastError()
+            return
+        log = next((lg for d, lg in self.errors.values() if d is doc), "")
+        self.copy(view.copy_text(doc, log))
+
+    @Slot()
+    @Slot(str)
+    def copyLastError(self, verb: str = "") -> None:
+        """The newest error (VERB's, when given) with its log on the clipboard."""
+        entry = self.errors.get(verb) if verb else self.last_error
+        if entry is None:
+            self.notice.say(f"no {verb + ' ' if verb else ''}error to copy", "info")
+            return
+        self.copy(view.copy_text(*entry))
+
     def farewell(self) -> str:
         return view.farewell(self.writes, self.applied, prog="nixin gui")
 
@@ -2710,10 +3075,13 @@ class Gui(VM):
 
     @Slot(str)
     def go(self, page: str) -> None:
-        if page not in ("search", "packages", "options", "pending", "status", "browse", "pins"):
+        pages = ("search", "packages", "options", "pending", "status", "browse", "pins", "branches")
+        if page not in pages:
             return
         self.set(page=page)
-        if page == "browse":
+        if page == "branches":
+            self.branches.visit()
+        elif page == "browse":
             self.browse.visit()
         elif page == "pins":
             self.pins.visit()
@@ -2735,14 +3103,20 @@ class Gui(VM):
 
     @Slot(str)
     def copy(self, text: str) -> None:
+        """TEXT on the clipboard. An error notice that is up stays (its Copy button says
+        "Copied" for a moment); otherwise a passing "copied" notice."""
         QGuiApplication.clipboard().setText(text)
-        self.notice.say("copied to the clipboard", "ok")
+        n = self.notice
+        if n["visible"] and not n["transient"] and n["code"]:
+            n.set(copies=n["copies"] + 1)
+        else:
+            n.say("copied to the clipboard", "ok")
 
     @Slot(result=bool)
     def mayQuit(self) -> bool:
         """Closing while a write, a plan or an apply runs takes a second try."""
         busy = self["busy"]
-        if busy in ("writing", "updating", "planning", "applying"):
+        if busy in ("writing", "updating", "planning", "applying", "merging", "pruning"):
             now = time.monotonic()
             if now - self._refused > QUIT_AGAIN:
                 self._refused = now
